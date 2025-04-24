@@ -278,9 +278,11 @@ Proof.
       * apply Hs.
     - apply A.
   + destruct A as (x, (Hx, A)).
-    assert ((bv_slt (bv_shl x s) (bv_shl (bv_shr (signed_min n) s) s)) = true).
-    - { admit. }
-    - { admit. }
+    assert (Hab: (bv_sle (bv_shl (bv_shr (signed_min n) s) s) (bv_shl x s)) = true). { admit. }
+    assert (trans : forall (a b c : bitvector), bv_sle a b = true -> bv_slt b c = true -> bv_slt a c = true) by admit.
+   now apply (@trans (bv_shl (bv_shr (signed_min n) s) s)
+                  (bv_shl x s)
+                  t).
 Admitted.
 
 (*------------------------------------------------------------*)
