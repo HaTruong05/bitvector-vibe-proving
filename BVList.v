@@ -84,17 +84,21 @@ Module Type BITVECTOR.
   Parameter bv_mult   : forall n, bitvector n -> bitvector n -> bitvector n.
   Parameter bv_ult    : forall n, bitvector n -> bitvector n -> bool.
   Parameter bv_slt    : forall n, bitvector n -> bitvector n -> bool.
-  Parameter bv_ule   : forall n, bitvector n -> bitvector n -> bool.
+  Parameter bv_ule    : forall n, bitvector n -> bitvector n -> bool.
+  Parameter bv_sle    : forall n, bitvector n -> bitvector n -> bool.
   Parameter bv_uge    : forall n, bitvector n -> bitvector n -> bool.
+  Parameter bv_sge    : forall n, bitvector n -> bitvector n -> bool.
+  Parameter bv_ugt    : forall n, bitvector n -> bitvector n -> bool.
+  Parameter bv_sgt    : forall n, bitvector n -> bitvector n -> bool.
 
   Parameter bv_ultP   : forall n, bitvector n -> bitvector n -> Prop.
   Parameter bv_sltP   : forall n, bitvector n -> bitvector n -> Prop.
   Parameter bv_uleP   : forall n, bitvector n -> bitvector n -> Prop.
+  Parameter bv_sleP   : forall n, bitvector n -> bitvector n -> Prop.
   Parameter bv_ugeP   : forall n, bitvector n -> bitvector n -> Prop.
-
-  Parameter bv_ugt    : forall n, bitvector n -> bitvector n -> bool.
-
+  Parameter bv_sgeP   : forall n, bitvector n -> bitvector n -> Prop.
   Parameter bv_ugtP   : forall n, bitvector n -> bitvector n -> Prop.
+  Parameter bv_sgtP   : forall n, bitvector n -> bitvector n -> Prop.
 
   Parameter bv_shl    : forall n, bitvector n -> bitvector n -> bitvector n.
   Parameter bv_shr    : forall n, bitvector n -> bitvector n -> bitvector n.
@@ -183,16 +187,23 @@ Parameter bv_subt'   : bitvector -> bitvector -> bitvector.
 Parameter bv_ult     : bitvector -> bitvector -> bool.
 Parameter bv_slt     : bitvector -> bitvector -> bool.
 Parameter bv_ule     : bitvector -> bitvector -> bool.
-Parameter bv2nat_a   : bitvector -> nat.
+Parameter bv_sle     : bitvector -> bitvector -> bool.
+Parameter bv_ugt     : bitvector -> bitvector -> bool.
+Parameter bv_sgt     : bitvector -> bitvector -> bool.
 Parameter bv_uge     : bitvector -> bitvector -> bool.
-Parameter bv_ugeP    : bitvector -> bitvector -> Prop.
+Parameter bv_sge     : bitvector -> bitvector -> bool.
+Parameter bv2nat_a   : bitvector -> nat.
+
 
 Parameter bv_ultP    : bitvector -> bitvector -> Prop.
 Parameter bv_sltP    : bitvector -> bitvector -> Prop.
 Parameter bv_uleP    : bitvector -> bitvector -> Prop.
-
-Parameter bv_ugt     : bitvector -> bitvector -> bool.
+Parameter bv_sleP    : bitvector -> bitvector -> Prop.
 Parameter bv_ugtP    : bitvector -> bitvector -> Prop.
+Parameter bv_sgtP    : bitvector -> bitvector -> Prop.
+Parameter bv_ugeP    : bitvector -> bitvector -> Prop.
+Parameter bv_sgeP    : bitvector -> bitvector -> Prop.
+
 
 Parameter bv_shl     : bitvector -> bitvector -> bitvector.
 Parameter bv_shr     : bitvector -> bitvector -> bitvector.
@@ -340,11 +351,17 @@ Module RAW2BITVECTOR (M:RAWBITVECTOR) <: BITVECTOR.
 
   Definition bv_sltP n (bv1 bv2:bitvector n) := M.bv_sltP bv1 bv2.
 
-  Definition bv_ugtP n (bv1 bv2:bitvector n) := M.bv_ugtP bv1 bv2.
-
   Definition bv_uleP n (bv1 bv2:bitvector n) := M.bv_uleP bv1 bv2.
 
+  Definition bv_sleP n (bv1 bv2:bitvector n) := M.bv_sleP bv1 bv2.
+
+  Definition bv_ugtP n (bv1 bv2:bitvector n) := M.bv_ugtP bv1 bv2.
+
+  Definition bv_sgtP n (bv1 bv2:bitvector n) := M.bv_sgtP bv1 bv2.
+
   Definition bv_ugeP n (bv1 bv2:bitvector n) := M.bv_ugeP bv1 bv2.
+
+  Definition bv_sgeP n (bv1 bv2:bitvector n) := M.bv_sgeP bv1 bv2.
 
   Definition bv_and n (bv1 bv2:bitvector n) : bitvector n :=
     @MkBitvector n (M.bv_and bv1 bv2) (M.bv_and_size (wf bv1) (wf bv2)).
@@ -371,11 +388,17 @@ Module RAW2BITVECTOR (M:RAWBITVECTOR) <: BITVECTOR.
 
   Definition bv_slt n (bv1 bv2:bitvector n) : bool := M.bv_slt bv1 bv2.
 
-  Definition bv_ugt n (bv1 bv2:bitvector n) : bool := M.bv_ugt bv1 bv2.
-
   Definition bv_ule n (bv1 bv2:bitvector n) : bool := M.bv_ule bv1 bv2. 
 
+  Definition bv_sle n (bv1 bv2:bitvector n) : bool := M.bv_sle bv1 bv2. 
+
+  Definition bv_ugt n (bv1 bv2:bitvector n) : bool := M.bv_ugt bv1 bv2.
+
+  Definition bv_sgt n (bv1 bv2:bitvector n) : bool := M.bv_sgt bv1 bv2.
+
   Definition bv_uge n (bv1 bv2:bitvector n) : bool := M.bv_uge bv1 bv2.
+
+  Definition bv_sge n (bv1 bv2:bitvector n) : bool := M.bv_sge bv1 bv2.
 
   Definition bv2nat_a n (bv1: bitvector n) : nat := M.bv2nat_a bv1.
 
@@ -1131,6 +1154,31 @@ Definition bv_sltP (a b : bitvector) : Prop :=
   if @size a =? @size b then slt_listP a b else False.
 
 
+(* signed less than or equal to *)
+Definition sle_list_big_endian (x y: list bool) :=
+  match x, y with
+    | nil, nil  => true
+    | nil, _ => false 
+    | _, nil => false
+    | xi :: x', yi :: y' =>
+      orb (andb (Bool.eqb xi yi) (ule_list_big_endian x' y'))
+          (andb xi (negb yi))
+  end.
+
+(* bool output *)
+Definition sle_list (x y: list bool) :=
+  sle_list_big_endian (List.rev x) (List.rev y).
+
+Definition bv_sle (a b : bitvector) : bool :=
+  if @size a =? @size b then sle_list a b else false.
+
+(* Prop output *)
+Definition sle_listP (x y: list bool) :=
+  if sle_list x y then True else False.
+
+Definition bv_sleP (a b : bitvector) : Prop :=
+  if @size a =? @size b then sle_listP a b else False.
+
 (* greater than *)
 
 (* unsigned greater than *)
@@ -1157,6 +1205,32 @@ Definition ugt_listP (x y: list bool) :=
 
 Definition bv_ugtP (a b : bitvector) : Prop :=
   if @size a =? @size b then ugt_listP a b else False.
+
+(* signed greater than *)
+
+Definition sgt_list_big_endian (x y: list bool) :=
+  match x, y with
+    | nil, _  => false
+    | _ , nil => false
+    | xi :: nil, yi :: nil => andb (negb xi) yi
+    | xi :: x', yi :: y' =>
+      orb (andb (Bool.eqb xi yi) (ugt_list_big_endian x' y'))
+          (andb (negb xi) yi)
+  end.
+
+(* bool output *)
+Definition sgt_list (x y: list bool) :=
+  sgt_list_big_endian (List.rev x) (List.rev y).
+
+Definition bv_sgt (a b : bitvector) : bool :=
+  if @size a =? @size b then sle_list a b else false.
+
+(* Prop output *)
+Definition sgt_listP (x y: list bool) :=
+  if slt_list x y then True else False.
+
+Definition bv_sgtP (a b : bitvector) : Prop :=
+  if @size a =? @size b then slt_listP a b else False.
 
 
 
@@ -5836,6 +5910,32 @@ Proof.
   apply bv_uleP_bv_ugeP. apply (@bv_uleP_trans b3 b2 b1 H0 H).
 Qed.
 
+(* signed greater than or equal to *)
+
+Definition sge_list_big_endian (x y: list bool) :=
+  match x, y with
+    | nil, nil  => true
+    | nil, _ => false 
+    | _, nil => false
+    | xi :: x', yi :: y' =>
+      orb (andb (Bool.eqb xi yi) (uge_list_big_endian x' y'))
+          (andb (negb xi) yi)
+  end.
+
+(* bool output *)
+Definition sge_list (x y: list bool) :=
+  sge_list_big_endian (List.rev x) (List.rev y).
+
+Definition bv_sge (a b : bitvector) : bool :=
+  if @size a =? @size b then sge_list a b else false.
+
+(* Prop output *)
+Definition sge_listP (x y: list bool) :=
+  if sge_list x y then True else False.
+
+Definition bv_sgeP (a b : bitvector) : Prop :=
+  if @size a =? @size b then sge_listP a b else False.
+
 
 (* Shift Right (Logical) *)
 
@@ -8814,6 +8914,37 @@ Proof.
     - now right.
     - now left.
 Qed.
+
+
+(* signed_min (size x) <=s x *)
+
+Lemma smin_sle_big_endian : forall (x : bitvector),
+  (sle_list_big_endian (smin_big_endian (length x)) x) = true.
+Proof.
+  intro x.
+  destruct x.
+  + reflexivity.
+  + simpl.
+    rewrite ule_list_big_endian_0.
+    destruct b.
+    - reflexivity.
+    - reflexivity.
+Qed.
+
+Lemma signed_min_sle : forall (x : bitvector),
+  (bv_sle (signed_min (size x)) x) = true.
+Proof.
+  intro x.
+  unfold bv_sle.
+  rewrite signed_min_size, N.eqb_refl.
+  unfold sle_list, signed_min.
+  rewrite rev_involutive.
+  unfold size.
+  rewrite Nat2N.id.
+  rewrite <- length_rev.
+  apply smin_sle_big_endian.
+Qed.
+
 
 
 End RAWBITVECTOR_LIST.
