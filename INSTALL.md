@@ -4,8 +4,9 @@ Installation of packages necessary to check proofs of invertibility conditions i
 ## Requirements
 - The library is designed to work on computers equipped with a POSIX (Unix or a clone) operating system. It is known to work under GNU/Linux (i386 and amd64) and Mac OS X.
 
-- [Coq 8.17.0](https://github.com/coq/coq/tree/v8.17)
+- [Coq 8.20.0](https://github.com/coq/coq/tree/v8.20)
 
+- [Coqhammer](https://github.com/lukaszcz/coqhammer)
 
 ## Installation of Packages using opam
 
@@ -30,7 +31,7 @@ eval `opam config env`
 
 (this is not necessary if you start another session in your shell).
 
-You need to have OCaml version >= 4.11.1 and Coq version 8.16.1.
+You need to have OCaml version >= 4.11.1 and Coq version 8.20.0.
 
 > **Warning**: The version of Coq that you plan to use must have been compiled
 > with the same version of OCaml that you are going to use to compile
@@ -47,19 +48,28 @@ opam switch create frocos23 ocaml-base-compiler.4.11.1
 
 ### Install Coq
 
-After OCaml is installed, you can install Coq-8.16.1 through opam.
+After OCaml is installed, you can install Coq-8.20.0 through opam.
 
 ```bash
-opam install coq.8.17.0
+opam install coq.8.20.0
 ```
 
 If you also want to install CoqIDE at the same time you can do
 
 ```bash
-opam install coq.8.17.0 coqide.8.17.0
+opam install coq.8.20.0 coqide.8.20.0
 ```
 but you might need to install some extra packages and libraries for your system
 (such as GTK2, gtksourceview2, etc.).
+
+
+### Install CoqHammer
+
+You can install CoqHammer through opam:
+
+```bash
+opam install coqhammer
+```
 
 
 ## Install BVList and IC Proofs
