@@ -278,12 +278,27 @@ Proof.
       * apply Hs.
     - apply A.
   + destruct A as (x, (Hx, A)).
-    assert (Hab: (bv_sle (bv_shl (bv_shr (signed_min n) s) s) (bv_shl x s)) = true). { admit. }
-    assert (trans : forall (a b c : bitvector), bv_sle a b = true -> bv_slt b c = true -> bv_slt a c = true) by admit.
-   now apply (@trans (bv_shl (bv_shr (signed_min n) s) s)
-                  (bv_shl x s)
-                  t).
-Admitted.
+    assert ((bv_sle (bv_shl (bv_shr (signed_min n) s) s) (bv_shl x s)) = true).
+    { case_eq (Nat.leb (N.to_nat n) (list2nat_be_a (bits s))); intro.
+      - rewrite !(@shl_ge_size n).
+        * apply bv_sle_refl.
+        * apply Hx.
+        * apply Hs.
+        * apply H.
+        * apply bv_shr_size.
+          ++ apply signed_min_size.
+          ++ apply Hs.
+        * apply Hs.
+        * apply H.
+      - rewrite shl_shr_signed_min.
+        * replace n with (size (bv_shl x s)).
+          ++ apply signed_min_sle.
+          ++ now apply bv_shl_size.
+        * apply Hs.
+        * apply H.
+    }
+    now apply (@bv_sle_slt_trans (bv_shl (bv_shr (signed_min n) s) s) (bv_shl x s) t).
+Qed.
 
 (*------------------------------------------------------------*)
 
