@@ -622,7 +622,22 @@ Theorem bvashr_slt : forall (n : N), forall (s t : bitvector),
     (bv_slt (bv_ashr (signed_min n) s) t = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_ashr x s) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split; intro A.
+  + exists (signed_min n). split.
+    - apply signed_min_size.
+    - apply A.
+  + destruct A as (x, (Hx, A)).
+    assert ((bv_sle (bv_ashr (signed_min n) s) (bv_ashr x s)) = true).
+    { apply (@sle_ashr n).
+      + apply signed_min_size.
+      + apply Hx.
+      + apply Hs.
+      + rewrite <- Hx.
+        apply signed_min_sle.
+    }
+    now apply (@bv_sle_slt_trans (bv_ashr (signed_min n) s) (bv_ashr x s) t).
+Qed.
 
 (*------------------------------------------------------------*)
 

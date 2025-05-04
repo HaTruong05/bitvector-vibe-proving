@@ -9382,6 +9382,177 @@ Proof.
   + apply Hx.
 Qed.
 
+(* x <=s y => x <<a z <=s y <<a z *)
+
+Lemma ule_list_big_endian_app_bool : forall (n : nat) (b b0 : bool) (x y: list bool),
+  length x = length y ->
+  (ule_list_big_endian (x ++ [b]) (y ++ [b0])) = true ->
+  (ule_list_big_endian x y) = true.
+Proof.
+  induction x.
+  + now destruct y.
+  + destruct y.
+    - discriminate.
+    - simpl.
+      intros.
+      apply orb_true_intro.
+      apply orb_prop in H0.
+      destruct H0.
+      * left.
+        apply andb_true_intro.
+        apply andb_prop in H0.
+        destruct H0.
+        split.
+        ++ apply H0.
+        ++ injection H.
+           intro.
+           now apply (@IHx y).
+      * now right.
+Qed.
+
+Lemma sle_list_big_endian_last : forall (b b0 : bool) (x y : list bool),
+  length x = length y ->
+  sle_list_big_endian (x ++ [b]) (y ++ [b0]) = true ->
+  sle_list_big_endian ([last (b :: rev x) false] ++ x)
+  ([last (b0 :: rev y) false] ++ y) = true.
+Proof.
+  intros.
+  destruct x.
+  + now destruct y.
+  + destruct y.
+    - discriminate.
+    - assert ((last (b :: rev (b1 :: x)) false) = b1).
+      {
+       now rewrite <- (@last_app bool (b :: rev x) b1 false) at 2.
+      }
+      assert ((last (b0 :: rev (b2 :: y)) false) = b2).
+      {
+       now rewrite <- (@last_app bool (b0 :: rev y) b2 false) at 2.
+      }
+      rewrite H1, H2.
+      simpl in H0.
+      apply orb_true_intro.
+      apply orb_prop in H0.
+      destruct H0.
+      * left.
+        apply andb_true_intro.
+        apply andb_prop in H0.
+        destruct H0.
+        split.
+        ++ apply H0.
+        ++ apply orb_true_intro.
+           left.
+           apply andb_true_intro.
+           split.
+           -- apply H0.
+           -- apply (@ule_list_big_endian_app_bool (length x) b b0).
+              ** simpl in H.
+                 now injection H.
+              ** apply H3.
+      * now right.
+Qed.
+
+Lemma sle_list_ashr_one_bit : forall (n : nat) (x y : list bool),
+  length x = length y ->
+  sle_list x y = true -> sle_list (ashr_one_bit x (last x false))
+  (ashr_one_bit y (last y false)) = true.
+Proof.
+  unfold sle_list.
+  intros.
+  destruct x.
+  + destruct y.
+    - easy.
+    - assert (rev (b :: y) <> []).
+      {
+       simpl.
+       now destruct (rev y).
+      }
+      now destruct (rev (b :: y)).
+  + destruct y.
+    - assert (rev (b :: x) <> []).
+      {
+       simpl.
+       now destruct (rev x).
+      }
+      now destruct (rev (b :: x)).
+    - unfold ashr_one_bit.
+      rewrite !rev_app_distr.
+      rewrite <- (@rev_involutive bool x) at 1.
+      rewrite <- (@rev_involutive bool y) at 1.
+      apply (@sle_list_big_endian_last b b0 (rev x) (rev y)).
+      * rewrite !length_rev.
+        simpl in H.
+        now injection H.
+      * apply H0.
+Qed.
+
+Lemma last_ashr_one_bit : forall (x : list bool),
+  ((last (ashr_one_bit x (last x false)) false) = last x false).
+Proof.
+  induction x.
+  + easy.
+  + unfold ashr_one_bit.
+    now rewrite last_app.
+Qed.
+
+Lemma last_ashr_n_bits : forall (m : nat) (x : list bool),
+  ((last (ashr_n_bits x m (last x false)) false) = last x false).
+Proof.
+  induction m.
+  + easy.
+  + intros.
+    simpl.
+    rewrite <- (@last_ashr_one_bit x) at 2.
+    rewrite (@IHm (ashr_one_bit x (last x false))).
+    now apply last_ashr_one_bit.
+Qed.
+
+Lemma sle_list_ashr_n_bits : forall (n m : nat) (x y : list bool),
+  length x = n -> length y = n ->
+  sle_list x y = true -> sle_list (ashr_n_bits x m (last x false))
+  (ashr_n_bits y m (last y false)) = true.
+Proof.
+  intros.
+  induction m.
+  + easy.
+  + simpl.
+    rewrite !ashr_n_ashr_one_comm.
+    rewrite <- (@last_ashr_n_bits m x) at 2.
+    rewrite <- (@last_ashr_n_bits m y) at 2.
+    apply (@sle_list_ashr_one_bit n).
+    - rewrite (@length_ashr_n_bits m x (last x false)).
+      rewrite (@length_ashr_n_bits m y (last y false)).
+      now rewrite H, H0.
+    - apply IHm.
+Qed.
+
+Lemma sle_ashr : forall (n : N) (x y z : bitvector),
+  size x = n -> size y = n -> size z = n -> 
+  bv_sle x y = true -> bv_sle (bv_ashr x z) (bv_ashr y z) = true.
+Proof.
+  intros.
+  unfold bv_sle.
+  rewrite (@bv_ashr_size n x z).
+  rewrite (@bv_ashr_size n y z).
+  + rewrite N.eqb_refl.
+    unfold bv_sle in H2.
+    rewrite H, H0, N.eqb_refl in H2.
+    unfold bv_ashr.
+    rewrite H, H0, H1, N.eqb_refl.
+    unfold ashr_aux.
+    apply (@sle_list_ashr_n_bits (N.to_nat n) (list2nat_be_a z)).
+    - rewrite <- Nat2N.id at 1.
+      now f_equal.
+    - rewrite <- Nat2N.id at 1.
+      now f_equal.
+    - apply H2.
+  + easy.
+  + easy.
+  + easy.
+  + easy.
+Qed.
+
+
 
 
 End RAWBITVECTOR_LIST.
