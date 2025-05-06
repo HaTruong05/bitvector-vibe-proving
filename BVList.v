@@ -9120,7 +9120,26 @@ Proof.
   + now rewrite H.
 Qed.
 
-(*x <= x*)
+(* x <= y => y <= z => x <= z *)
+Lemma sle_list_big_endian_trans : forall (x y z : bitvector),
+  sle_list_big_endian x y = true ->
+  sle_list_big_endian y z = true ->
+  sle_list_big_endian x z = true.
+Proof.
+  intros.
+  apply sle_list_big_endian_implies_slt_list_big_endian_or_eq in H.
+  destruct H.
+  + apply sle_list_big_endian_implies_slt_list_big_endian_or_eq in H0.
+    apply slt_list_big_endian_or_eq_implies_sle_list_big_endian.
+    destruct H0.
+    - left.
+      now apply (@slt_list_big_endian_trans x y z).
+    - left.
+      now rewrite <- H0.
+  + now rewrite H.
+Qed.
+
+(* x <= x *)
 Lemma sle_list_big_endian_refl : forall (b : list bool), 
    sle_list_big_endian b b = true.
 Proof.
@@ -9142,6 +9161,66 @@ Proof.
   induction (rev b).
   + easy.
   + rewrite (@sle_list_big_endian_refl (a :: l)). easy.
+Qed.
+
+(* x < y <=> ~ (y <= x) *)
+Lemma ult_negb_ule_list_big_endian : forall (x y : list bool),
+  length x = length y ->
+  ult_list_big_endian x y = negb (ule_list_big_endian y x).
+Proof.
+  intros.
+  case_eq (ult_list_big_endian x y); intro.
+  + case_eq (ule_list_big_endian y x); intro.
+    - apply ult_big_endian_implies_not_uge_big_endian in H0.
+      apply ule_list_big_endian_uge_list_big_endian in H1.
+      now rewrite H1 in H0.
+    - easy.
+  + case_eq (ule_list_big_endian y x); intro.
+    - easy.
+    - apply not_ult_list_big_endian_implies_uge_list_big_endian in H0.
+      * apply uge_list_big_endian_ule_list_big_endian in H0.
+        now rewrite H1 in H0.
+      * unfold size.
+        now f_equal.
+Qed.
+
+Lemma slt_negb_sle_list_big_endian : forall (x y : list bool),
+  length x = length y ->
+  slt_list_big_endian x y = negb (sle_list_big_endian y x).
+Proof.
+  intros.
+  rewrite slt_list_big_endian_equiv.
+  destruct x.
+  + now destruct y.
+  + destruct y.
+    - easy.
+    - simpl.
+      rewrite ult_negb_ule_list_big_endian.
+      * destruct b.
+        ++ destruct b0.
+           -- now destruct (ule_list_big_endian y x).
+           -- now destruct (ule_list_big_endian y x).
+        ++ destruct b0.
+           -- now destruct (ule_list_big_endian y x).
+           -- now destruct (ule_list_big_endian y x).
+      * simpl in H.
+        now injection H.
+Qed.
+
+Lemma bv_slt_negb_sle : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  bv_slt x y = negb (bv_sle y x).
+Proof.
+  intros.
+  unfold bv_slt, bv_sle.
+  rewrite H, H0.
+  rewrite N.eqb_refl.
+  unfold slt_list, sle_list.
+  apply slt_negb_sle_list_big_endian.
+  rewrite !length_rev.
+  rewrite <- H0 in H.
+  unfold size in H.
+  now apply Nat2N.inj.
 Qed.
 
 (* signed_min (size x) <= x *)
@@ -9171,96 +9250,37 @@ Proof.
 Qed.
 
 (* y >= size (x) => y << x = 0 *)
-Lemma shl_n_bits_le_length: forall (k n : nat) (x : list bool),
-  length x = n ->
-  (k <= n)%nat ->
-  shl_n_bits x k = (mk_list_false k) ++ (firstn (n - k) x).
-Proof.
-  intros.
-  induction k.
-  + rewrite app_nil_l.
-    rewrite Nat.sub_0_r.
-    rewrite <- H.
-    symmetry.
-    apply firstn_all.
-  + pose proof H0.
-    apply le_S in H1.
-    apply le_S_n in H1.
-    apply IHk in H1.
-    simpl.
-    rewrite shl_n_shl_one_comm.
-    rewrite H1.
-    rewrite shl_one_bit_app;
-    apply (@f_equal (list bool) nat (@length bool)) in H1;
-    rewrite length_shl_n_bits in H1;
-    rewrite length_app in H1;
-    rewrite length_mk_list_false in H1.
-    * rewrite removelast_firstn_len.
-      rewrite firstn_length_le.
-      ++ f_equal.
-         f_equal.
-         rewrite firstn_firstn.
-         f_equal.
-         rewrite Nat.min_l.
-         -- symmetry.
-            apply Nat.sub_succ_r.
-         -- now apply Nat.le_le_pred.
-      ++ rewrite H.
-         apply Nat.le_sub_l.
-   * intro.
-     apply (@f_equal (list bool) nat (@length bool)) in H2.
-     rewrite H2 in H1.
-     simpl in H1.
-     rewrite Nat.add_0_r in H1.
-     rewrite H in H1.
-     rewrite H1 in H0.
-     now apply Nat.nle_succ_diag_l in H0.
-Qed.
-
-Lemma shl_n_bits_ge_length : forall (n m : nat) (x : list bool),
-  length x = n -> Nat.leb n m = true ->
-  shl_n_bits x m = mk_list_false n.
-Proof.
-  intros.
-  rewrite <- (@Nat.sub_add n m).
-  + induction (m - n)%nat.
-    - rewrite Nat.add_0_l.
-      rewrite (@shl_n_bits_le_length n n x).
-      * rewrite Nat.sub_diag.
-        rewrite firstn_O.
-        apply app_nil_r.
-      * apply H.
-      * apply Nat.le_refl.
-    - simpl.
-      rewrite shl_n_shl_one_comm.
-      rewrite IHn0.
-      rewrite <- H.
-      apply shl_one_bit_all_false.
-  + now apply Nat.leb_le in H0.
-Qed.
-
 Lemma shl_ge_size: forall (n : N) (x y : bitvector),
   size x = n -> size y = n ->
   Nat.leb (N.to_nat n) (list2nat_be_a (bits y)) = true ->
   bv_shl x y = zeros n.
 Proof.
   intros n x y Hx Hy H.
-  unfold bv_shl.
+  rewrite bv_shl_eq.
+  unfold bv_shl_a.
   rewrite Hx.
   rewrite <- Hy.
   rewrite N.eqb_refl.
-  unfold shl_aux.
-  rewrite Hy.
-  unfold bits in H.
-  unfold size in Hx, Hy.
+  unfold shl_n_bits_a.
+  assert ((list2nat_be_a y <? length x)%nat = false).
+  {
+    rewrite (Nat.ltb_antisym).
+    rewrite <- Hx in H.
+    unfold size in H.
+    rewrite Nat2N.id in H.
+    unfold bits in H.
+    now rewrite H.
+  }
+  rewrite H0.
   unfold zeros.
-  apply shl_n_bits_ge_length.
-  + rewrite <- (@Nat2N.id (length x)).
-    now rewrite Hx.
-  + easy.
+  unfold size.
+  rewrite <- Hx in Hy.
+  unfold size in Hy.
+  rewrite Hy.
+  now rewrite Nat2N.id.
 Qed.
 
-(* y < size(x) => (signed_min x >> y) << y = signed_min x  *)
+(* y < size x => (signed_min (size x) >> y) << y = signed_min (size x)  *)
 Lemma shr_n_bits_smin_le_length : forall (n m : nat),
   (m <= n)%nat ->
   shr_n_bits (mk_list_false n ++ [true]) m = mk_list_false (n - m) ++ [true] ++ mk_list_false m.
@@ -9348,8 +9368,7 @@ Proof.
         apply Arith.Compare_dec.not_le.
         intro.
         apply Nat.leb_le in H0.
-        rewrite H in H0.
-        now apply diff_false_true.
+        now rewrite H in H0.
       }
       rewrite shr_n_bits_smin_le_length.
       rewrite shl_n_bits_le_length_smin.
@@ -9382,8 +9401,41 @@ Proof.
   + apply Hx.
 Qed.
 
-(* x <=s y => x <<a z <=s y <<a z *)
+(* sign x <<a y = sign x *)
+Lemma sign_ashr_one_bit : forall (x : list bool),
+  ((last (ashr_one_bit x (last x false)) false) = last x false).
+Proof.
+  induction x.
+  + easy.
+  + unfold ashr_one_bit.
+    now rewrite last_app.
+Qed.
 
+Lemma sign_ashr_n_bits : forall (m : nat) (x : list bool),
+  ((last (ashr_n_bits x m (last x false)) false) = last x false).
+Proof.
+  induction m.
+  + easy.
+  + intros.
+    simpl.
+    rewrite <- (@sign_ashr_one_bit x) at 2.
+    rewrite (@IHm (ashr_one_bit x (last x false))).
+    now apply sign_ashr_one_bit.
+Qed.
+
+Lemma sign_bv_ashr : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  last (bv_ashr x y) false = last x false.
+Proof.
+  intros.
+  unfold bv_ashr.
+  rewrite H, H0.
+  rewrite N.eqb_refl.
+  unfold ashr_aux.
+  apply sign_ashr_n_bits.
+Qed.
+
+(* x <=s y => x >>a z <=s y >>a z *)
 Lemma ule_list_big_endian_app_bool : forall (n : nat) (b b0 : bool) (x y: list bool),
   length x = length y ->
   (ule_list_big_endian (x ++ [b]) (y ++ [b0])) = true ->
@@ -9486,27 +9538,6 @@ Proof.
       * apply H0.
 Qed.
 
-Lemma last_ashr_one_bit : forall (x : list bool),
-  ((last (ashr_one_bit x (last x false)) false) = last x false).
-Proof.
-  induction x.
-  + easy.
-  + unfold ashr_one_bit.
-    now rewrite last_app.
-Qed.
-
-Lemma last_ashr_n_bits : forall (m : nat) (x : list bool),
-  ((last (ashr_n_bits x m (last x false)) false) = last x false).
-Proof.
-  induction m.
-  + easy.
-  + intros.
-    simpl.
-    rewrite <- (@last_ashr_one_bit x) at 2.
-    rewrite (@IHm (ashr_one_bit x (last x false))).
-    now apply last_ashr_one_bit.
-Qed.
-
 Lemma sle_list_ashr_n_bits : forall (n m : nat) (x y : list bool),
   length x = n -> length y = n ->
   sle_list x y = true -> sle_list (ashr_n_bits x m (last x false))
@@ -9517,8 +9548,8 @@ Proof.
   + easy.
   + simpl.
     rewrite !ashr_n_ashr_one_comm.
-    rewrite <- (@last_ashr_n_bits m x) at 2.
-    rewrite <- (@last_ashr_n_bits m y) at 2.
+    rewrite <- (@sign_ashr_n_bits m x) at 2.
+    rewrite <- (@sign_ashr_n_bits m y) at 2.
     apply (@sle_list_ashr_one_bit n).
     - rewrite (@length_ashr_n_bits m x (last x false)).
       rewrite (@length_ashr_n_bits m y (last y false)).
@@ -9552,6 +9583,113 @@ Proof.
   + easy.
 Qed.
 
+(* 0 <= x <=> sign x = 0 *)
+
+Lemma mk_list_false_sle : forall (x : list bool),
+  (sle_list_big_endian (mk_list_false (length x)) x) = negb (last (rev x) false).
+Proof.
+  destruct x.
+  + easy.
+  + destruct x.
+    - now destruct b.
+    - simpl.
+      destruct b.
+      * now rewrite last_app.
+      * destruct b0.
+        ++ now rewrite last_app.
+        ++ rewrite ule_list_big_endian_0.
+           now rewrite last_app.
+Qed.
+
+Lemma bv_zeros_sle : forall (x : bitvector),
+  bv_sle (zeros (size x)) x = negb (last x false).
+Proof.
+  intro x.
+  unfold bv_sle.
+  rewrite zeros_size.
+  rewrite N.eqb_refl.
+  unfold sle_list.
+  unfold zeros.
+  rewrite rev_mk_list_false.
+  unfold size.
+  rewrite Nat2N.id.
+  rewrite <- length_rev.
+  rewrite <- (@rev_involutive bool x) at 3.
+  apply mk_list_false_sle.
+Qed.
+
+(* x < 0 <=> sign x = 1 *)
+
+Lemma bv_slt_zeros : forall (x : bitvector),
+  bv_slt x (zeros (size x)) = last x false.
+Proof.
+  intro x.
+  rewrite (@bv_slt_negb_sle (size x)).
+  + rewrite bv_zeros_sle.
+    now rewrite negb_involutive.
+  + easy.
+  + apply zeros_size.
+Qed.
+
+(* x < 0 -> x <=s bv_ashr x y *)
+Lemma ashr_one_bit_neg' : forall (x : list bool),
+  last (rev x) false = true ->
+  sle_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
+Proof.
+  intros.
+  destruct x.
+  + easy.
+  + replace (last (rev (b :: x)) false) with b in H.
+    - rewrite H.
+      admit.
+Admitted.
+
+Lemma ashr_one_bit_neg : forall (x : list bool),
+  last x false = true ->
+  sle_list_big_endian (rev x) (rev (ashr_one_bit x true)) = true.
+Proof.
+  intros.
+  rewrite <- (@rev_involutive bool x) at 2.
+  rewrite <- (@rev_involutive bool x) in H.
+  now apply ashr_one_bit_neg'.
+Qed.
+
+Lemma ashr_n_bits_neg : forall (m : nat) (x : list bool),
+  last x false = true ->
+  sle_list_big_endian (rev x) (rev (ashr_n_bits x m true)) = true.
+Proof.
+  intros.
+  induction m.
+  + simpl.
+    apply sle_list_big_endian_refl.
+  + simpl.
+    rewrite ashr_n_ashr_one_comm.
+    apply (@sle_list_big_endian_trans (rev x) (rev (ashr_n_bits x m true))).
+    - apply IHm.
+    - apply (@ashr_one_bit_neg (ashr_n_bits x m true)).
+      rewrite <- H.
+      apply sign_ashr_n_bits.
+Qed.
+
+Lemma bv_ashr_neg : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  last x false = true -> (bv_sle x (bv_ashr x y)) = true.
+Proof.
+  intros.
+  unfold bv_sle.
+  Search bv_shl.
+  rewrite H, (@bv_ashr_size n).
+  + rewrite N.eqb_refl.
+    unfold bv_ashr.
+    rewrite H, H0.
+    rewrite N.eqb_refl.
+    unfold sle_list.
+    unfold ashr_aux.
+    rewrite H1.
+    now apply ashr_n_bits_neg.
+  + apply H.
+  + apply H0.
+Qed.
 
 
 

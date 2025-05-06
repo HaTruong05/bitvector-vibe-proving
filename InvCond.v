@@ -1488,7 +1488,65 @@ Theorem bvashr_slt2 : forall (n : N), forall (s t : bitvector),
     ((bv_slt s t = true) \/ (bv_slt (zeros (size t)) t = true))
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_ashr s x) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split; intro A.
+  + case_eq (last s false); intro.
+    - exists (zeros n). split.
+      * apply zeros_size.
+      * assert (bv_slt s t = true).
+        {
+         destruct A.
+         + apply H0.
+         + rewrite <- bv_slt_zeros in H.
+           rewrite Hs in H.
+           rewrite Ht in H0.
+           now apply (@bv_slt_trans s (zeros n) t).
+        }
+        rewrite <- Hs.
+        rewrite bv_ashr_eq.
+        now rewrite bvashr_zero.
+    - exists (nat2bv (N.to_nat n) n).
+      split.
+      * apply nat2bv_size.
+      * assert ((bv_slt (zeros (size t)) t) = true).
+        {
+         destruct A.
+         + rewrite Ht.
+           apply (@f_equal bool bool negb) in H.
+           rewrite <- bv_zeros_sle in H.
+           rewrite Hs in H.
+           now apply (@bv_sle_slt_trans (zeros n) s t).
+         + apply H0.
+        }
+        rewrite bv_ashr_eq.
+        rewrite <- Hs.
+        unfold size at 1.
+        rewrite Nat2N.id.
+        rewrite ashr_size_sign0.
+        ++ rewrite Hs.
+           now rewrite Ht in H0.
+        ++ apply H.
+  + destruct A as (x, (Hx, A)).
+    case_eq (last s false); intro.
+    - left.
+      assert ((bv_sle s (bv_ashr s x)) = true).
+      {
+       now apply (@bv_ashr_neg n).
+      }
+      now apply (@bv_sle_slt_trans s (bv_ashr s x) t).
+    - right.
+      rewrite Ht.
+      apply (@bv_sle_slt_trans (zeros n) (bv_ashr s x) t).
+      * rewrite <- (@bv_ashr_size n s x).
+        ++ rewrite bv_zeros_sle.
+           rewrite (@sign_bv_ashr n).
+           -- now rewrite H.
+           -- apply Hs.
+           -- apply Hx.
+        ++ apply Hs.
+        ++ apply Hx.
+      * apply A.
+Qed.
 
 (*------------------------------------------------------------*)
 
