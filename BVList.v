@@ -8913,14 +8913,6 @@ Proof.
 Qed.
 
 (* Signed Less Than *)
-Definition slt_list_big_endian' (x y: list bool) :=
-  match x, y with
-    | nil, _  => false
-    | _ , nil => false
-    | xi :: x', yi :: y' =>
-      orb (andb (Bool.eqb xi yi) (ult_list_big_endian x' y'))
-          (andb xi (negb yi))
-  end.
 
 (* x < y => y < z => x < z *)
 Lemma slt_list_big_endian_trans : forall x y z,
@@ -9564,7 +9556,6 @@ Proof.
 Qed.
 
 (* 0 <= x <=> sign x = 0 *)
-
 Lemma mk_list_false_sle : forall (x : list bool),
   (sle_list_big_endian (mk_list_false (length x)) x) = negb (last (rev x) false).
 Proof.
@@ -9599,7 +9590,6 @@ Proof.
 Qed.
 
 (* x < 0 <=> sign x = 1 *)
-
 Lemma bv_slt_zeros : forall (x : bitvector),
   bv_slt x (zeros (size x)) = last x false.
 Proof.
@@ -9612,6 +9602,13 @@ Proof.
 Qed.
 
 (* x < 0 -> x <=s bv_ashr x y *)
+
+Lemma ule_list_big_endian_ashr_one_bit_true : forall (x : list bool),
+  ule_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
+Proof.
+  admit.
+Admitted.
+
 Lemma ashr_one_bit_neg' : forall (x : list bool),
   last (rev x) false = true ->
   sle_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
@@ -9670,6 +9667,7 @@ Proof.
   + apply H.
   + apply H0.
 Qed.
+
 
 
 
