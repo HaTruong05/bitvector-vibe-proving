@@ -1085,7 +1085,6 @@ Definition slt_list_big_endian (x y: list bool) :=
   match x, y with
     | nil, _  => false
     | _ , nil => false
-    | xi :: nil, yi :: nil => andb xi (negb yi)
     | xi :: x', yi :: y' =>
       orb (andb (Bool.eqb xi yi) (ult_list_big_endian x' y'))
           (andb xi (negb yi))
@@ -8924,20 +8923,6 @@ Definition slt_list_big_endian' (x y: list bool) :=
           (andb xi (negb yi))
   end.
 
-Lemma slt_list_big_endian_equiv: forall x y,
-    slt_list_big_endian x y = slt_list_big_endian' x y.
-Proof.
-  destruct x.
-  + easy.
-  + destruct y.
-    - now destruct x.
-    - destruct x.
-      * destruct y.
-        ++ destruct b; now destruct b0.
-        ++ easy.
-      * easy.
-Qed.
-
 (* x < y => y < z => x < z *)
 Lemma slt_list_big_endian_trans : forall x y z,
     slt_list_big_endian x y = true ->
@@ -8945,7 +8930,6 @@ Lemma slt_list_big_endian_trans : forall x y z,
     slt_list_big_endian x z = true.
 Proof.
   intros x y z.
-  rewrite !slt_list_big_endian_equiv.
   destruct x.
     + easy.
     + destruct y.
@@ -9006,7 +8990,6 @@ Lemma sle_list_big_endian_implies_slt_list_big_endian_or_eq : forall (x y : list
   sle_list_big_endian x y = true -> slt_list_big_endian x y = true \/ (x = y).
 Proof.
   intros x y.
-  rewrite slt_list_big_endian_equiv.
   destruct x.
   + destruct y.
     - now right.
@@ -9037,7 +9020,6 @@ Lemma slt_list_big_endian_or_eq_implies_sle_list_big_endian : forall (x y : list
   slt_list_big_endian x y = true \/ (x = y) -> sle_list_big_endian x y = true.
 Proof.
   intros x y.
-  rewrite slt_list_big_endian_equiv.
   destruct x.
   + destruct y.
     - easy.
@@ -9189,7 +9171,6 @@ Lemma slt_negb_sle_list_big_endian : forall (x y : list bool),
   slt_list_big_endian x y = negb (sle_list_big_endian y x).
 Proof.
   intros.
-  rewrite slt_list_big_endian_equiv.
   destruct x.
   + now destruct y.
   + destruct y.
