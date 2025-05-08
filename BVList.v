@@ -9606,8 +9606,17 @@ Qed.
 Lemma ule_list_big_endian_ashr_one_bit_true : forall (x : list bool),
   ule_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
 Proof.
-  admit.
-Admitted.
+  intros. induction x.
+  + easy.
+  + rewrite rev_ashr_one_bit_true in *. 
+    rewrite rev_involutive in *. 
+    unfold ashl_one_bit. case a.
+    - assert (forall m n b, ule_list_big_endian m n = true -> 
+          ule_list_big_endian (b :: m) (b :: n) = true).
+      { intros. simpl. rewrite H. rewrite eqb_reflx. now simpl. }
+      apply H. apply IHx. 
+    - easy.
+Qed.
 
 Lemma ashr_one_bit_neg' : forall (x : list bool),
   last (rev x) false = true ->
