@@ -1211,7 +1211,6 @@ Definition sgt_list_big_endian (x y: list bool) :=
   match x, y with
     | nil, _  => false
     | _ , nil => false
-    | xi :: nil, yi :: nil => andb (negb xi) yi
     | xi :: x', yi :: y' =>
       orb (andb (Bool.eqb xi yi) (ugt_list_big_endian x' y'))
           (andb (negb xi) yi)
