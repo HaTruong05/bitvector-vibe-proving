@@ -9602,15 +9602,12 @@ Proof.
 Qed.
 
 (* x < 0 -> x <=s bv_ashr x y *)
-
-Lemma ule_list_big_endian_ashr_one_bit_true : forall (x : list bool),
-  ule_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
+Lemma ule_list_big_endian_ashl_one_bit_true : forall (x : list bool),
+  ule_list_big_endian x (removelast (true :: x)) = true.
 Proof.
   intros. induction x.
   + easy.
-  + rewrite rev_ashr_one_bit_true in *. 
-    rewrite rev_involutive in *. 
-    unfold ashl_one_bit. case a.
+  + unfold ashl_one_bit. case a.
     - assert (forall m n b, ule_list_big_endian m n = true -> 
           ule_list_big_endian (b :: m) (b :: n) = true).
       { intros. simpl. rewrite H. rewrite eqb_reflx. now simpl. }
@@ -9618,26 +9615,32 @@ Proof.
     - easy.
 Qed.
 
-Lemma ashr_one_bit_neg' : forall (x : list bool),
+Lemma sle_list_big_endian_ashl_one_bit_true : forall (x : list bool),
   last (rev x) false = true ->
-  sle_list_big_endian x (rev (ashr_one_bit (rev x) true)) = true.
+  sle_list_big_endian x (removelast (true :: x)) = true.
 Proof.
   intros.
   destruct x.
   + easy.
-  + replace (last (rev (b :: x)) false) with b in H.
-    - rewrite H.
-      admit.
-Admitted.
+  + simpl in H.
+    rewrite last_app in H.
+    rewrite H.
+    apply orb_true_intro.
+    left.
+    apply andb_true_intro.
+    split.
+    - easy.
+    - apply ule_list_big_endian_ashl_one_bit_true.
+Qed.
 
 Lemma ashr_one_bit_neg : forall (x : list bool),
   last x false = true ->
   sle_list_big_endian (rev x) (rev (ashr_one_bit x true)) = true.
 Proof.
   intros.
-  rewrite <- (@rev_involutive bool x) at 2.
-  rewrite <- (@rev_involutive bool x) in H.
-  now apply ashr_one_bit_neg'.
+  rewrite rev_ashr_one_bit_true.
+  apply sle_list_big_endian_ashl_one_bit_true.
+  now rewrite rev_involutive.
 Qed.
 
 Lemma ashr_n_bits_neg : forall (m : nat) (x : list bool),
