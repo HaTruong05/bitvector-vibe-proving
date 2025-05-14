@@ -3960,6 +3960,15 @@ Proof. intro a.
          simpl. case (k - 1 <? 0)%Z; simpl; now rewrite IHa.
 Qed. 
 
+Lemma mult_bool_step_k_h_nil : forall (a : list bool) (k : Z),
+  mult_bool_step_k_h a [] false k = a.
+Proof.
+  intros.
+  induction a.
+  + easy.
+  + simpl.
+    now rewrite IHa.
+Qed.
 
 Lemma empty_list_length: forall {A: Type} (a: list A), (length a = 0)%nat <-> a = [].
 Proof. intros A a.
@@ -3974,11 +3983,39 @@ Proof. intro k'.
        - intros. simpl. rewrite IHk'. rewrite prop_mult_bool_step_k_h_len. simpl; lia.
 Qed.
 
-Lemma and_with_bool_len: forall a b, length (and_with_bool a (nth 0 b false)) = length a.
+Lemma and_with_bool_len: forall a b, length (and_with_bool a b) = length a.
 Proof. intro a.
        - induction a.
          intros. now simpl.
          intros. simpl. now rewrite IHa.
+Qed.
+
+Lemma and_with_true : forall (x : list bool),
+  and_with_bool x true = x.
+Proof.
+  induction x.
+  + easy.
+  + simpl.
+    now rewrite IHx.
+Qed.
+
+Lemma and_with_false : forall (x : list bool),
+  and_with_bool x false = mk_list_false (length x).
+Proof.
+  induction x.
+  + easy.
+  + simpl.
+    now rewrite IHx.
+Qed.
+
+Lemma and_with_bool_app : forall (x y : list bool) (b : bool),
+  (and_with_bool (x ++ y) b) = and_with_bool x b ++ and_with_bool y b.
+Proof.
+  intros.
+  induction x.
+  + easy.
+  + simpl.
+    now rewrite IHx.
 Qed.
 
 Lemma bv_mult_size: forall n a b, (size a) = n -> (@size b) = n -> size (bv_mult a b) = n.
@@ -3993,6 +4030,45 @@ Proof. intros n a b H0 H1.
          + intros.
            case n0 in *. now rewrite and_with_bool_len.
            rewrite prop_mult_bool_step. now rewrite and_with_bool_len.
+Qed.
+
+(* miscellaneous properties of nth, skipn and firstn *)
+
+Lemma skipn_length_minus_1 : forall (a : list bool) (n : nat),
+  length a = S n -> skipn n a = [nth n a false].
+Proof.
+  induction a; intros.
+  + easy.
+  + destruct n.
+    - now destruct a0.
+    - apply IHa.
+      now injection H.
+Qed.
+
+Lemma nth_cons_skip_n : forall (a : list bool) (n : nat),
+  (n < length a)%nat -> skipn n a = nth n a false :: skipn (S n) a.
+Proof.
+  induction a; intros.
+  + now apply Nat.nlt_0_r in H.
+  + destruct n.
+    - easy.
+    - simpl.
+      rewrite IHa.
+      * easy.
+      * now apply Nat.succ_lt_mono.
+Qed.
+
+Lemma first_n_app_cons : forall (a : list bool) (n : nat),
+  (n < length a)%nat -> firstn (S n) a = firstn n a ++ [nth n a false].
+Proof.
+  induction a; intros.
+  + now apply Nat.nlt_0_r in H.
+  + destruct n.
+    - easy.
+    - simpl.
+      f_equal.
+      apply IHa.
+      now apply Nat.succ_lt_mono.
 Qed.
 
  (** list extraction *)
@@ -9666,7 +9742,6 @@ Lemma bv_ashr_neg : forall (n : N) (x y : bitvector),
 Proof.
   intros.
   unfold bv_sle.
-  Search bv_shl.
   rewrite H, (@bv_ashr_size n).
   + rewrite N.eqb_refl.
     unfold bv_ashr.
@@ -9678,6 +9753,490 @@ Proof.
     now apply ashr_n_bits_neg.
   + apply H.
   + apply H0.
+Qed.
+
+(* BV -> Z Conversion *)
+Fixpoint pow2_int (n: nat): Z :=
+  match n with
+    | O => 1%Z
+    | S n' => (2 * pow2_int n')%Z
+  end.
+
+Lemma pow2_int_succ : forall (n : nat),
+  (pow2_int (S n) = 2 * pow2_int n)%Z.
+Proof.
+  easy.
+Qed.
+
+Lemma pow2_int_add : forall (n m : nat),
+  (pow2_int (n + m) = pow2_int n * pow2_int m)%Z.
+Proof.
+  intros.
+  induction n.
+  + now rewrite Z.mul_1_l.
+  + rewrite pow2_int_succ.
+    rewrite <- Z.mul_assoc.
+    now rewrite <- IHn.
+Qed.
+
+Lemma pow2_int_neq_0 : forall (n : nat),
+  pow2_int n <> 0%Z.
+Proof.
+  induction n.
+  + easy.
+  + rewrite pow2_int_succ.
+    now apply Z.neq_mul_0.
+Qed.
+
+Definition bool2int (b : bool) : Z :=
+  if b then 1%Z else 0%Z.
+
+Fixpoint list2int (a: list bool) :=
+  match a with
+    | [] => 0%Z
+    | h :: t => (2 * (list2int t) + bool2int h)%Z
+  end.
+
+Lemma list2int_cons : forall (x : list bool) (b : bool),
+  list2int (b :: x) = (2 * (list2int x) + bool2int b)%Z.
+Proof.
+  easy.
+Qed.
+
+Definition bv2int (a: bitvector) := list2int a.
+
+Lemma list2int_bool : forall (b : bool),
+  list2int [b] = bool2int b.
+Proof.
+  easy.
+Qed.
+
+Lemma list2int_mk_list_false : forall (n : nat),
+  (list2int (mk_list_false n) = 0)%Z.
+Proof.
+  induction n.
+  + easy.
+  + replace (mk_list_false (S n)) with (false :: mk_list_false n).
+    * rewrite list2int_cons.
+      now rewrite IHn.
+    * easy.
+Qed.
+
+Lemma list2int_app : forall (x y : list bool),
+  (list2int (x ++ y) = (pow2_int (length x)) * list2int y + list2int x)%Z.
+Proof.
+  induction x; intros.
+  + rewrite Z.mul_1_l.
+    now rewrite Z.add_0_r.
+  + rewrite <- app_comm_cons.
+    rewrite !list2int_cons.
+    rewrite IHx.
+    rewrite Z.mul_add_distr_l.
+    rewrite <- Z.add_assoc.
+    now rewrite Z.mul_assoc.
+Qed.
+
+Lemma list2int_geq_0 : forall (x : list bool),
+  (0 <= list2int x)%Z.
+Proof.
+  induction x; intros.
+  + easy.
+  + rewrite list2int_cons.
+    apply Z.add_nonneg_nonneg.
+    - now apply Z.mul_nonneg_nonneg.
+    - now destruct a.
+Qed.
+
+Lemma list2int_let_pow2_int : forall (x : list bool) (n : nat),
+  length x = n ->
+  (list2int x < pow2_int n) %Z.
+Proof.
+  induction x; intros.
+  + now destruct n.
+  + destruct n.
+    - easy.
+    - apply (@Z.lt_le_trans (list2int (a :: x)) (2 * list2int x + 2) (pow2_int (S n))).
+      * rewrite list2int_cons.
+        apply Zplus_lt_compat_l.
+        now destruct a.
+      * replace (2 * list2int x + 2)%Z with (2 * (list2int x + 1))%Z.
+        ++ apply (@Z.mul_le_mono_nonneg_l (list2int x + 1) (pow2_int n) 2).
+           -- easy.
+           -- apply Ztac.Zlt_le_add_1.
+              apply IHx.
+              now injection H.
+        ++ now rewrite Z.mul_add_distr_l.
+Qed.
+
+Lemma list2int_inj : forall (x y : list bool),
+  length x = length y ->
+  list2int x = list2int y -> x = y.
+Proof.
+  induction x; intros.
+  + now destruct y.
+  + destruct y.
+    - easy.
+    - rewrite !list2int_cons in H0.
+      destruct a.
+      * destruct b.
+        ++ f_equal.
+           apply (@IHx y).
+           -- now injection H.
+           -- apply (@Zmult_reg_l (list2int x) (list2int y) 2).
+              ** easy.
+              ** apply (@Z.add_reg_l 1).
+                 rewrite Z.add_comm.
+                 now rewrite (@Z.add_comm 1 (2 * list2int y)).
+        ++ assert (1 = 2 * (list2int y - list2int x))%Z.
+           {
+             rewrite Z.mul_sub_distr_l.
+             rewrite Z.add_0_r in H0.
+             rewrite <- H0.
+             now rewrite Z.add_simpl_l.
+           }
+           assert (1 mod 2 = 0)%Z.
+           {  
+             rewrite H1.
+             rewrite Z.mul_comm.
+             apply Z_mod_mult.
+           }
+           easy.
+      * destruct b.
+        ++ assert (1 = 2 * (list2int x - list2int y))%Z.
+           {
+             rewrite Z.mul_sub_distr_l.
+             rewrite Z.add_0_r in H0.
+             rewrite H0.
+             now rewrite Z.add_simpl_l.
+           }
+           assert (1 mod 2 = 0)%Z.
+           {
+             rewrite H1.
+             rewrite Z.mul_comm.
+             apply Z_mod_mult.
+           }
+           easy.
+        ++ f_equal.
+           apply (@IHx y).
+           -- now injection H.
+           -- rewrite !Z.add_0_r in H0.
+              now apply (@Zmult_reg_l (list2int x) (list2int y) 2).
+Qed.
+
+(* bv2int (x * y) = bv2int x * bv2int y (mod pow2_int n) *)
+Lemma list2int_and_with_bool : forall (x : list bool) (b : bool),
+  (list2int (and_with_bool x b) = list2int x * bool2int b)%Z.
+Proof.
+  destruct b.
+  + rewrite and_with_true.
+    now rewrite Z.mul_1_r.
+  + rewrite and_with_false.
+    rewrite list2int_mk_list_false.
+    now rewrite Z.mul_0_r.
+Qed.
+
+Lemma sum_bool2int : forall (a b c : bool),
+  (bool2int a + bool2int b + bool2int c = 2 * bool2int (a && b || xorb a b && c)  + bool2int (xorb (xorb a b) c))%Z.
+Proof.
+  now destruct a; destruct b; destruct c.
+Qed.
+
+Lemma list2int_mult_bool_step_k_h_leq_0: forall (a b : list bool) (n : nat) (k : Z) (c : bool),
+  length a = n -> length b = n -> (k - 1 <? 0)%Z = true ->
+  ((list2int (mult_bool_step_k_h a b c k)) mod (pow2_int n) =
+  (list2int b + list2int a + bool2int c) mod (pow2_int n))%Z.
+Proof.
+  induction a; intros.
+  + rewrite <- H.
+    now rewrite !Z.mod_1_r.
+  + destruct b.
+    - now rewrite <- H0 in H.
+    - assert ((mult_bool_step_k_h (a :: a0) (b :: b0) c k) = ((xorb (xorb a b) c) :: mult_bool_step_k_h a0 b0 ((a && b) || ((xorb a b) && c)) (k - 1))).
+      {
+        simpl.
+        now rewrite H1.
+      }
+      rewrite H2.
+      rewrite !list2int_cons.
+      rewrite <- !Z.add_assoc.
+      rewrite (@Z.add_comm (bool2int b)).
+      rewrite <- !Z.add_assoc.
+      rewrite (@Z.add_comm (bool2int c)).
+      rewrite (@Z.add_assoc (bool2int a)).
+      rewrite sum_bool2int.
+      rewrite !Z.add_assoc.
+      rewrite Zplus_mod.
+      rewrite (@Zplus_mod (2 * list2int b0 + 2 * list2int a0 + 2 * bool2int (a && b || xorb a b && c))).
+      f_equal.
+      f_equal.
+      rewrite <- !Z.mul_add_distr_l.
+      simpl in H, H0.
+      rewrite <- H.
+      rewrite pow2_int_succ.
+      rewrite !Z.mul_mod_distr_l.
+      * rewrite IHa.
+        ++ easy.
+        ++ easy.
+        ++ rewrite <- H0 in  H. 
+           now injection H.
+        ++ apply Z.ltb_lt.
+           apply Z.lt_lt_pred.
+           now apply Z.ltb_lt.
+       * apply pow2_int_neq_0.
+       * easy.
+       * apply pow2_int_neq_0.
+       * easy.
+Qed.
+
+Lemma list2int_mult_bool_step_k_h : forall (k : nat) (n : nat) (a b : list bool),
+  length a = n -> (length b + k = n)%nat ->
+  ((list2int (mult_bool_step_k_h a b false (Z.of_nat k))) mod (pow2_int n) =
+  ((pow2_int k) * list2int b + list2int a) mod (pow2_int n))%Z.
+Proof.
+  induction k; intros.
+  + rewrite Z.mul_1_l.
+    rewrite Nat.add_0_r in H0.
+    rewrite <- (@Z.add_0_r (list2int b + list2int a)).
+    now apply (@list2int_mult_bool_step_k_h_leq_0  a b n 0 false).
+  + destruct a.
+    - rewrite <- H.
+      now rewrite !Z.mod_1_r.
+    - destruct b.
+      * rewrite mult_bool_step_k_h_nil.
+        rewrite Z.mul_0_r.
+        now rewrite Z.add_0_l.
+      * assert (Z.of_nat (S k) - 1 = Z.of_nat k)%Z.
+        {
+          rewrite <- Nat.add_1_r.
+          rewrite Nat2Z.inj_add.
+          apply Z.add_simpl_r.
+        }
+        assert (Z.of_nat (S k) - 1 <? 0 = false)%Z.
+        {
+          apply Z.ltb_ge.
+          rewrite H1.
+          apply Zle_0_nat.
+        }
+        assert (mult_bool_step_k_h (b0 :: a) (b :: b1) false (Z.of_nat (S k)) = b0 :: mult_bool_step_k_h a (b :: b1) false (Z.of_nat k)).
+        {
+          unfold mult_bool_step_k_h.
+          now rewrite H2, H1.
+        }
+        rewrite H3.
+        rewrite !list2int_cons.
+        rewrite Z.add_assoc.
+        rewrite Zplus_mod.
+        rewrite (@Zplus_mod (pow2_int (S k) * list2int (b :: b1) + 2 * list2int a)).
+        f_equal.
+        f_equal.
+        rewrite pow2_int_succ.
+        rewrite <- Z.mul_assoc.
+        rewrite <- Z.mul_add_distr_l.
+        simpl in H.
+        rewrite <- H.
+        rewrite pow2_int_succ.
+        rewrite !Z.mul_mod_distr_l.
+        ++ rewrite (@IHk (length a) a (b :: b1)).
+           -- easy.
+           -- easy.
+           -- rewrite <- H0 in H.
+              rewrite Nat.add_succ_r in H.
+              now injection H.
+        ++ apply pow2_int_neq_0.
+        ++ easy.
+        ++ apply pow2_int_neq_0.
+        ++ easy.
+Qed.
+
+Lemma list2int_mult_bool_step : forall (n : nat) (k' : nat) (a b : list bool) (res : list bool) (k : nat),
+  length a = n -> length b = n -> length res = n -> (1 + k' + k = n)%nat ->
+  (list2int (mult_bool_step a b res k k') mod (pow2_int n) =
+  (pow2_int k * list2int(firstn (S k') a) * list2int(skipn k b) + (list2int res)) mod (pow2_int n))%Z.
+Proof.
+  induction k'; intros.
+  + assert ((mult_bool_step a b res k 0) = mult_bool_step_k_h res (and_with_bool (List.firstn (S O) a) (nth k b false)) false (Z.of_nat k)).
+    {
+      easy.
+    }
+    rewrite H3.
+    rewrite list2int_mult_bool_step_k_h.
+    - rewrite list2int_and_with_bool.
+      rewrite skipn_length_minus_1.
+      * rewrite list2int_bool.
+        now rewrite Z.mul_assoc.
+      * now rewrite <- H2 in H0.
+    - apply H1.
+    - rewrite and_with_bool_len.
+      rewrite firstn_length_le.
+      * apply H2.
+      * rewrite H.
+        rewrite <- H2.
+        apply Nat.le_add_r.
+  + assert ((mult_bool_step a b res k (S k')) = mult_bool_step a b (mult_bool_step_k_h res (and_with_bool (List.firstn (S (S k')) a) (nth k b false)) false (Z.of_nat k)) (S k) k').
+    {
+      easy.
+    }
+    rewrite H3.
+    rewrite IHk'.
+    - assert (skipn k b = nth k b false :: skipn (S k) b).
+      {
+        apply nth_cons_skip_n.
+        rewrite H0.
+        rewrite <- H2.
+        apply Nat.lt_add_pos_l.
+        apply Nat.lt_0_succ.
+      }
+      rewrite H4.
+      rewrite list2int_cons.
+      rewrite Z.mul_add_distr_l.
+      assert (firstn (S (S k')) a = firstn (S k') a ++ [nth (S k') a false]).
+      {
+        apply first_n_app_cons.
+        rewrite H.
+        rewrite <- H2.
+        rewrite Nat.add_shuffle0.
+        apply Nat.lt_add_pos_l.
+        apply Nat.lt_0_succ.
+      }
+      rewrite H5.
+      rewrite list2int_app.
+      rewrite Z.mul_add_distr_l.
+      rewrite Z.mul_add_distr_r.
+      rewrite !Z.mul_assoc.
+      rewrite <- !(@Z.mul_comm 2).
+      rewrite !Z.mul_assoc. 
+      rewrite (@Z.add_comm (2 * pow2_int k * pow2_int (length (firstn (S k') a)) * list2int [nth (S k') a false] * list2int (skipn (S k) b))).
+      rewrite <- !Z.add_assoc.
+      rewrite pow2_int_succ.
+      rewrite Zplus_mod.
+      rewrite (@Zplus_mod (2 * pow2_int k * list2int (firstn (S k') a) * list2int (skipn (S k) b))).
+      f_equal.
+      f_equal.
+      assert (length (firstn (S k') a) = S k').
+      {
+        apply firstn_length_le.
+        rewrite H.
+        rewrite <- H2.
+        rewrite Nat.add_shuffle0.
+        apply Nat.le_add_l.
+      }
+      rewrite list2int_mult_bool_step_k_h.
+      * rewrite and_with_bool_app.
+        rewrite list2int_app.
+        rewrite Z.mul_add_distr_l.
+        rewrite Z.mul_add_distr_r.
+        rewrite !list2int_and_with_bool.
+        rewrite and_with_bool_len.
+        rewrite !H6.
+        assert (pow2_int n = 2 * pow2_int k * pow2_int (S k'))%Z.
+        {
+        rewrite <- H2.
+        rewrite Nat.add_shuffle0.
+        now rewrite pow2_int_add.
+        }
+        rewrite <- H7.
+        rewrite <- (@Zplus_mod_idemp_l (pow2_int n * list2int [nth (S k') a false] * list2int (skipn (S k) b))).
+        rewrite <- Z.mul_assoc.
+        rewrite (@Z.mul_comm (pow2_int n)).
+        rewrite Z_mod_mult.
+        rewrite Z.add_0_l.
+        now rewrite !Z.mul_assoc.
+        * apply H1.
+        * rewrite and_with_bool_len.
+          rewrite length_app.
+          rewrite H6.
+          now rewrite Nat.add_1_r.
+    - apply H.
+    - apply H0.
+    - now rewrite prop_mult_bool_step_k_h_len.
+    - rewrite Nat.add_succ_r.
+      rewrite <- Nat.add_succ_l.
+      now rewrite <- Nat.add_succ_r.
+Qed.
+
+Lemma list2int_mult : forall (n : nat) (x y : list bool),
+  length x = n -> length y = n ->
+  (list2int (bvmult_bool x y n) mod (pow2_int n))%Z =
+  ((list2int x) * (list2int y) mod (pow2_int n))%Z.
+Proof.
+  intros.
+  destruct n.
+  + now destruct x.
+  + destruct n.
+    - destruct x.
+      * easy.
+      * destruct x.
+        ++ destruct y.
+           -- easy.
+           -- destruct y; destruct b; now destruct b0.
+        ++ easy.
+   - unfold bvmult_bool.
+     rewrite list2int_mult_bool_step.
+     * assert (pow2_int 1 = 2%Z).
+       {
+         easy.
+       }
+       rewrite H1.
+       rewrite Zplus_mod.
+       assert ((2 * list2int (firstn (S n) x) * list2int (skipn 1 y)) mod pow2_int (S (S n)) =
+              (2 * list2int x * list2int (skipn 1 y)) mod pow2_int (S (S n)))%Z.
+       {
+         rewrite <- (@firstn_skipn bool (S n) x) at 2.
+         rewrite list2int_app.
+         rewrite Z.mul_add_distr_l.
+         rewrite Z.mul_add_distr_r.
+         rewrite Zplus_mod.
+         rewrite <- Zmod_mod at 1.
+         rewrite <- (@Z.add_0_l ((2 * list2int (firstn (S n) x) * list2int (skipn 1 y)) mod pow2_int (S (S n)))%Z) at 1.
+         f_equal.
+         f_equal.
+         rewrite firstn_length_le.
+         + rewrite Z.mul_assoc.
+           rewrite <- pow2_int_succ.
+           rewrite <- Z.mul_assoc.
+           rewrite Z.mul_comm.
+           now rewrite Z_mod_mult.
+         + rewrite H.
+           apply Nat.le_succ_diag_r.
+       }
+       rewrite H2.
+       rewrite list2int_and_with_bool.
+       rewrite (@Z.mul_comm 2 (list2int x)).
+       rewrite Zmult_assoc_reverse.
+       rewrite <- Zplus_mod.
+       rewrite <- Z.mul_add_distr_l.
+       f_equal.
+       f_equal.
+       now destruct y.
+     * apply H.
+     * apply H0.
+     * now rewrite and_with_bool_len.
+     * now rewrite Nat.add_1_r.
+Qed.
+
+Lemma bv2int_mult : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  (bv2int (bv_mult x y) mod (pow2_int (N.to_nat n)))%Z =
+  ((bv2int x * bv2int y)%Z mod (pow2_int (N.to_nat n)))%Z.
+Proof.
+  intros.
+  unfold bv_mult.
+  rewrite H, H0.
+  rewrite N.eqb_refl.
+  unfold bv2int.
+  unfold mult_list.
+  assert (length x = N.to_nat n).
+  {
+    rewrite <- H.
+    unfold size.
+    now rewrite Nat2N.id.
+  }
+  rewrite H1.
+  apply list2int_mult.
+  + apply H1.
+  + rewrite <- H0.
+    unfold size.
+    now rewrite Nat2N.id.
 Qed.
 
 
