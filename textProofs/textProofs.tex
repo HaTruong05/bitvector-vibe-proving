@@ -1,0 +1,97 @@
+\documentclass[11pt]{article}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{amsmath, amsfonts, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{verbatim}
+\usepackage{graphicx}
+
+\newcommand{\rem}[1]{\textcolor{red}{[#1]}}
+\newcommand{\ed}[1]{\textcolor{blue}{#1}}
+\newcommand{\ct}[1]{\rem{#1 --ct}}
+\newcommand{\avar}{Fatom (AppUnintr 0 [])}
+\newcommand{\bvar}{Fatom (AppUnintr 1 [])}
+\newcommand{\cvar}{Fatom (AppUnintr 2 [])}
+\newcommand{\fnot}[1]{Fnot (#1)}
+\newcommand{\intr}[1]{\mathbb{I}_{\nu}(#1)}
+
+\begin{document}
+	\title{Invertibility Condition Proofs}
+	\author{Arjun Viswanathan}
+	\date{}
+	\maketitle
+	
+\section*{Proof: Invertibility Condition Over BV Multiplication and Equality}
+Equivalence to prove:
+$$\forall s, t\ :\ \texttt{BV}_n.\ (-s\ |\ s)\ \&\ t = t
+\iff (\exists x\ :\ \texttt{BV}_n. x \cdot s = t) 
+$$
+	
+\subsection*{Case: $s = 0$}
+If $s = 0$, we can prove both implications as follows:
+\begin{itemize}
+	\item Given $(-s\ |\ s)\ \&\ t = t$, we can derive
+		\begin{align*}
+			(-s\ |\ s)\ \&\ t = t &\models (-0\ |\ 0)\ \&\ t = t\\
+			&\models 0\ \&\ t = t\\
+			&\models 0 = t
+		\end{align*}
+		Since $t = 0$, we can prove the existence of $x$ by 
+		picking $x = 0$ so that
+		$$x \cdot s = 0 \cdot s = 0 = t$$
+	\item Given $x$ such that $x \cdot s = t$, we have
+		\begin{align*}
+			t &= x \cdot s\\
+			  &= x \cdot 0\\
+			  &= 0
+		\end{align*}
+		Then, $(-s\ |\ s)\ \&\ t = (-0\ |\ 0)\ \&\ 0 = 0 = t$.
+\end{itemize}
+
+\subsection*{Case: $s \neq 0$}
+At least one of $s$'s bits must be one. In other words,
+$$s = s_{n-1}s_{n} \ldots s_{k+1}10 \ldots 0$$
+There are $k$ least significant $0$s in $s$ where $k \geq 0$. Then,
+\begin{align*}
+	-s &= \neg s + 1\\
+	&= \neg s_{n-1} \neg s_n \ldots \neg s_{k+1} 0 1 \ldots 1\\
+	&= \neg s_{n-1} \neg s_n \ldots \neg s_{k+1} 1 0 \ldots 0
+\end{align*}
+and $(-s\ |\ s) =$\\
+	\begin{tabular}{c c c c c c c c c c}
+		& &$\neg s_{n-1}$ & $\neg s_n$ & $\ldots$ & $\neg s_{k+1}$ & $1$ & $0$ & $\ldots$ &$0$\\
+		&$| $&$s_{n-1}$ &$s_{n}$ &$\ldots$ &$s_{k+1}$ &$1$ &$0$ &$\ldots$ &$0$\\
+		&$= $&$1$ & $1$ & $\ldots$ & $1$ & $1$ & $0$ & $\ldots$ &$0$
+	\end{tabular}\\
+Then, $(-s\ |\ s)\ \&\ t =$\\
+\begin{tabular}{c c c c c c c c c c}
+	&$ $&$1$ & $1$ & $\ldots$ & $1$ & $1$ & $0$ & $\ldots$ &$0$\\
+	&$\& $&$t_{n-1}$ &$t_{n}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$\\
+	&$= $&$t_{n-1}$ & $t_{n}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$
+\end{tabular}\\
+Thus, we have:
+\begin{equation}
+	\label{eq1}
+	(-s\ |\ s)\ \&\ t = t_{n-1}\ t_{n}\ \ldots\ t_{k+1}\ t_k\ 0\ \ldots\ 0
+\end{equation}
+
+Now split the equivalence into its corresponding implications.
+\begin{enumerate}
+	\item Given $(-s\ |\ s)\ \&\ t = t$, we need to show
+	$(\exists x\ :\ \texttt{BV}_n. x \cdot s = t)$.
+	
+	From $(-s\ |\ s)\ \&\ t = t$, we can derive\\
+	\begin{tabular}{c c c c c c c c c c}
+		&&$t_{n-1}$ & $t_{n}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$\\
+		&$= $&$t_{n-1}$ &$t_{n}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$
+	\end{tabular}\\
+	by substituting equation~(\ref{eq1}) on the left hand-side
+	and so the least significant $k$ bits of $t$ are $0$ ($k \geq 0$).
+	
+	Then, there exists some $t^{\prime}$ such that
+	\begin{align*}
+		t &= t^{\prime} << k\\
+		  &= 2^k \cdot t^{\prime}
+	\end{align*}
+\end{enumerate}
+\end{document}
