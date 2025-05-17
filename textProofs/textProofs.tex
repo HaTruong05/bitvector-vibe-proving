@@ -50,48 +50,71 @@ If $s = 0$, we can prove both implications as follows:
 
 \subsection*{Case: $s \neq 0$}
 At least one of $s$'s bits must be one. In other words,
-$$s = s_{n-1}s_{n} \ldots s_{k+1}10 \ldots 0$$
+$$s = s_{n-1}s_{n-2} \ldots s_{k+1}10 \ldots 0$$
 There are $k$ least significant $0$s in $s$ where $k \geq 0$. Then,
 \begin{align*}
 	-s &= \neg s + 1\\
-	&= \neg s_{n-1} \neg s_n \ldots \neg s_{k+1} 0 1 \ldots 1\\
-	&= \neg s_{n-1} \neg s_n \ldots \neg s_{k+1} 1 0 \ldots 0
+	&= \neg s_{n-1} \neg s_{n-2} \ldots \neg s_{k+1} 0 1 \ldots 1\\
+	&= \neg s_{n-1} \neg s_{n-2} \ldots \neg s_{k+1} 1 0 \ldots 0
 \end{align*}
 and $(-s\ |\ s) =$\\
 	\begin{tabular}{c c c c c c c c c c}
-		& &$\neg s_{n-1}$ & $\neg s_n$ & $\ldots$ & $\neg s_{k+1}$ & $1$ & $0$ & $\ldots$ &$0$\\
-		&$| $&$s_{n-1}$ &$s_{n}$ &$\ldots$ &$s_{k+1}$ &$1$ &$0$ &$\ldots$ &$0$\\
+		& &$\neg s_{n-1}$ & $\neg s_{n-2}$ & $\ldots$ & $\neg s_{k+1}$ & $1$ & $0$ & $\ldots$ &$0$\\
+		&$| $&$s_{n-1}$ &$s_{n-2}$ &$\ldots$ &$s_{k+1}$ &$1$ &$0$ &$\ldots$ &$0$\\
 		&$= $&$1$ & $1$ & $\ldots$ & $1$ & $1$ & $0$ & $\ldots$ &$0$
 	\end{tabular}\\
 Then, $(-s\ |\ s)\ \&\ t =$\\
 \begin{tabular}{c c c c c c c c c c}
 	&$ $&$1$ & $1$ & $\ldots$ & $1$ & $1$ & $0$ & $\ldots$ &$0$\\
-	&$\& $&$t_{n-1}$ &$t_{n}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$\\
-	&$= $&$t_{n-1}$ & $t_{n}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$
+	&$\& $&$t_{n-1}$ &$t_{n-2}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$\\
+	&$= $&$t_{n-1}$ & $t_{n-2}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$
 \end{tabular}\\
+
 Thus, we have:
-\begin{equation}
+\begin{equation*}
 	\label{eq1}
 	(-s\ |\ s)\ \&\ t = t_{n-1}\ t_{n}\ \ldots\ t_{k+1}\ t_k\ 0\ \ldots\ 0
-\end{equation}
+\end{equation*}
 
-Now split the equivalence into its corresponding implications.
-\begin{enumerate}
-	\item Given $(-s\ |\ s)\ \&\ t = t$, we need to show
-	$(\exists x\ :\ \texttt{BV}_n. x \cdot s = t)$.
-	
-	From $(-s\ |\ s)\ \&\ t = t$, we can derive\\
+Hence the invertible condition $(-s\ |\ s)\ \&\ t = t$ is equivalent to the equality \\
 	\begin{tabular}{c c c c c c c c c c}
-		&&$t_{n-1}$ & $t_{n}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$\\
-		&$= $&$t_{n-1}$ &$t_{n}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$
+		&&$t_{n-1}$ & $t_{n-2}$ & $\ldots$ & $t_{k+1}$ & $t_k$ & $0$ & $\ldots$ &$0$\\
+		&$= $&$t_{n-1}$ &$t_{n-2}$ &$\ldots$ &$t_{k+1}$ &$t_k$ &$t_{k-1}$ &$\ldots$ &$t_0$
 	\end{tabular}\\
-	by substituting equation~(\ref{eq1}) on the left hand-side
-	and so the least significant $k$ bits of $t$ are $0$ ($k \geq 0$).
-	
-	Then, there exists some $t^{\prime}$ such that
-	\begin{align*}
-		t &= t^{\prime} << k\\
-		  &= 2^k \cdot t^{\prime}
-	\end{align*}
-\end{enumerate}
+i.e. that the least significant $k$ bits of $t$ are $0$.
+
+We now reduce to a statement about integers modulo $2^n$. Observe that we may write
+
+\[
+\text{bv2int}(s) = 2^{n-1}s_{n-1} + 2^{n-2}s_{n-2} + \cdots 2^{k+1}s_{k+1} + 2^k = 2^ks'
+\]
+for some odd integer $s'$. Similarly,
+
+\[
+\text{bv2int}(t) = 2^{n-1}t_{n-1} + 2^{n-2}t_{n-2} + \cdots 2^{k+1}t_{k+1} + 2^kt_k + 2^{k-1}t_{k-1} + \cdots + t_0
+\]
+is divisible by $2^k$ in $\mathbb{Z}$ (or equivalently in $\mathbb{Z}/2^n$) if and only the least significant $k$ bits of $t$ are $0$. We saw above that this is equivalent to the invertibility condition $(-s\ |\ s)\ \&\ t = t$.
+
+On the other hand, $(\exists x\ :\ \texttt{BV}_n. x \cdot s = t)$ is equivalent to $(\exists x\ :\ \mathbb{Z}/2^n. x \cdot \text{bv2int}(s) = \text{bv2int}(t))$, since $\text{bv2int} : \texttt{BV}_n \cong \mathbb{Z}/2^n$ preserves multiplication.
+
+Writing $s, t$ for $\text{bv2int}(s), \text{bv2int}(t)$, we are reduced to the following:
+
+\emph{Let $s, t : \mathbb{Z}/2^n$. Suppose $s = 2^k s'$ where $s' : \mathbb{Z}/2^n$ is (the image of) an odd integer. Then $2^k$ divides $t$ in $\mathbb{Z}/2^n$ if and only if $s$ divides $t$ in $\mathbb{Z}/2^n$.}
+
+This is basic number theory:
+
+($\Leftarrow$) Suppose $s$ divides $t$. Let $x$ be such that $x s = t$. From the calculation
+
+\[
+ (xs')2^k = x(2^ks') = xs = t,
+\]
+we conclude that $2^k$ divides $t$.
+
+($\Rightarrow$) Suppose $2^k$ divides $t$. Let $x'$ be such that $x' 2^k = t$. Since $s'$ is (the image of) an odd integer, it is relatively prime to $2^k$. By a result of number theory, $s'$ admits a multiplicative inverse $u$ in $\mathbb{Z}/2^n$. We compute
+
+\[
+(x'u)s = (x'u)(2^ks') = (x'2^k)(us') = x'2^k = t,
+\]
+so that $s$ divides $t$.
+
 \end{document}
