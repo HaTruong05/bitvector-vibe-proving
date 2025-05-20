@@ -1577,3 +1577,71 @@ Proof. intros n s t (Hs, Ht).
 Qed.
 
 (*------------------------------------------------------------*)
+
+(*-----------------------Multiplication-----------------------*)
+(* (s | -s) & t = t <=> (exists x, x * s = t) *)
+Theorem bvmult_eq : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_and (bv_or (bv_neg s) s) t = t)
+    (exists (x : bitvector), (size x = n) /\ (bv_mult x s = t)).
+Proof.
+  intros n s t Hs Ht.
+  destruct (@zeros_one_factorization s).
+  + rewrite H at 1.
+    rewrite bv_neg_zeros_zeros.
+    rewrite (@bv_or_comm (size s)).
+    - rewrite bv_or_0_neutral.
+      rewrite H.
+      rewrite (@bv_and_comm (size s)).
+      * rewrite Hs.
+        rewrite <- Ht.
+        rewrite bv_and_0_absorb.
+        split; intro.
+        ++ exists (zeros (size t)).
+           split.
+           -- apply zeros_size.
+           -- rewrite bv_mult_zero_r.
+              ** apply H0.
+              ** apply zeros_size.
+        ++ destruct H0 as (x, (H0, H1)).
+           rewrite <- H1 at 2.
+           now rewrite bv_mult_zero_r.
+      * apply zeros_size.
+      * now rewrite Hs.
+    - apply zeros_size.
+    - easy.
+  + destruct H as (k, (s', H)).
+    apply (@iff_trans (bv_and (bv_or (bv_neg s) s) t = t)
+          (exists (x : Z), ((x * pow2_int_N k) mod (pow2_int_N n) = bv2int t mod (pow2_int_N n))%Z)).
+    - rewrite H.
+      rewrite bv_neg_zeros_one.
+      rewrite bv_or_neg_zeros_one.
+      assert (n = (size s' + 1 + k)%N).
+      {
+        rewrite <- Hs.
+        rewrite H.
+        apply (@bv_concat_size (size s' + 1) k).
+        + now apply (@bv_concat_size (size s') 1).
+        + apply zeros_size.
+      }
+      rewrite bv_and_or_neg_zeros_one.
+      * rewrite <- Ht.
+        apply bv_and_or_neg_eq_zeros_one.
+        rewrite Ht.
+        rewrite H0.
+        apply N.le_add_l.
+      * now rewrite Ht.
+    - apply (@iff_trans (exists (x : Z), ((x * pow2_int_N k) mod (pow2_int_N n) = bv2int t mod (pow2_int_N n))%Z)
+            (exists (x : Z), ((x * bv2int s) mod (pow2_int_N n) = bv2int t mod (pow2_int_N n))%Z)).
+      * replace (bv2int s) with (pow2_int_N k * (2 * list2int s' + 1))%Z.
+        ++ apply divide_mod_pow2_int_N.
+           now exists (bv2int s').
+        ++ rewrite H.
+           rewrite bv2int_app.
+           rewrite zeros_size.
+           rewrite bv2int_zeros.
+           now rewrite Z.add_0_r.
+      * now apply bv2int_exists_bv_mult_eq.
+Qed.
+
+(*------------------------------------------------------------*)

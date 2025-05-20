@@ -719,6 +719,8 @@ Fixpoint mk_list_true (t: nat) : list bool :=
     | S t' => true::(mk_list_true t')
   end.
 
+Definition ones (n : N) : bitvector := mk_list_true (N.to_nat n).
+
 Fixpoint mk_list_false_acc (t: nat) (acc: list bool) : list bool :=
   match t with
     | O    => acc
@@ -806,6 +808,14 @@ Proof.
       easy.
 Qed.
 
+(* mk_list_false (n + m) = mk_list_false n ++ mk_list_false m *)
+Lemma mk_list_false_plus : forall (n m : nat),
+  mk_list_false (n + m) = mk_list_false n ++ mk_list_false m.
+Proof.
+  intros. induction n.
+  + easy.
+  + simpl. now rewrite IHn.
+Qed.
 
 (* forall x : bitvector, size(x) >= 0 *)
 
@@ -1277,6 +1287,9 @@ Lemma one_size (n : N) : size (one n) = n.
 Proof. unfold size. unfold one. rewrite length_mk_list_one.
   rewrite N2Nat.id. reflexivity. Qed.
 
+Lemma ones_size (n : N) : size (ones n) = n.
+Proof. unfold size, ones. now rewrite length_mk_list_true, N2Nat.id. Qed. 
+
 Definition smin_big_endian (t : nat) : list bool :=
   match t with
     | O => []
@@ -1573,6 +1586,21 @@ Proof. induction a as [ | a' xs IHxs].
          inversion H; auto.
 Qed.
 
+Lemma map2_and_app : forall (a a' b b' : list bool),
+  length a = length b -> length a' = length b' ->
+  (map2 andb (a ++ a') (b ++ b')) = map2 andb a b ++ map2 andb a' b'.
+Proof.
+  induction a; intros.
+  + now destruct b.
+  + destruct b.
+    - easy.
+    - simpl.
+      rewrite IHa.
+      * easy.
+      * now injection H.
+      * apply H0.
+Qed.
+
 (*bitvector AND properties*)
 
 Lemma bv_and_size n a b : size a = n -> size b = n -> size (bv_and a b) = n.
@@ -1653,18 +1681,18 @@ Proof. intro a. unfold bv_and, bv_empty, size.
        case (length a); simpl; auto.
 Qed.
 
-Lemma bv_and_1_neutral: forall a, (bv_and a (mk_list_true (length (bits a)))) = a.
+Lemma bv_and_1_neutral: forall a, (bv_and a (ones (size a))) = a.
 Proof. intro a. unfold bv_and.
-       rewrite N.eqb_compare. unfold size, bits. rewrite length_mk_list_true.
-       rewrite N.compare_refl.
-       rewrite map2_and_1_neutral. reflexivity.
+       rewrite ones_size. rewrite N.eqb_refl. unfold ones, size, bits.
+       rewrite Nat2N.id.
+       apply map2_and_1_neutral.
 Qed.
 
-Lemma bv_and_0_absorb: forall a, (bv_and a (mk_list_false (length (bits a)))) = (mk_list_false (length (bits a))).
+Lemma bv_and_0_absorb: forall a, (bv_and a (zeros (size a))) = zeros (size a).
 Proof. intro a. unfold bv_and.
-       rewrite N.eqb_compare. unfold size, bits. rewrite length_mk_list_false. 
-       rewrite N.compare_refl.
-       rewrite map2_and_0_absorb. reflexivity.
+       rewrite zeros_size. rewrite N.eqb_refl. unfold zeros, size, bits.
+       rewrite Nat2N.id.
+       apply map2_and_0_absorb.
 Qed.
 
 (* lists bitwise OR properties *)
@@ -1778,6 +1806,21 @@ Proof. intro a.
          now rewrite H, IHa.
 Qed.
 
+Lemma map2_or_app : forall (a a' b b' : list bool),
+  length a = length b -> length a' = length b' ->
+  (map2 orb (a ++ a') (b ++ b')) = map2 orb a b ++ map2 orb a' b'.
+Proof.
+  induction a; intros.
+  + now destruct b.
+  + destruct b.
+    - easy.
+    - simpl.
+      rewrite IHa.
+      * easy.
+      * now injection H.
+      * apply H0.
+Qed.
+
 (*bitvector OR properties*)
 
 Lemma bv_or_size n a b : size a = n -> size b = n -> size (bv_or a b) = n.
@@ -1831,20 +1874,19 @@ Proof. intros a b n i H0 H1 H2.
        now rewrite <- Nat2N.inj_iff, H1. rewrite Nat2N.id in H2; exact H2.
 Qed.
 
-Lemma bv_or_0_neutral: forall a, (bv_or a (mk_list_false (length (bits a)))) = a.
+Lemma bv_or_0_neutral: forall a, (bv_or a (zeros (size a))) = a.
 Proof. intro a. unfold bv_or.
-       rewrite N.eqb_compare. unfold size, bits. rewrite length_mk_list_false.
-       rewrite N.compare_refl.
-       rewrite map2_or_0_neutral. reflexivity.
+       rewrite zeros_size. rewrite N.eqb_refl. unfold zeros, size, bits.
+       rewrite Nat2N.id.
+       apply map2_or_0_neutral.
 Qed.
 
-Lemma bv_or_1_true: forall a, (bv_or a (mk_list_true (length (bits a)))) = (mk_list_true (length (bits a))).
+Lemma bv_or_1_true: forall a, (bv_or a (ones (size a))) = (ones (size a)).
 Proof. intro a. unfold bv_or.
-       rewrite N.eqb_compare.  unfold size, bits. rewrite length_mk_list_true.
-       rewrite N.compare_refl.
-       rewrite map2_or_1_true. reflexivity.
+       rewrite ones_size. rewrite N.eqb_refl. unfold ones, size, bits.
+       rewrite Nat2N.id.
+       apply map2_or_1_true.
 Qed.
-
 
 Lemma bv_or_idem1:  forall a b n, size a = n -> size b = n -> (bv_or (bv_or a b) a) = (bv_or a b).
 Proof. intros a b n H0 H1.
@@ -2445,6 +2487,12 @@ Proof. intro n.
        - auto.
        - simpl. rewrite <- twos_complement_cons_false.
          apply f_equal. exact IHn.
+Qed.
+
+Lemma bv_neg_zeros_zeros : forall (n : N), bv_neg (zeros n) = zeros n.
+Proof.
+  intro.
+  apply twos_complement_false_false.
 Qed.
 
 Lemma subst_list'_empty_neutral: forall (a: list bool), (subst_list' a (mk_list_false (length a))) = a.
@@ -9762,14 +9810,16 @@ Fixpoint pow2_int (n: nat): Z :=
     | S n' => (2 * pow2_int n')%Z
   end.
 
+Definition pow2_int_N (n : N) := pow2_int (N.to_nat n).
+
 Lemma pow2_int_succ : forall (n : nat),
-  (pow2_int (S n) = 2 * pow2_int n)%Z.
+  pow2_int (S n) = (2 * pow2_int n)%Z.
 Proof.
   easy.
 Qed.
 
 Lemma pow2_int_add : forall (n m : nat),
-  (pow2_int (n + m) = pow2_int n * pow2_int m)%Z.
+  pow2_int (n + m) = (pow2_int n * pow2_int m)%Z.
 Proof.
   intros.
   induction n.
@@ -9779,13 +9829,21 @@ Proof.
     now rewrite <- IHn.
 Qed.
 
-Lemma pow2_int_neq_0 : forall (n : nat),
-  pow2_int n <> 0%Z.
+Lemma zero_lt_pow2_int : forall (n : nat),
+  (0 < pow2_int n)%Z.
 Proof.
   induction n.
   + easy.
   + rewrite pow2_int_succ.
-    now apply Z.neq_mul_0.
+    now apply Z.mul_pos_pos.
+Qed.
+
+Lemma pow2_int_neq_zero : forall (n : nat),
+  pow2_int n <> 0%Z.
+Proof.
+  intro.
+  apply Znumtheory.Z_lt_neq.
+  apply zero_lt_pow2_int.
 Qed.
 
 Definition bool2int (b : bool) : Z :=
@@ -9794,16 +9852,16 @@ Definition bool2int (b : bool) : Z :=
 Fixpoint list2int (a: list bool) :=
   match a with
     | [] => 0%Z
-    | h :: t => (2 * (list2int t) + bool2int h)%Z
+    | h :: t => (2 * list2int t + bool2int h)%Z
   end.
 
+Definition bv2int (a: bitvector) := list2int a.
+
 Lemma list2int_cons : forall (x : list bool) (b : bool),
-  list2int (b :: x) = (2 * (list2int x) + bool2int b)%Z.
+  list2int (b :: x) = (2 * list2int x + bool2int b)%Z.
 Proof.
   easy.
 Qed.
-
-Definition bv2int (a: bitvector) := list2int a.
 
 Lemma list2int_bool : forall (b : bool),
   list2int [b] = bool2int b.
@@ -9812,7 +9870,7 @@ Proof.
 Qed.
 
 Lemma list2int_mk_list_false : forall (n : nat),
-  (list2int (mk_list_false n) = 0)%Z.
+  list2int (mk_list_false n) = 0%Z.
 Proof.
   induction n.
   + easy.
@@ -9822,8 +9880,15 @@ Proof.
     * easy.
 Qed.
 
+Lemma bv2int_zeros : forall (n : N),
+  bv2int (zeros n) = 0%Z.
+Proof.
+  intro.
+  apply list2int_mk_list_false.
+Qed.
+
 Lemma list2int_app : forall (x y : list bool),
-  (list2int (x ++ y) = (pow2_int (length x)) * list2int y + list2int x)%Z.
+  list2int (x ++ y) = ((pow2_int (length x)) * list2int y + list2int x)%Z.
 Proof.
   induction x; intros.
   + rewrite Z.mul_1_l.
@@ -9836,7 +9901,16 @@ Proof.
     now rewrite Z.mul_assoc.
 Qed.
 
-Lemma list2int_geq_0 : forall (x : list bool),
+Lemma bv2int_app : forall (x y : bitvector),
+  bv2int (bv_concat x y) = ((pow2_int_N (size y)) * bv2int x + bv2int y)%Z.
+Proof.
+  intros.
+  unfold pow2_int_N, size.
+  rewrite Nat2N.id.
+  apply list2int_app.
+Qed.
+
+Lemma list2int_geq_zero : forall (x : list bool),
   (0 <= list2int x)%Z.
 Proof.
   induction x; intros.
@@ -9847,9 +9921,9 @@ Proof.
     - now destruct a.
 Qed.
 
-Lemma list2int_let_pow2_int : forall (x : list bool) (n : nat),
+Lemma list2int_lt_pow2_int : forall (x : list bool) (n : nat),
   length x = n ->
-  (list2int x < pow2_int n) %Z.
+  (list2int x < pow2_int n)%Z.
 Proof.
   induction x; intros.
   + now destruct n.
@@ -9866,6 +9940,85 @@ Proof.
               apply IHx.
               now injection H.
         ++ now rewrite Z.mul_add_distr_l.
+Qed.
+
+Lemma list2int_mod_pow2_int : forall (x : list bool) (n : nat),
+  length x = n ->
+  ((list2int x) mod (pow2_int n))%Z = list2int x.
+Proof.
+  intros.
+  apply Zmod_small.
+  split.
+  + apply list2int_geq_zero.
+  + now apply list2int_lt_pow2_int.
+Qed.
+
+Lemma list2int_surj : forall (n : nat) (k : Z),
+  (0 <= k)%Z -> (k < pow2_int n)%Z ->
+  (exists (x : list bool), length x = n /\ list2int x = k).
+Proof.
+  induction n; intros.
+  + exists [].
+    split.
+    - easy.
+    - apply Z.le_antisymm.
+      * apply H.
+      * now apply Zlt_succ_le.
+  + destruct (@Z.lt_ge_cases k (pow2_int n)).
+    - destruct (@IHn k).
+      * apply H.
+      * apply H1.
+      * exists (x ++ [false]).
+        destruct H2.
+        split.
+        ++ rewrite length_app.
+           rewrite Nat.add_1_r.
+           now rewrite H2.
+        ++ rewrite list2int_app.
+           rewrite Z.mul_0_r.
+           now rewrite Z.add_0_l.
+    - destruct (@IHn (k - (pow2_int n))%Z).
+      * now apply Zle_minus_le_0.
+      * apply Z.lt_sub_lt_add_r.
+        now rewrite Z.add_diag.
+      * exists (x ++ [true]).
+        destruct H2.
+        split.
+        ++ rewrite length_app.
+           rewrite Nat.add_1_r.
+           now rewrite H2.
+        ++ rewrite list2int_app.
+           rewrite Z.mul_1_r.
+           rewrite H3.
+           rewrite H2.
+           apply Zplus_minus.
+Qed.
+
+Lemma list2int_surj_mod : forall (n : nat) (k : Z),
+  (exists (x : list bool), length x = n /\ ((list2int x) mod (pow2_int n) = k mod (pow2_int n))%Z).
+Proof.
+  intros.
+  destruct (@Z_mod_lt k (pow2_int n)).
+  + apply Z.lt_gt.
+    apply zero_lt_pow2_int.
+  + destruct (@list2int_surj n (k mod (pow2_int n))%Z).
+    - easy.
+    - easy.
+    - exists x.
+      now rewrite list2int_mod_pow2_int.
+Qed.
+
+Lemma bv2int_surj_mod : forall (n : N) (k : Z),
+  (exists (x : bitvector), size x = n /\ ((bv2int x) mod (pow2_int_N n) = k mod (pow2_int_N n))%Z).
+Proof.
+  intros.
+  destruct (@list2int_surj_mod (N.to_nat n) k) as (x, (H, H0)).
+  exists x.
+  split.
+  + unfold size.
+    rewrite H.
+    apply N2Nat.id.
+  + apply H0.
 Qed.
 
 Lemma list2int_inj : forall (x y : list bool),
@@ -9923,9 +10076,36 @@ Proof.
               now apply (@Zmult_reg_l (list2int x) (list2int y) 2).
 Qed.
 
-(* bv2int (x * y) = bv2int x * bv2int y (mod pow2_int n) *)
+Lemma list2int_inj_mod : forall (n : nat) (x y : list bool),
+  length x = n -> length y = n ->
+  ((list2int x) mod (pow2_int n) = (list2int y) mod (pow2_int n))%Z -> x = y.
+Proof.
+  intros.
+  apply list2int_inj.
+  + now rewrite H, H0.
+  + rewrite <- (@list2int_mod_pow2_int x n).
+    - now rewrite <- (@list2int_mod_pow2_int y n).
+    - apply H.
+Qed.
+
+Lemma bv2int_inj_mod : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  ((bv2int x) mod (pow2_int_N n) = (bv2int y) mod (pow2_int_N n))%Z -> x = y.
+Proof.
+  intros.
+  apply (@list2int_inj_mod (N.to_nat n)).
+  + unfold size in H.
+    rewrite <- H.
+    now rewrite Nat2N.id.
+  + unfold size in H0.
+    rewrite <- H0.
+    now rewrite Nat2N.id.
+  + apply H1.
+Qed.
+
+(* bv2int (x * y) = bv2int x * bv2int y (mod 2^n) *)
 Lemma list2int_and_with_bool : forall (x : list bool) (b : bool),
-  (list2int (and_with_bool x b) = list2int x * bool2int b)%Z.
+  list2int (and_with_bool x b) = (list2int x * bool2int b)%Z.
 Proof.
   destruct b.
   + rewrite and_with_true.
@@ -9982,15 +10162,15 @@ Proof.
         ++ apply Z.ltb_lt.
            apply Z.lt_lt_pred.
            now apply Z.ltb_lt.
-       * apply pow2_int_neq_0.
+       * apply pow2_int_neq_zero.
        * easy.
-       * apply pow2_int_neq_0.
+       * apply pow2_int_neq_zero.
        * easy.
 Qed.
 
 Lemma list2int_mult_bool_step_k_h : forall (k : nat) (n : nat) (a b : list bool),
   length a = n -> (length b + k = n)%nat ->
-  ((list2int (mult_bool_step_k_h a b false (Z.of_nat k))) mod (pow2_int n) =
+  (list2int (mult_bool_step_k_h a b false (Z.of_nat k)) mod (pow2_int n) =
   ((pow2_int k) * list2int b + list2int a) mod (pow2_int n))%Z.
 Proof.
   induction k; intros.
@@ -10042,9 +10222,9 @@ Proof.
            -- rewrite <- H0 in H.
               rewrite Nat.add_succ_r in H.
               now injection H.
-        ++ apply pow2_int_neq_0.
+        ++ apply pow2_int_neq_zero.
         ++ easy.
-        ++ apply pow2_int_neq_0.
+        ++ apply pow2_int_neq_zero.
         ++ easy.
 Qed.
 
@@ -10156,8 +10336,8 @@ Qed.
 
 Lemma list2int_mult : forall (n : nat) (x y : list bool),
   length x = n -> length y = n ->
-  (list2int (bvmult_bool x y n) mod (pow2_int n))%Z =
-  ((list2int x) * (list2int y) mod (pow2_int n))%Z.
+  (list2int (bvmult_bool x y n) mod (pow2_int n) =
+  (list2int x) * (list2int y) mod (pow2_int n))%Z.
 Proof.
   intros.
   destruct n.
@@ -10216,8 +10396,8 @@ Qed.
 
 Lemma bv2int_mult : forall (n : N) (x y : bitvector),
   size x = n -> size y = n ->
-  (bv2int (bv_mult x y) mod (pow2_int (N.to_nat n)))%Z =
-  ((bv2int x * bv2int y)%Z mod (pow2_int (N.to_nat n)))%Z.
+  (bv2int (bv_mult x y) mod (pow2_int_N n) =
+  bv2int x * bv2int y mod (pow2_int_N n))%Z.
 Proof.
   intros.
   unfold bv_mult.
@@ -10237,6 +10417,361 @@ Proof.
   + rewrite <- H0.
     unfold size.
     now rewrite Nat2N.id.
+Qed.
+
+Lemma bv2int_exists_bv_mult_eq : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n -> iff 
+  (exists z : Z, ((z * bv2int x) mod (pow2_int_N n))%Z = (bv2int y mod (pow2_int_N n))%Z)
+  (exists z : bitvector, size z = n /\ bv_mult z x = y).
+Proof.
+  intros.
+  split; intro.
+  + destruct H1.
+    destruct (@bv2int_surj_mod n x0) as (z, (H2, H3)).
+    exists z.
+    split.
+    - apply H2.
+    - apply (@bv2int_inj_mod n).
+      * apply bv_mult_size.
+        ++ apply H2.
+        ++ apply H.
+      * apply H0.
+      * rewrite bv2int_mult.
+        ++ rewrite <- Zmult_mod_idemp_l.
+           -- rewrite H3.
+              now rewrite Zmult_mod_idemp_l.
+        ++ apply H2.
+        ++ apply H.
+  + destruct H1 as (z, (H1, H2)).
+    - exists (bv2int z).
+      rewrite <- bv2int_mult.
+      * now rewrite H2.
+      * apply H1.
+      * apply H.
+Qed.
+
+(* 0 * x = x *)
+Lemma bv_mult_zero_r : forall (n : N) (x : bitvector),
+  size x = n ->
+  bv_mult x (zeros n) = zeros n.
+Proof.
+  intros.
+  apply (@bv2int_inj_mod n).
+  + rewrite (@bv_mult_size n).
+    - easy.
+    - apply H.
+    - apply zeros_size.
+  + apply zeros_size.
+  + rewrite bv2int_mult.
+    - rewrite bv2int_zeros.
+      now rewrite Z.mul_0_r.
+    - apply H.
+    - apply zeros_size.
+Qed.
+
+(* (x = 00..0 \/ exists z, x = z100..0) *)
+Lemma mk_list_false_true_factorization : forall (x : list bool),
+  x = mk_list_false (length x) \/ (exists (k : nat) (z : list bool), x = mk_list_false k ++ [true] ++ z).
+Proof.
+  induction x.
+  + now left.
+  + destruct a.
+    - right.
+      exists 0%nat.
+      now exists x.
+    - destruct IHx.
+      * left.
+        now rewrite H at 1.
+      * right.
+        destruct H as (k, (z, H)).
+        exists (S k)%nat.
+        exists z.
+        now rewrite H.
+Qed.
+
+Lemma zeros_one_factorization : forall (x : bitvector),
+  x = zeros (size x) \/ (exists (k : N) (z : bitvector), x = bv_concat (bv_concat z (one 1)) (zeros k)).
+Proof.
+  intro.
+  unfold zeros, size.
+  rewrite Nat2N.id.
+  destruct (@mk_list_false_true_factorization x).
+  + now left.
+  + destruct H as (k, (z, H)).
+    right.
+    exists (N.of_nat k).
+    exists z.
+    now rewrite Nat2N.id.
+Qed.
+
+(* -(z100..0) = ~z011..1 *)
+Lemma map_neg_mk_list_false_true : forall (z : list bool) (k : nat),
+  map negb (mk_list_false k ++ [true] ++ z) =
+  (mk_list_true k ++ [false] ++ map negb z).
+Proof.
+  intros.
+  rewrite map_app.
+  now rewrite not_list_false_true.
+Qed.
+
+Lemma add_list_ingr_mk_list_false_true : forall (z : list bool) (k : nat),
+  add_list_ingr (mk_list_true k ++ [false] ++ map negb z)
+  (mk_list_false k ++ mk_list_false (length [true]) ++ mk_list_false (length z))
+  true = mk_list_false k ++ [true] ++ map negb z.
+Proof.
+  intros.
+  induction k.
+  + simpl.
+    rewrite not_list_length.
+    now rewrite add_list_carry_empty_neutral_r.
+  + simpl.
+    simpl in IHk.
+    now rewrite IHk.
+Qed.
+
+Lemma twos_complement_mk_list_false_true : forall (z : list bool) (k : nat),
+  twos_complement (mk_list_false k ++ [true] ++ z) =
+  (mk_list_false k ++ [true] ++ map negb z).
+Proof.
+  intros.
+  unfold twos_complement.
+  rewrite map_neg_mk_list_false_true.
+  rewrite !length_app.
+  rewrite length_mk_list_false.
+  rewrite !mk_list_false_plus.
+  apply add_list_ingr_mk_list_false_true.
+Qed.
+
+Lemma bv_neg_zeros_one : forall (z : bitvector) (k : N),
+  bv_neg (bv_concat (bv_concat z (one 1)) (zeros k)) =
+  bv_concat (bv_concat (bv_not z) (one 1)) (zeros k).
+Proof.
+  intros.
+  apply twos_complement_mk_list_false_true.
+Qed.
+
+(* (~z011..1 | z100..0) = 11..100..0 *)
+Lemma map2_or_map_neg_mk_list_false_true : forall (z : list bool) (k : nat),
+  map2 orb (mk_list_false k ++ [true] ++ map negb z) (mk_list_false k ++ [true] ++ z) =
+  mk_list_false k ++ mk_list_true (length z + 1).
+Proof.
+  intros.
+  rewrite Nat.add_1_r.
+  rewrite mk_list_true_succ.
+  rewrite map2_or_app.
+  + rewrite map2_or_app.
+    - rewrite <- length_mk_list_false at 2.
+      rewrite map2_or_0_neutral.
+      now rewrite map2_or_neg_true.
+    - easy.
+    - now rewrite <- not_list_length.
+  + easy.
+  + simpl.
+    now rewrite <- not_list_length.
+Qed.
+
+Lemma bv_or_neg_zeros_one : forall (z : bitvector) (k : N),
+  bv_or (bv_concat (bv_concat (bv_not z) (one 1)) (zeros k)) (bv_concat (bv_concat z (one 1)) (zeros k)) = 
+  bv_concat (ones (size z + 1)) (zeros k).
+Proof.
+  intros.
+  unfold bv_or.
+  rewrite !(@bv_concat_size (size z + 1) k).
+  + rewrite N.eqb_refl.
+    unfold ones.
+    rewrite N2Nat.inj_add.
+    unfold size.
+    rewrite Nat2N.id.
+    apply map2_or_map_neg_mk_list_false_true.
+  + now apply (@bv_concat_size (size z) 1).
+  + apply zeros_size.
+  + apply (@bv_concat_size (size z) 1).
+    - now apply bv_not_size.
+    - easy.
+  + apply zeros_size.
+Qed.
+
+(* 11..100..0 & t = t_n-1 t_n-2 .. t_k 00..0 *)
+Lemma map2_and_or_map_neg_mk_list_false_true : forall (y z : list bool) (k : nat),
+  (length z + 1 + k)%nat = length y ->
+  map2 andb ((mk_list_false k) ++ mk_list_true (length z + 1)) y = mk_list_false k ++ skipn k y.
+Proof.
+  intros.
+  assert (length (firstn k y) = k).
+  {
+    apply firstn_length_le.
+    rewrite <- H.
+    apply Nat.le_add_l.
+  }
+  assert (length (skipn k y) = (length z + 1)%nat).
+  {
+    rewrite length_skipn.
+    rewrite <- H.
+    apply Nat.add_sub.
+  }
+  rewrite <- (@firstn_skipn bool k y) at 1.
+  rewrite map2_and_app.
+  + rewrite <- H0 at 1.
+    rewrite map2_and_comm.
+    rewrite map2_and_0_absorb.
+    rewrite H0.
+    rewrite <- H1.
+    rewrite map2_and_comm.
+    now rewrite map2_and_1_neutral.
+  + rewrite length_mk_list_false.
+    now rewrite H0.
+  + now rewrite length_mk_list_true.
+Qed.
+
+Lemma bv_and_or_neg_zeros_one : forall (y z : bitvector) (k : N),
+  size z + 1 + k = size y ->
+  bv_and (bv_concat (ones (size z + 1)) (zeros k)) y = bv_concat (skipn (N.to_nat k) y) (zeros k) .
+Proof.
+  intros.
+  unfold bv_and.
+  rewrite (@bv_concat_size (size z + 1) k).
+  + rewrite H.
+    rewrite N.eqb_refl.
+    unfold ones.
+    rewrite N2Nat.inj_add.
+    unfold size.
+    rewrite Nat2N.id.
+    apply map2_and_or_map_neg_mk_list_false_true.
+    apply Nat2N.inj.
+    rewrite !Nat2N.inj_add.
+    now rewrite N2Nat.id.
+  + apply ones_size.
+  + apply zeros_size.
+Qed.
+
+(* t_n-1 t_n-2 .. t_k 00..0 = t <=> (exists t', t = 2^k * t') *)
+Lemma map2_and_or_map_neg_eq_mk_list_false : forall (y : list bool) (k : nat),
+  (k <= length y)%nat -> iff
+  (mk_list_false k ++ skipn k y = y)
+  (exists (x : Z), ((x * pow2_int k) mod (pow2_int (length y)) = (list2int y) mod (pow2_int (length y)))%Z).
+Proof.
+  intros.
+  apply (@iff_trans (mk_list_false k ++ skipn k y = y) (exists (x : Z),  (x * pow2_int k)%Z = list2int y)).
+  + split; intro.
+    - exists (list2int (skipn k y)).
+      rewrite <- H0 at 2.
+      rewrite list2int_app.
+      rewrite length_mk_list_false.
+      rewrite list2int_mk_list_false.
+      rewrite Z.add_0_r.
+      now rewrite Z.mul_comm.
+    - rewrite <- (@firstn_skipn bool k).
+      f_equal.
+      apply (@list2int_inj_mod k).
+      * apply length_mk_list_false.
+      * now apply firstn_length_le.
+      * rewrite list2int_mk_list_false.
+        destruct H0.
+        rewrite <- (@firstn_skipn bool k y) in H0.
+        rewrite list2int_app in H0.
+        rewrite firstn_length_le in H0.
+        ++ apply Zplus_minus_eq in H0.
+           rewrite (@Z.mul_comm (pow2_int k)) in H0.
+           rewrite <- Z.mul_sub_distr_r in H0.
+           rewrite H0.
+           now rewrite Z_mod_mult.
+        ++ apply H.
+  + split; intro; destruct H0.
+    - exists x.
+      now rewrite H0.
+    - assert ((list2int y - x * pow2_int k) mod (pow2_int (length y)) = 0)%Z.
+      {
+        rewrite Zminus_mod.
+        rewrite H0.
+        now rewrite Z.sub_diag.
+      }
+      apply Z.mod_divide in H1.
+      * destruct H1.
+        exists (x0 * pow2_int (length y - k) + x)%Z.
+        rewrite Z.mul_add_distr_r.
+        rewrite <- Z.mul_assoc.
+        rewrite <- pow2_int_add.
+        rewrite Nat.sub_add.
+        ++ symmetry.
+           now apply Z.sub_move_r.
+        ++ apply H.
+      * apply pow2_int_neq_zero.
+Qed.
+
+Lemma bv_and_or_neg_eq_zeros_one : forall (y : bitvector) (k : N),
+  k <= size y -> iff
+  (bv_concat (skipn (N.to_nat k) y) (zeros k) = y)
+  (exists (x : Z), ((x * pow2_int_N k) mod (pow2_int_N (size y)) = (bv2int y) mod (pow2_int_N (size y)))%Z).
+Proof.
+  intros.
+  unfold pow2_int_N, size.
+  rewrite Nat2N.id.
+  apply map2_and_or_map_neg_eq_mk_list_false.
+  apply Nat.max_r_iff.
+  rewrite <- (@Nat2N.id (length y)).
+  rewrite <- N2Nat.inj_max.
+  f_equal.
+  now apply N.max_r_iff.
+Qed.
+
+(* x odd => x * 2^k | y (mod 2^n) <=> 2^k | y (mod 2^n) *)
+Lemma rel_prime_odd_pow2_int : forall (k : nat) (x : Z),
+  Z.Odd x -> Znumtheory.rel_prime x (pow2_int k).
+Proof.
+  intros.
+  induction k.
+  + apply Znumtheory.rel_prime_sym.
+    apply Znumtheory.rel_prime_1.
+  + apply Znumtheory.rel_prime_mult.
+    - apply Znumtheory.rel_prime_mod_rev.
+      * easy.
+      * rewrite Zmod_odd.
+        destruct (@Z.odd_spec x).
+        apply H1 in H.
+        rewrite H.
+        apply Znumtheory.rel_prime_1.
+    - apply IHk.
+Qed.
+
+Lemma divide_mod_pow2_int : forall (n k : nat) (x y : Z),
+  Z.Odd x -> iff
+  (exists (z : Z), (z * pow2_int k mod (pow2_int n) = y mod (pow2_int n))%Z)
+  (exists (z : Z), (z * (pow2_int k * x) mod (pow2_int n) = y mod (pow2_int n))%Z).
+Proof.
+  split; intro; destruct H0.
+  + assert (@Z.Bezout x (pow2_int n) 1%Z).
+    {
+      apply Z.gcd_bezout.
+      apply Znumtheory.Zgcd_1_rel_prime.
+      now apply rel_prime_odd_pow2_int.
+    }
+    destruct H1 as (a, (b, H1)).
+    exists (x0 * a)%Z.
+    rewrite <- Z.mul_assoc.
+    rewrite (@Z.mul_assoc a).
+    rewrite (@Z.mul_comm a).
+    rewrite <- (@Z.mul_assoc (pow2_int k)).
+    rewrite Z.mul_assoc.
+    rewrite <- Zmult_mod_idemp_r.
+    - replace ((a * x) mod pow2_int n)%Z with (1 mod (pow2_int n))%Z.
+      * rewrite Zmult_mod_idemp_r.
+        now rewrite Z.mul_1_r.
+      * rewrite <- H1.
+        rewrite <- Zplus_mod_idemp_r.
+        rewrite Z_mod_mult.
+        now rewrite Z.add_0_r.
+  + exists (x0 * x)%Z.
+    - rewrite <- Z.mul_assoc.
+      now rewrite (@Z.mul_comm x).
+Qed.
+
+Lemma divide_mod_pow2_int_N : forall (n k : N) (x y : Z),
+  Z.Odd x -> iff
+  (exists (z : Z), (z * pow2_int_N k mod (pow2_int_N n) = y mod (pow2_int_N n))%Z)
+  (exists (z : Z), (z * (pow2_int_N k * x) mod (pow2_int_N n) = y mod (pow2_int_N n))%Z).
+Proof.
+  intros.
+  now apply divide_mod_pow2_int.
 Qed.
 
 
