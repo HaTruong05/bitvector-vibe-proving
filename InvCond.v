@@ -1579,7 +1579,7 @@ Qed.
 (*------------------------------------------------------------*)
 
 (*-----------------------Multiplication-----------------------*)
-(* (s | -s) & t = t <=> (exists x, x * s = t) *)
+(* (-s | s) & t = t <=> (exists x, x * s = t) *)
 Theorem bvmult_eq : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_and (bv_or (bv_neg s) s) t = t)
@@ -1600,12 +1600,12 @@ Proof.
         ++ exists (zeros (size t)).
            split.
            -- apply zeros_size.
-           -- rewrite bv_mult_zero_r.
+           -- rewrite bv_mult_zeros_r.
               ** apply H0.
               ** apply zeros_size.
         ++ destruct H0 as (x, (H0, H1)).
            rewrite <- H1 at 2.
-           now rewrite bv_mult_zero_r.
+           now rewrite bv_mult_zeros_r.
       * apply zeros_size.
       * now rewrite Hs.
     - apply zeros_size.
@@ -1642,6 +1642,141 @@ Proof.
            rewrite bv2int_zeros.
            now rewrite Z.add_0_r.
       * now apply bv2int_exists_bv_mult_eq.
+Qed.
+
+(* s != 0 \/ t != 0 <=> (exists x, x * s != t) *)
+Theorem bvmult_neq : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_eq s (zeros n) = false \/ bv_eq t (zeros n) = false)
+    (exists (x : bitvector), (size x = n) /\ (bv_eq (bv_mult x s) t = false)).
+Proof.
+  intros n s t Hs Ht.
+  case_eq (bv_eq t (zeros n)); intro.
+  + split; intro A.
+    - destruct A.
+      * exists (one n).
+        split.
+        ++ apply one_size.
+        ++ rewrite bv_mult_one_l.
+           -- apply bv_eq_reflect in H.
+              now rewrite H.
+           -- apply Hs.
+      * easy.
+    - destruct A as (x, (Hx, A)).
+      left.
+      apply not_true_is_false.
+      intro.
+      apply bv_eq_reflect in H0.
+      rewrite H0 in A.
+      rewrite bv_mult_zeros_r in A.
+      * apply bv_eq_reflect in H.
+        rewrite H in A.
+        now rewrite bv_eq_refl in A.
+      * apply Hx.
+  + split; intro A.
+    - exists (zeros n).
+      split.
+      * apply zeros_size.
+      * rewrite bv_mult_zeros_l.
+        ++ apply not_true_is_false.
+           intro.
+           apply bv_eq_reflect in H0.
+           rewrite H0 in H.
+           now rewrite bv_eq_refl in H.
+        ++ apply Hs.
+    - now right.
+Qed.
+
+(* t <u s | -s <=> (exists x, x * s >u t) *)
+Theorem bvmult_ugt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_ult t (bv_or (bv_neg s) s) = true)
+    (exists (x : bitvector), (size x = n) /\ (bv_ugt (bv_mult x s) t = true)).
+Proof.
+  intros n s t Hs Ht.
+  split; intro A.
+  + assert (exists x : bitvector, size x = n /\ bv_mult x s = bv_or (bv_neg s) s).
+    {
+      destruct (@bvmult_eq n s ((bv_or (bv_neg s) s))).
+      + apply Hs.
+      + rewrite (@bv_or_size n).
+        * easy.
+        * now apply bv_neg_size.
+        * apply Hs.
+      + apply H.
+        apply bv_and_idem.
+    }
+    destruct H as (x, (Hx, B)).
+    exists x.
+    split.
+    - apply Hx.
+    - rewrite B.
+      now apply bv_ult_bv_ugt.
+  + destruct A as (x, (Hx, A)).
+    apply (@bv_ult_ule_list_trans t (bv_mult x s)).
+    - now apply bv_ugt_bv_ult.
+    - assert (bv_and (bv_or (bv_neg s) s) (bv_mult x s) = bv_mult x s).
+      {
+        destruct (@bvmult_eq n s (bv_mult x s)).
+        + apply Hs.
+        + apply bv_mult_size.
+          - apply Hx.
+          - apply Hs.
+        + apply H0.
+          now exists x.
+      }
+      rewrite <- H.
+      apply bv_ule_and.
+      rewrite (@bv_or_size (size s)).
+      * now rewrite (@bv_mult_size n).
+      * now apply bv_neg_size.
+      * easy.
+Qed.
+
+(* s | -s >=u t <=> (exists x, x * s >=u t) *)
+Theorem bvmult_uge : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_uge (bv_or (bv_neg s) s) t = true)
+    (exists (x : bitvector), (size x = n) /\ (bv_uge (bv_mult x s) t = true)).
+Proof.
+  intros n s t Hs Ht.
+  split; intro A.
+  + assert (exists x : bitvector, size x = n /\ bv_mult x s = bv_or (bv_neg s) s).
+    {
+      destruct (@bvmult_eq n s ((bv_or (bv_neg s) s))).
+      + apply Hs.
+      + rewrite (@bv_or_size n).
+        * easy.
+        * now apply bv_neg_size.
+        * apply Hs.
+      + apply H.
+        apply bv_and_idem.
+    }
+    destruct H as (x, (Hx, B)).
+    exists x.
+    split.
+    - apply Hx.
+    - now rewrite B.
+  + destruct A as (x, (Hx, A)).
+    apply (@bv_uge_list_trans (bv_or (bv_neg s) s) (bv_mult x s)).
+    - assert (bv_and (bv_or (bv_neg s) s) (bv_mult x s) = bv_mult x s).
+      {
+        destruct (@bvmult_eq n s (bv_mult x s)).
+        + apply Hs.
+        + apply bv_mult_size.
+          - apply Hx.
+          - apply Hs.
+        + apply H0.
+          now exists x.
+      }
+      apply bv_ule_bv_uge.
+      rewrite <- H.
+      apply bv_ule_and.
+      rewrite (@bv_or_size (size s)).
+      * now rewrite (@bv_mult_size n).
+      * now apply bv_neg_size.
+      * easy.
+    - apply A.
 Qed.
 
 (*------------------------------------------------------------*)
