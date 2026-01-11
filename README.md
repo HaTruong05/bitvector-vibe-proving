@@ -12,7 +12,7 @@ recostruction tactics of the [Coqhammer](https://github.com/lukaszcz/coqhammer) 
 However, one does not need to install Coqhammer to be able to compile the library,
 since all such tactics are in `Reconstr.v`.
 
-Compilation requires Coq version 8.17.0. To compile, run in `root`:
+Compilation requires Coq version 8.20.0. To compile, run in `root`:
 1. `coq_makefile -f _CoqProject -o Makefile`
 2. `make`
 
