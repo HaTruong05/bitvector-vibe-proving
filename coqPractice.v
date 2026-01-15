@@ -40,7 +40,68 @@ Import ListNotations.
 Open Scope N_scope.
 
 Lemma test : forall (b : bitvector) (n : N), 
+  size b = n -> bv_ule (zeros n) b = true.
+  
+Proof.
+  intros b n Hsize.
+  unfold bv_ule.
+
+  (* 1. Handle the Size Logic *)
+  rewrite Hsize.
+  rewrite zeros_size.      (* Or: unfold zeros. rewrite repeat_length. fold zeros. *)
+  rewrite N.eqb_refl. 
+  simpl.
+
+  (* 2. Prepare the List Comparison *)
+  unfold ule_list. 
+  unfold zeros. rewrite rev_mk_list_false.
+
+  (* 3. CLEAN SETUP: Convert bitvector facts into simple List facts *)
+  remember (rev b) as bits.
+  remember (N.to_nat n) as k.
+  
+  (* Create a clean length hypothesis for the list 'bits' *)
+  assert (Hlen: length bits = k). {
+    subst k bits. rewrite length_rev.
+    (* Convert size b = n into length b = N.to_nat n *)
+    apply (f_equal N.to_nat) in Hsize.
+    unfold size in Hsize. rewrite Nnat.Nat2N.id in Hsize.
+    auto. 
+  }
+
+  (* 4. GENERALIZE: Forget about 'b' and 'n'. We only care about 'bits' and 'k' *)
+  clear Hsize Heqbits Heqk b n.
+  generalize dependent bits.
+
+  (* 5. The Induction (Now Hlen and bits will update correctly!) *)
+  induction k as [| k' IHk]; intros bits Hlen.
+
+  - (* Base Case: k = 0 *)
+    destruct bits.
+    + (* bits is empty ([]) *)
+      simpl. reflexivity.
+    + (* bits is not empty (b :: l) -> Contradiction! *)
+      simpl in Hlen. discriminate.
+
+  - (* Inductive Step: k = S k' *)
+    destruct bits as [| bit bits'].
+    + (* bits is empty ([]) -> Contradiction! *)
+      simpl in Hlen. discriminate.
+    + (* bits has data (bit :: bits') *)
+      simpl. destruct bit.
+      * (* Case: False <= True (Win) *)
+        reflexivity.
+      * (* Case: False <= False (Recurse) *)
+        rewrite Bool.andb_true_l. (* simplify (true && x) *)
+        rewrite Bool.orb_false_r. (* simplify (x || false) *)
+        apply IHk.
+        (* Prove the tail has the right length *)
+        simpl in Hlen. injection Hlen. auto.
+Qed.
+
+Lemma test2 : forall (b : bitvector) (n : N), 
 size b = n -> bv_ule (zeros n) b = true.
+Locate zeros.
 Proof.
 intros. induction b.
 + rewrite <- H. 
