@@ -1780,3 +1780,105 @@ Proof.
 Qed.
 
 (*------------------------------------------------------------*)
+
+(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
+Theorem bv_and_slt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
+Proof.
+Admitted.
+
+(* t <s s & signed_max <=> (exists x, x & s >s t) *)
+Theorem bvand_sgt_signed_max :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((bv_slt t (bv_and s (signed_max n))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sgt (bv_and x s) t) = true)).
+Proof.
+Admitted.
+
+(* s >=u t & signed_min <=> (exists x, x & s <=s t) *)
+Theorem bvand_sle_signed_min :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((bv_uge s (bv_and t (signed_min n))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sle (bv_and x s) t) = true)).
+Proof.
+Admitted.
+
+(* NOT SURE ON THIS ONE, USED AI*)
+(* s & t = t V t <s (t - s) & s <=> (exists x, x & s >=s t) *)
+Theorem bvand_sge_split :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((orb
+          (bv_eq (bv_and s t) t)
+          (bv_slt t (bv_and (bv_subt t s) s))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sge (bv_and x s) t) = true)).
+Proof.
+Admitted.
+
+(* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
+Theorem bv_or_slt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
+Proof.
+Admitted.
+
+(* t <s (s | signed_max) <=> (exists x, x | s >s t) *)
+Theorem bvor_sgt_signed_max :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((bv_slt t (bv_or s (signed_max n))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sgt (bv_or x s) t) = true)).
+Proof.
+Admitted.
+
+(* t >=s s | signed_min <=> (exists x, x | s <=s t) *)
+Theorem bvor_sle_signed_min :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((bv_sge t (bv_or s (signed_min n))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sle (bv_or x s) t) = true)).
+Proof.
+Admitted.
+
+(* NOT SURE IF THIS IS CORRECT *)
+(* s & t <=> (exists x, x | s >=s t) *)
+Theorem bvand_sge_basic :
+  forall (n : N), forall (s t : bitvector),
+    (size s) = n ->
+    (size t) = n ->
+    iff
+      ((bv_eq (bv_and s t) t) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sge (bv_or x s) t) = true)).
+Proof.
+Admitted.
+
+
+
+
