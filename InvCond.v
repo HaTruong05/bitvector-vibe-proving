@@ -8,7 +8,7 @@ Require Import List Bool NArith Psatz (*Int63*) ZArith Nnat.
 (* Remaining Proofs - CSC490 *)
 
 
-(* t <s (maxs >> s) << s <=> (exists x, t <s x << s) *)
+(* (* t <s (maxs >> s) << s <=> (exists x, t <s x << s) *)
 Theorem bvshl_sgt :
   forall (n : N) (s t : bitvector),
     size s = n ->
@@ -102,23 +102,16 @@ Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
     (exists x, size x = n /\ bv_slt t (bv_mult x s) = true)
     (bv_slt t (bv_subt t (bv_or (bv_or s t) (bv_neg s))) = true).
 Proof.
-Admitted.
+Admitted. *)
 
-(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
-Theorem bvand_slt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
-Proof.
-Admitted.
-
+(* 
 (* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
 Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
 Proof.
-Admitted.
+Admitted. *)
 
 
 (*------------------------------Neg------------------------------*)
@@ -171,6 +164,196 @@ Proof. intros n s t Hs Ht.
          now rewrite (@bv_and_comm n x s Hx Hs), (@bv_and_idem1 s x n Hs Hx).
 Qed.
 
+(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
+Theorem bvand_slt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
+Proof.
+
+Search bv_not.
+  intros n s t Hs Ht.
+  split.
+  - intro H_cond.
+      exists (bv_not (bv_neg t)).
+      split.
+        rewrite (@bv_not_size n).
+        split.
+        rewrite (@bv_neg_size n).
+        reflexivity.
+        assumption.
+        +
+        assumption. 
+  - intro H_exists.
+    destruct H_exists as [x [Hx_size Hx_lt]].
+    destruct (bv_slt s (zeros n)) eqn:H_sign.
+    
+    + (* Case 1: s < 0 *)
+      assert (H_not_min : t <> signed_min n).
+      {
+         intro H_is_min.
+         
+         rewrite H_is_min in Hx_lt.
+         
+         pose proof (signed_min_sle (bv_and x s)) as H_imp.
+         Search bv_and.
+         rewrite (bv_and_size Hx_size Hs) in H_imp.
+         rewrite bv_sle_eq in H_imp.
+         destruct H_imp as [H_min_lt_val | H_min_eq_val].
+         + 
+          pose proof (bv_slt_trans Hx_lt H_min_lt_val) as H_cycle.
+          rewrite bv_slt_nrefl in H_cycle. 
+          discriminate.
+         + 
+          rewrite <- H_min_eq_val in Hx_lt.
+          rewrite bv_slt_nrefl in Hx_lt.
+          discriminate.
+      }
+      (* Step 2: Prove that (t - 1) is strictly less than t *)
+      (* Reasoning: Since t != min, subtracting 1 stays smaller. *)
+      assert (H_t_minus_1_lt : bv_slt (bv_not (bv_neg t)) t = true).
+      {
+      Search ones.
+        (* 1. Bridge: Convert signed bitvector comparison to Integer comparison *)
+        rewrite bv_slt_iff_sbv2int with (n := n).
+        
+        (* Side goal 1: Prove size (t-1) = n *)
+        2: { 
+        Search "bv_not_size".
+          apply bv_not_size. 
+          apply bv_neg_size.
+          exact Ht. 
+        }
+        
+        (* Side goal 2: Prove size t = n *)
+        2: { exact Ht. }
+        
+        (* 2a. Pre-step: Normalize the syntax of "t minus 1" *)
+        assert (H_syntax_fix : bv_not (bv_neg t) = bv_subt' t (one n)).
+        {
+          (* 2. Apply algebra to move the subtraction *)
+          
+          assert (H_sizes : size (one n) = n /\ size t = n /\ size (bv_not (bv_neg t)) = n).
+          { 
+            split. apply one_size.
+            split. exact Ht.
+            apply bv_not_size, bv_neg_size; auto.
+          }
+          (* Only pass the proof H_sizes explicitly, let Coq infer the rest *)
+          apply (proj1 (bvadd_U H_sizes)).
+          Check bv_neg_involutive.  
+          rewrite <- bv_neg_involutive.
+          Check bv_neg_is_not_plus_one.
+          Search bv_not one.
+          symmetry. 
+          apply bv_neg_is_not_plus_one.
+          apply bv_neg_size. easy.
+        }
+        rewrite H_syntax_fix.
+
+        (* 2. Arithmetic: Replace value of (t-1) with (val t) - 1 *)
+        (* This requires proving t is not MIN_INT, which is H_not_min *)
+        
+        rewrite sbv2int_sub_one with (n := n).
+        
+        (* Side goal 3: Prove size conditions for the subtraction lemma *)
+        2: { exact Ht. }
+        
+        (* Side goal 4: Prove t <> min (The Guard) *)
+        2: { exact H_not_min. }
+
+        (* 3. Solve: The goal is now (val t - 1 < val t)%Z *)
+        lia.
+        
+      }
+
+      (* Step 3: Prove that ((t-1) & s) <= (t-1) *)
+      (* This was your 'bvand_slt_helper1' *)
+      assert (H_le : bv_sle (bv_and (bv_not (bv_neg t)) s) (bv_not (bv_neg t)) = true).
+      { 
+         (* Need bitwise lemma: a & b <= a (careful with signs here!) *)
+(*          bv_ule_and. USEFUL LATER *)
+         admit.
+      }
+      
+      apply (bv_sle_slt_trans H_le H_t_minus_1_lt).
+    
+    (* ========================================================== *)
+    (* CASE 2: s is NON-NEGATIVE (s >= 0)                         *)
+    (* ========================================================== *)
+    +
+      rewrite (bv_slt_negb_sle Hs (zeros_size n)) in H_sign. 
+      apply negb_false_iff in H_sign.
+      
+      (* 2. Prove s is Positive (last bit is 0) *)
+      rewrite <- Hs in H_sign.
+      rewrite bv_zeros_sle in H_sign.
+      apply negb_true_iff in H_sign.
+       assert (H_and_sz : size (bv_and x s) = n).
+        { apply bv_and_size; assumption. }
+        
+      (* 3. Prove (x & s) is Positive *)
+      assert (H_xs_pos : last (bv_and x s) false = false).
+      {
+         Search "pos_bvand_pos".
+         Search bv_and.
+         rewrite (bv_and_comm Hx_size Hs).
+         apply (pos_bvand_pos Hs Hx_size H_sign).  
+      }
+      destruct (bv_slt t (zeros n)) eqn:H_t_sign.
+      * 
+      (* Case 2a: t < 0 (Contradiction) *)
+      (* 1. Prove t is Negative (last bit is 1) *)
+      rewrite <- Ht in H_t_sign.
+      rewrite bv_slt_zeros in H_t_sign. 
+      (* H_t_sign: last t false = true *)
+
+      assert (H_size_match : size t = size (bv_and x s)).
+      { 
+        rewrite H_and_sz.
+        assumption.
+      }
+      (* 4. Use bv_slt_tf to prove t < (x & s) *)
+      pose proof (bv_slt_tf H_size_match H_t_sign H_xs_pos) as H_contra.
+      
+      (* 5. Final Clash: (x&s) < t AND t < (x&s) implies (x&s) < (x&s) *)
+      pose proof (bv_slt_trans H_contra Hx_lt) as H_impossible.
+      rewrite bv_slt_nrefl in H_impossible.
+      discriminate.
+      *
+      rewrite (bv_slt_negb_sle Ht (zeros_size n)) in H_t_sign. 
+      apply negb_false_iff in H_t_sign.
+      Search bv_sle.
+      apply bv_sle_eq in H_t_sign.
+      destruct H_t_sign as [H_t_pos | H_t_eq_0].
+      **
+        Check bv_sle_slt_trans.
+        apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
+        (* Subgoal 1: Prove ((t-1) & s) <= (t-1) *)
+        {
+          admit.
+        }
+    
+        (* Subgoal 2: Prove (t-1) < t *)
+        { 
+           (* Since t > 0, subtracting 1 makes it smaller. *)
+          admit.
+        }             
+      **
+        (* 1. Replace t with 0 everywhere *)
+        rewrite <- H_t_eq_0 in *.
+        rewrite <- H_and_sz in Hx_lt.
+        
+        (* 2. Expose the contradiction in Hx_lt *)
+        (* Hx_lt says: (x & s) < 0 *)
+        (* This means the sign bit of (x & s) is 1 (true) *)
+        rewrite (bv_slt_zeros (bv_and x s)) in Hx_lt.
+
+        (* 4. Final Clash *)
+        (* Hx_lt says it's true, H_pos says it's false *)
+        rewrite H_xs_pos in Hx_lt.
+        discriminate.
+Admitted.
 
 (*------------------------------------------------------------*)
 
@@ -425,13 +608,13 @@ Proof. split; intros.
          rewrite H, <- H1, Nat2N.id. now rewrite N2List_list2N.
 Qed.
 
-(* mins << s <s t + mins <=> (exists x, s << x <s t) *)
+(* (* mins << s <s t + mins <=> (exists x, s << x <s t) *)
 Theorem bvshl_slt2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_slt (bv_shl (signed_min n) s) (bv_add t (signed_min n)) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_shl s x) t) = true)).
 Proof.
-Admitted.
+Admitted. *)
 
 (*------------------------------------------------------------*)
 
@@ -1880,23 +2063,23 @@ Proof.
     - apply A.
 Qed.
 
-(* ~(-t) & (-s | s) <s t <=> (exists x, x * s <s t) *)
+(* (* ~(-t) & (-s | s) <s t <=> (exists x, x * s <s t) *)
 Theorem bvmult_slt : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists x, size x = n /\ bv_slt (bv_mult x s) t = true)
     (bv_slt (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) t = true).
 Proof.
-Admitted.
+Admitted. *)
     
-(* t <s t - ((s | t) | -s) <=> (exists x, x * s >s t) *)
+(* (* t <s t - ((s | t) | -s) <=> (exists x, x * s >s t) *)
 Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists x, size x = n /\ bv_slt t (bv_mult x s) = true)
     (bv_slt t (bv_subt t (bv_or (bv_or s t) (bv_neg s))) = true).
 Proof.
-Admitted.
+Admitted. *)
 
 (*------------------------------------------------------------*)
 

@@ -352,7 +352,7 @@ Module RAW2BITVECTOR (M:RAWBITVECTOR) <: BITVECTOR.
   Definition bv_sltP n (bv1 bv2:bitvector n) := M.bv_sltP bv1 bv2.
 
   Definition bv_uleP n (bv1 bv2:bitvector n) := M.bv_uleP bv1 bv2.
-
+ 
   Definition bv_sleP n (bv1 bv2:bitvector n) := M.bv_sleP bv1 bv2.
 
   Definition bv_ugtP n (bv1 bv2:bitvector n) := M.bv_ugtP bv1 bv2.
@@ -10951,7 +10951,159 @@ Proof.
   now apply divide_mod_pow2_int.
 Qed.
 
+(* Start: bvand_slt *)
 
+(* signed *)
+Definition sbv2int (n : N) (v : bitvector) : Z :=
+  let u := bv2int v in
+  let half := pow2_int_N (n - 1) in
+  if (u <? half)%Z then u else (u - pow2_int_N n)%Z.
+  
+Lemma bv_slt_iff_sbv2int : forall n (x y : bitvector),
+  size x = n -> size y = n ->
+  bv_slt x y = true <-> (sbv2int n x < sbv2int n y)%Z.
+Proof. Admitted.
+
+
+(* Bitvector minus one equals Integer minus one, IF we don't wrap around. *)
+Lemma sbv2int_sub_one : forall n (t : bitvector),
+  size t = n ->
+  t <> signed_min n ->
+  sbv2int n (bv_subt' t (one n)) = (sbv2int n t - 1)%Z.
+Proof. 
+Admitted.
+
+(*-t = ~t + 1 *)
+Lemma bv_neg_is_not_plus_one : forall (a : bitvector) (n : N), 
+  size a = n -> 
+  bv_neg a = bv_add (bv_not a) (one n).
+Proof.
+  intros a n Hs.
+  unfold bv_neg.
+  unfold twos_complement.
+  unfold bv_add.
+  (* 1. Force the check to be true *)
+  match goal with
+  | [ |- _ = (if ?CHECK then _ else _) ] => replace CHECK with true
+  end.
+
+  (* 2. Prove that the sizes actually match (Side Goal) *)
+  2: {
+      symmetry. 
+      apply N.eqb_eq. (* Switches from boolean (=?) to logical (=) *)
+      
+      (* Show LHS size is n *)
+      apply bv_not_size.
+      rewrite one_size. easy.
+      }
+
+  assert (H_zeros: forall m : nat, add_list_ingr (mk_list_false m) (mk_list_false m) false = mk_list_false m).
+  {
+    intro m. induction m as [|m' IHm]; simpl.
+    - reflexivity.
+    - f_equal. exact IHm.
+  }
+    
+  assert (H_one: one n = add_list_ingr (mk_list_false (N.to_nat n)) (mk_list_false (N.to_nat n)) true).
+  {
+    unfold one.
+    induction (N.to_nat n) as [|k IH].
+    - reflexivity.
+    - destruct k.
+      + reflexivity. 
+      + simpl in *.
+        rewrite IH.
+        simpl.
+        f_equal.
+        
+        (* 2. Now you can rewrite using H_zeros simply by passing the current 'k' *)
+        rewrite (H_zeros k).
+
+        (* Complete the proof using the snoc logic *)
+        clear. induction k; simpl; [reflexivity | f_equal; apply IHk].
+  }
+  (* 1. Fix the length mismatch so terms align *)
+  replace (length a) with (N.to_nat n).
+  2: {
+      (* 1. Use your hypothesis backwards: change 'n' to 'size a' *)
+      rewrite <- Hs.
+      
+      (* 2. Reveal what 'size' is: 'N.of_nat (length a)' *)
+      unfold size.
+      
+      (* 3. Apply the law: N.to_nat (N.of_nat x) = x *)
+      rewrite Nat2N.id.
+      
+      (* 4. Done: length a = length a *)
+      reflexivity.
+      }
+
+  (* 2. Substitute 'one n' with your new definition *)
+  rewrite H_one.
+
+  (* 3. Unfold wrappers to see the raw 'add_list_ingr' structure *)
+  unfold add_list, bv_not.
+
+  (* Current state: *)
+  (* LHS: ~a + 0 + 1 *)
+  (* RHS: ~a + (0 + 0 + 1) + 0 *)
+
+  (* 1. Normalize 'bits a' to 'a' so it matches the LHS *)
+  unfold bits in *. 
+  (* Manually force the RHS to look the way we want *)
+  replace (add_list_ingr (map negb a) (add_list_ingr (mk_list_false (N.to_nat n)) (mk_list_false (N.to_nat n)) true) false)
+     with (add_list_ingr (add_list_ingr (mk_list_false (N.to_nat n)) (mk_list_false (N.to_nat n)) true) (map negb a) false).
+  
+  (* Prove the swap is valid using commutativity *)
+  2: { apply add_list_carry_comm. }
+
+  (* Now continue with the main proof... *)
+  rewrite <- bv_neg_involutive_aux.
+
+
+  (* 2. Use this fact to simplify the inner term *)
+  rewrite H_zeros.
+
+  (* Current State: *)
+  (* LHS: add_list_ingr (~a) (zeros) true *)
+  (* RHS: add_list_ingr (zeros) (~a) true *)
+
+  (* 3. Swap arguments on the RHS to match the LHS *)
+  rewrite add_list_carry_comm.
+
+  (* 4. Done *)
+  reflexivity.
+Qed.
+
+Lemma bv_and_neg_sle_itself : forall n (a s : bitvector),
+  size a = n -> size s = n ->
+  bv_slt s (zeros n) = true ->  
+  bv_sle (bv_and a s) a = true.
+Proof.
+  admit.
+Admitted.
+
+(* End: bvand_slt *)
+
+
+
+(* MSB(a) = 0 -> MSB(a && b) = 0
+   In other words, anding with a positive number returns a positive number *)
+
+Lemma pos_bvand_pos : forall (x y : bitvector) (n : N), size x = n -> size y = n -> last x false = false -> last (bv_and x y) false = false.
+Proof.
+intros x y n Hx Hy H. rewrite <- hd_rev in *.
+unfold bv_and. rewrite Hx, Hy. assert (n =? n = true) by apply N.eqb_refl. rewrite H0.
+About rev_map2_and. rewrite rev_map2_and. unfold bits. induction (rev x).
++ induction (rev y).
+  - easy.
+  - easy.
++ unfold hd in H. rewrite H. unfold hd. induction (rev y).
+  - easy.
+  - case a0; easy.
++ pose proof bits_size as bits_size.
+  rewrite !bits_size. rewrite Hx, Hy. easy.
+Qed.
 
 
 End RAWBITVECTOR_LIST.
