@@ -1829,7 +1829,7 @@ Proof.
     + (* Case: t is negative (MSB = 1) *)
       (* t & signed_min = signed_min *)
       assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      About pos_bvand_pos.
+      About bv_and_signed_min_pos.
       { apply bv_and_signed_min_neg; assumption. }
       rewrite Hmask in H.
       
