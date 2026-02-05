@@ -1803,17 +1803,131 @@ Proof.
 Admitted.
 
 (* s >=u t & signed_min <=> (exists x, x & s <=s t) *)
-Theorem bvand_sle_signed_min :
-  forall (n : N), forall (s t : bitvector),
-    (size s) = n ->
-    (size t) = n ->
-    iff
-      ((bv_uge s (bv_and t (signed_min n))) = true)
-      (exists (x : bitvector),
-          (size x = n) /\
-          ((bv_sle (bv_and x s) t) = true)).
+Theorem bv_uge_s_impl_ex : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  (bv_uge s (bv_and t (signed_min n)) = true <-> exists x, size x = n /\ bv_sle (bv_and x s) t = true).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split; intro H.
+  
+  (* ===== Direction 1: Left to Right ===== *)
+  - (* Given: s >=u (t & signed_min) *)
+    (* Show: exists x such that (x & s) <=s t *)
+    
+    (* Witness: x = signed_min n *)
+    exists (signed_min n).
+    split.
+    { apply signed_min_size. }
+    
+    (* Commutativity: (signed_min & s) <=s t *)
+    (* We pass the size proofs explicitly to satisfy the lemma *)
+    rewrite (bv_and_comm (signed_min_size n) Hs).
+    
+    (* Case analysis on sign of t *)
+    destruct (last (bits t) false) eqn:Hsign_t.
+    
+    + (* Case: t is negative (MSB = 1) *)
+      (* t & signed_min = signed_min *)
+      assert (Hmask: bv_and t (signed_min n) = signed_min n).
+      About pos_bvand_pos.
+      { apply bv_and_signed_min_neg; assumption. }
+      rewrite Hmask in H.
+      
+      (* We know s >=u signed_min. We need to check if n=0 to safely handle MSB logic. *)
+      destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+      * (* n = 0 *)
+        subst n.
+        apply bits_size in Hs. apply bits_size in Ht.
+        rewrite Hs, Ht in *. simpl. apply bv_sle_refl.
+      * (* n > 0 *)
+        assert (Hn_gt_0: (0 < n)%N) by lia.
+        
+        (* If s >=u signed_min, s must be negative *)
+        assert (Hs_neg: last (bits s) false = true).
+        { apply bv_uge_signed_min_implies_msb; assumption. }
+        
+        (* Thus s & signed_min = signed_min *)
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
+        { apply bv_and_signed_min_neg; assumption. }
+        rewrite Hmask_s.
+        
+        (* signed_min is the smallest signed integer, so it is <=s t *)
+        apply signed_min_sle; assumption.
+        
+    + (* Case: t is positive (MSB = 0) *)
+      (* t & signed_min = zeros *)
+      assert (Hmask: bv_and t (signed_min n) = zeros n).
+      { apply bv_and_signed_min_pos; assumption. }
+      rewrite Hmask in H.
+      
+      (* s >=u zeros is trivial. Let's look at s to determine (s & signed_min). *)
+      destruct (last (bits s) false) eqn:Hsign_s.
+      * (* s is negative *)
+        (* s & signed_min = signed_min *)
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
+        { apply bv_and_signed_min_neg; assumption. }
+        rewrite Hmask_s.
+        
+        (* signed_min (neg) <=s t (pos). Negative is always <= Positive *)
+        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { subst. apply bits_size in Hs. rewrite Hs in Hsign_s. simpl in Hsign_s. discriminate. }
+        
+        apply signed_min_sle. 
+        lia.
+        
+      * (* s is positive *)
+        (* s & signed_min = zeros *)
+        assert (Hmask_s: bv_and s (signed_min n) = zeros n).
+        { apply bv_and_signed_min_pos; assumption. }
+        rewrite Hmask_s.
+        
+        (* zeros <=s t (where t is positive) *)
+        apply zeros_sle_nonneg; assumption.
+
+  (* ===== Direction 2: Right to Left ===== *)
+  - (* Given: exists x, x & s <=s t *)
+    destruct H as [x [Hx Hsle]].
+    
+    destruct (last (bits t) false) eqn:Hsign_t.
+    + (* t is negative *)
+      (* Goal: s >=u signed_min *)
+      
+      (* Simplification: t & signed_min = signed_min *)
+      assert (Hmask: bv_and t (signed_min n) = signed_min n).
+      { apply bv_and_signed_min_neg; assumption. }
+      rewrite Hmask.
+
+      (* We must prove s is negative. *)
+      destruct (last (bits s) false) eqn:Hs_case.
+      * (* s is negative. Then s >=u signed_min holds. *)
+        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { subst. apply bv_uge_refl. }
+        { apply bv_msb_implies_uge_signed_min; try assumption. lia. }
+        
+      * (* s is positive. Derive contradiction. *)
+        exfalso.
+        
+        (* x & s is positive *)
+        assert (Hxs_pos: last (bits (bv_and x s)) false = false).
+        { apply (pos_bvand_pos x s n); assumption. }
+        
+        (* Contradiction: (Positive) <=s (Negative) is impossible *)
+        unfold bv_sle in Hsle.
+        rewrite Hxs_pos in Hsle.
+        rewrite Hsign_t in Hsle.
+        simpl in Hsle.
+        discriminate.
+        
+    + (* t is positive *)
+      (* Goal: s >=u zeros *)
+      assert (Hmask: bv_and t (signed_min n) = zeros n).
+      { apply bv_and_signed_min_pos; assumption. }
+      rewrite Hmask.
+      
+      (* Anything is >=u zeros *)
+      apply bv_uge_zeros.
+      assumption.
+Qed.
 
 (* NOT SURE ON THIS ONE, USED AI*)
 (* s & t = t V t <s (t - s) & s <=> (exists x, x & s >=s t) *)

@@ -10951,7 +10951,644 @@ Proof.
   now apply divide_mod_pow2_int.
 Qed.
 
+(*Start: & <=s *)
 
+(* MSB(a) = 0 -> MSB(a && b) = 0 *)
+Lemma pos_bvand_pos : forall (x y : bitvector) (n : N), 
+  size x = n -> size y = n -> last x false = false -> last (bv_and x y) false = false.
+Proof.
+  intros x y n Hx Hy H. rewrite <- hd_rev in *.
+  unfold bv_and. rewrite Hx, Hy. assert (n =? n = true) by apply N.eqb_refl. rewrite H0.
+  rewrite rev_map2_and. unfold bits. induction (rev x).
+  + induction (rev y).
+    - easy.
+    - easy.
+  + unfold hd in H. rewrite H. unfold hd. induction (rev y).
+    - easy.
+    - case a0; easy.
+  + pose proof bits_size as bits_size.
+    rewrite !bits_size. rewrite Hx, Hy. easy.
+Qed.
+
+(* If MSB is 1, AND with signed_min preserves signed_min. *)
+Lemma bv_and_signed_min_neg : forall n v,
+  size v = n ->
+  (last (bits v) false = true -> bv_and v (signed_min n) = signed_min n).
+Proof.
+  intros n v Hv Hlast.
+  
+  (* Use bv_eq_reflect to convert to equality *)
+  apply bv_eq_reflect.
+  
+  (* Show: bv_eq (bv_and v (signed_min n)) (signed_min n) = true *)
+  unfold bv_eq.
+  
+  (* First, check sizes match *)
+  assert (Hsize_and: size (bv_and v (signed_min n)) = n).
+  {
+    apply bv_and_size; assumption || apply signed_min_size.
+  }
+  rewrite Hsize_and, signed_min_size.
+  rewrite N.eqb_refl.
+  
+  (* Now need: beq_list (bits (bv_and v (signed_min n))) (bits (signed_min n)) = true *)
+  unfold bits.
+  unfold bv_and.
+  rewrite Hv, signed_min_size.
+  rewrite N.eqb_refl.
+  
+  (* Now we have: beq_list (and_list v (signed_min n)) (signed_min n) = true *)
+  unfold signed_min.
+  
+  destruct (N.to_nat n) eqn:En.
+  - (* n = 0 case *)
+    simpl. 
+    assert (v = nil).
+    {
+      assert (n = 0%N).
+      {
+        rewrite <- (N2Nat.id n).
+        rewrite En.
+        reflexivity.
+      }
+      unfold size in Hv.
+      rewrite H in Hv.
+      simpl in Hv.
+      apply length_zero_iff_nil.
+      apply Nat2N.inj.
+      rewrite Hv.
+      reflexivity.
+    }
+    subst. simpl. reflexivity.
+    
+  - (* n = S n0 case *)
+    simpl.
+    
+    (* 1. Prove list is not nil *)
+    assert (Hnot_nil: bits v <> nil).
+    { 
+      intro Hnil.
+      apply (f_equal (@length bool)) in Hnil.
+      simpl in Hnil.
+      rewrite bits_size in Hnil.
+      rewrite Hv in Hnil.
+      rewrite En in Hnil.
+      discriminate. 
+    }
+    
+    (* 2. Decompose v using the proof Hnot_nil *)
+    apply exists_last in Hnot_nil.
+    destruct Hnot_nil as [v_prefix [last_bit Heq_v]].
+    rewrite Heq_v in *.
+
+    (* 3. Prove the last bit is 'true' *)
+    rewrite last_app in Hlast. 
+    subst last_bit.
+
+    (* 4. Handle lengths *)
+    pose proof (bits_size v) as Hlen_v.
+    rewrite Heq_v in Hlen_v.
+    rewrite Hv in Hlen_v.
+    rewrite En in Hlen_v.
+    rewrite length_app in Hlen_v.
+    simpl in Hlen_v.
+    rewrite Nat.add_1_r in Hlen_v.
+    injection Hlen_v as Hlen_prefix.
+
+    (* 5. Prove the lists are equal bit-by-bit *)
+    assert (Heq_lists: map2 andb (v_prefix ++ [true]) (rev (mk_list_false n0) ++ [true]) 
+                       = rev (mk_list_false n0) ++ [true]).
+    {
+      apply nth_ext with (d:=false) (d':=false).
+      
+      (* 5a. Check Lengths *)
+      - rewrite length_app. simpl.
+        rewrite length_rev, length_mk_list_false.
+        
+        rewrite <- map2_and_length.
+        (* Subgoal: Prove lengths equal *)
+        2: { 
+          rewrite !length_app. simpl.
+          rewrite Hlen_prefix.
+          rewrite length_rev, length_mk_list_false.
+          reflexivity.
+        }
+        
+        (* Main goal *)
+        rewrite length_app. simpl.
+        rewrite Hlen_prefix.
+        reflexivity.
+        
+      (* 5b. Check Bits *)
+      - intros i Hi.
+        rewrite map2_and_nth_bitOf.
+        (* Note: rewriting map2_and_nth_bitOf creates side goals (length and bound) 
+           that we must address after the cases, or they "fall through". *)
+        
+        (* Split into two cases: Prefix vs Tail *)
+        destruct (lt_dec i n0) as [H_prefix | H_tail].
+        
+        + (* Case 1: We are in the prefix (i < n0) *)
+          rewrite !app_nth1; try assumption;
+            try (rewrite length_rev, length_mk_list_false; assumption);
+            try (rewrite Hlen_prefix; assumption).
+            
+          (* The mask bit is 'false' *)
+          assert (Hbit_false: nth i (rev (mk_list_false n0)) false = false).
+          { 
+             rewrite rev_mk_list_false.
+             clear Hi En Hlen_prefix. 
+             revert i H_prefix.
+             induction n0 as [|n' IH].
+             - intros i Hi_bound. inversion Hi_bound.
+             - intros i Hi_bound.
+               rewrite mk_list_false_succ.
+               destruct i.
+               + simpl. reflexivity.
+               + simpl. apply IH.
+                 simpl in Hi_bound. apply Nat.succ_lt_mono in Hi_bound. assumption.
+          }
+          rewrite Hbit_false.
+          apply Bool.andb_false_r.
+          
+        + (* Case 2: We are at the tail (i >= n0) *)
+          assert (Hi_eq: i = n0).
+          {
+             rewrite <- map2_and_length in Hi.
+             2: {
+                rewrite !length_app. simpl.
+                rewrite Hlen_prefix, length_rev, length_mk_list_false.
+                reflexivity.
+             }
+             rewrite length_app in Hi. simpl in Hi.
+             rewrite Hlen_prefix in Hi.
+             lia.
+          }
+          subst i.
+          
+          (* Here we use * to handle subgoals without breaking the bullet structure *)
+          rewrite !app_nth2.
+          (* 1. Solve the Main Equality (which appeared first) *)
+          * rewrite length_rev, length_mk_list_false.
+            rewrite Hlen_prefix.
+            rewrite Nat.sub_diag. (* Turns (n0 - n0) into 0 *)
+            simpl.
+            reflexivity.
+
+          (* 2. Solve Side Condition 1: Index bound for mask list *)
+          * rewrite length_rev, length_mk_list_false.
+            apply Nat.le_refl.
+
+          (* 3. Solve Side Condition 2: Index bound for v_prefix *)
+          * rewrite Hlen_prefix.
+            apply Nat.le_refl.
+
+        (* Side Condition 1: Lengths equal (generated by map2_and_nth_bitOf) *)
+        + rewrite !length_app. simpl.
+          rewrite Hlen_prefix, length_rev, length_mk_list_false.
+          reflexivity.
+
+        (* Side Condition 2: Bound check (generated by map2_and_nth_bitOf) *)
+        + rewrite length_app. simpl.
+          rewrite Hlen_prefix.
+          
+          (* Use Hi to prove the bound *)
+          rewrite <- map2_and_length in Hi.
+          2: { rewrite !length_app; simpl; rewrite Hlen_prefix, length_rev, length_mk_list_false; reflexivity. }
+          
+          rewrite length_app in Hi. 
+          simpl in Hi.
+          rewrite Hlen_prefix in Hi.
+          lia.
+    }
+
+    (* 6. Finish the goal *)
+    unfold bits. 
+    
+    rewrite Heq_lists.
+    apply List_eq_refl.
+Qed.
+
+(* If MSB is 0, AND with signed_min Then zeros. *)
+Lemma bv_and_signed_min_pos : forall n v,
+  size v = n ->
+  (last (bits v) false = false -> bv_and v (signed_min n) = zeros n).
+Proof.
+  intros n v Hv Hlast.
+  
+  apply bv_eq_reflect.
+  unfold bv_eq.
+  
+  (* 1. Check sizes match *)
+  assert (Hsize_and: size (bv_and v (signed_min n)) = n).
+  {
+    apply bv_and_size; assumption || apply signed_min_size.
+  }
+  rewrite Hsize_and.
+  rewrite zeros_size.
+  rewrite N.eqb_refl.
+  
+  (* 2. Unfold definitions to compare lists *)
+  (* Fix: Do NOT unfold signed_min yet so we can use its size lemma *)
+  unfold bits, bv_and, zeros. 
+  
+  rewrite Hv, signed_min_size.
+  rewrite N.eqb_refl.
+  
+  (* NOW it is safe to unfold signed_min for the list comparison *)
+  unfold signed_min.
+  
+  destruct (N.to_nat n) eqn:En.
+  - (* n = 0 case *)
+    simpl. 
+    assert (v = nil).
+    {
+      assert (n = 0%N). { rewrite <- (N2Nat.id n), En. reflexivity. }
+      unfold size in Hv. rewrite H in Hv. simpl in Hv.
+      apply length_zero_iff_nil. apply Nat2N.inj. rewrite Hv. reflexivity.
+    }
+    subst. simpl. reflexivity.
+    
+  - (* n = S n0 case *)
+    simpl.
+    
+    (* Prove list is not nil *)
+    assert (Hnot_nil: bits v <> nil).
+    { 
+      intro Hnil. apply (f_equal (@length bool)) in Hnil. simpl in Hnil.
+      rewrite bits_size in Hnil. rewrite Hv, En in Hnil. discriminate. 
+    }
+    
+    (* Decompose v *)
+    apply exists_last in Hnot_nil.
+    destruct Hnot_nil as [v_prefix [last_bit Heq_v]].
+    rewrite Heq_v in *.
+
+    (* Prove the last bit is 'false' *)
+    rewrite last_app in Hlast. 
+    subst last_bit.
+
+    (* Handle lengths *)
+    pose proof (bits_size v) as Hlen_v.
+    rewrite Heq_v, Hv, En in Hlen_v.
+    rewrite length_app in Hlen_v. simpl in Hlen_v.
+    rewrite Nat.add_1_r in Hlen_v.
+    injection Hlen_v as Hlen_prefix.
+
+    (* Compare against mk_list_false (which is zeros) *)
+    assert (Heq_lists: map2 andb (v_prefix ++ [false]) (rev (mk_list_false n0) ++ [true]) 
+                       = mk_list_false (S n0)).
+    {
+      apply nth_ext with (d:=false) (d':=false).
+      
+      (* 5a. Check Lengths *)
+      - rewrite length_mk_list_false.
+        rewrite <- map2_and_length.
+        2: { 
+          rewrite !length_app. simpl.
+          rewrite Hlen_prefix, length_rev, length_mk_list_false.
+          reflexivity.
+        }
+        rewrite length_app. simpl.
+        rewrite Hlen_prefix.
+        lia. (* Solves n0 + 1 = S n0 *)
+        
+      (* 5b. Check Bits *)
+      - intros i Hi.
+        rewrite map2_and_nth_bitOf.
+        
+        destruct (lt_dec i n0) as [H_prefix | H_tail].
+        
+        + (* Case 1: Prefix (i < n0) *)
+          rewrite !app_nth1; try assumption;
+            try (rewrite length_rev, length_mk_list_false; assumption);
+            try (rewrite Hlen_prefix; assumption).
+            
+          (* The mask bit (from signed_min) is false *)
+          assert (Hbit_false: nth i (rev (mk_list_false n0)) false = false).
+          { 
+             rewrite rev_mk_list_false.
+             clear Hi En Hlen_prefix. 
+             revert i H_prefix.
+             induction n0 as [|n' IH].
+             - intros. inversion H_prefix.
+             - intros. rewrite mk_list_false_succ. destruct i.
+               + reflexivity.
+               + simpl. apply IH. simpl in H_prefix. apply Nat.succ_lt_mono. assumption.
+          }
+          rewrite Hbit_false.
+          rewrite Bool.andb_false_r.
+          
+          (* Now Goal: false = nth i (mk_list_false (S n0)) false *)
+          symmetry.
+          
+          (* Prove that nth of mk_list_false is always false *)
+          (* Fix: Removed Hlast from this list *)
+          clear Hbit_false H_prefix Hi Hlen_prefix Heq_v En Hv Hsize_and.
+          revert i.
+          induction n0 as [|n' IH].
+          { (* Base case: n0=0. mk_list_false 1 is [false] *)
+            intros i.
+            destruct i.
+            - (* i=0 *) simpl. reflexivity.
+            - (* i>0, looking at empty list *) simpl. destruct i; reflexivity.
+          }
+          { (* Inductive step *)
+            intros i. rewrite mk_list_false_succ. destruct i.
+            - reflexivity.
+            - simpl. apply IH.
+          }
+          
+        + (* Case 2: Tail (i = n0) *)
+          assert (Hi_eq: i = n0).
+          {
+             rewrite <- map2_and_length in Hi.
+             2: { rewrite !length_app; simpl; rewrite Hlen_prefix, length_rev, length_mk_list_false; reflexivity. }
+             rewrite length_app in Hi. simpl in Hi.
+             rewrite Hlen_prefix in Hi.
+             lia.
+          }
+          subst i.
+          
+          rewrite !app_nth2.
+          (* Solve Main Equation *)
+          * rewrite length_rev, length_mk_list_false.
+            rewrite Hlen_prefix.
+            rewrite Nat.sub_diag.
+            simpl.
+            
+            (* Fix: simpl already reduced "false && true" to "false". 
+               So we simply remove the rewrite Bool.andb_false_l command. *)
+            
+            symmetry.
+            
+            (* Prove nth n0 of mk_list_false is false *)
+            (* Fix: Clear En and others to ensure clean induction *)
+            clear Hi H_tail Hlen_prefix Heq_v En Hv Hsize_and.
+            induction n0 as [|n' IH].
+            { simpl. reflexivity. }
+            { 
+              rewrite mk_list_false_succ. 
+              simpl. 
+              (* nth (S n') (false :: ...) becomes nth n' ... *)
+              apply IH. 
+            }
+
+          (* Side Condition 1: Index bound for mask list *)
+          * rewrite length_rev, length_mk_list_false. apply Nat.le_refl.
+          (* Side Condition 2: Index bound for v_prefix *)
+          * rewrite Hlen_prefix. apply Nat.le_refl.
+
+        (* Side Condition 3: Lengths equal (for map2) *)
+        + rewrite !length_app. simpl.
+          rewrite Hlen_prefix, length_rev, length_mk_list_false.
+          reflexivity.
+
+        (* Side Condition 4: Bound check (for map2) *)
+        + rewrite length_app. simpl.
+          rewrite Hlen_prefix.
+          
+          rewrite <- map2_and_length in Hi.
+          2: { rewrite !length_app; simpl; rewrite Hlen_prefix, length_rev, length_mk_list_false; reflexivity. }
+          
+          rewrite length_app in Hi. simpl in Hi.
+          rewrite Hlen_prefix in Hi.
+          lia.
+    }
+
+    (* 6. Finish the goal *)
+    unfold bits.
+    rewrite Heq_lists.
+    apply List_eq_refl.
+Qed.
+
+(* Helper: signed_min has MSB = 1 *)
+Lemma signed_min_last : forall (n : N),
+  (0 < n)%N ->
+  last (signed_min n) false = true.
+Proof.
+  intros n Hn.
+  unfold signed_min.
+  destruct (N.to_nat n) eqn:E.
+  - (* N.to_nat n = 0 *)
+    (* This means n = 0%N *)
+    assert (n = 0%N).
+    {
+      rewrite <- (N2Nat.id n).
+      rewrite E.
+      reflexivity.
+    }
+    (* Contradiction with Hn : (0 < n)%N *)
+    lia.
+  - (* N.to_nat n = S n0 *)
+    simpl.
+    (* After simpl, we have: last (rev (mk_list_false n0) ++ [true]) false = true *)
+    (* The rev was already distributed by simpl *)
+    (* We just need: last (anything ++ [true]) false = true *)
+    destruct n0.
+    + (* n0 = 0: rev (mk_list_false 0) ++ [true] = [] ++ [true] = [true] *)
+      simpl. reflexivity.
+    + (* n0 = S n1: we have a non-empty list ++ [true] *)
+      rewrite last_last.
+      reflexivity.
+Qed.
+
+(* Helper lemma: zeros <=s non-negative values *)
+Lemma zeros_sle_nonneg : forall (n : N) (t : bitvector),
+  size t = n ->
+  last t false = false ->
+  bv_sle (zeros n) t = true.
+Proof.
+  intros n t Ht Hlast.
+  (* Use bv_zeros_sle: bv_sle (zeros (size x)) x = negb (last x false) *)
+  rewrite <- Ht.
+  rewrite bv_zeros_sle.
+  rewrite Hlast.
+  reflexivity.
+Qed.
+
+(* Lemma: s >=u signed_min implies s has MSB = 1 *)
+Lemma bv_uge_signed_min_implies_msb : forall n s,
+  size s = n ->
+  (0 < n)%N ->
+  bv_uge s (signed_min n) = true ->
+  last (bits s) false = true.
+Proof.
+  intros n s Hs Hn Huge.
+  rewrite <- hd_rev.
+  
+  unfold bv_uge in Huge.
+  rewrite Hs, signed_min_size in Huge.
+  rewrite N.eqb_refl in Huge.
+  unfold uge_list in Huge.
+  
+  destruct (N.to_nat n) eqn:En.
+  - (* n = 0 *)
+    assert (n = 0%N) by (rewrite <- (N2Nat.id n), En; reflexivity).
+    lia.
+  - (* n = S n0 *)
+    unfold signed_min, bits in Huge.
+    unfold bits in *. (* Ensure bits is unfolded everywhere *)
+    rewrite rev_involutive in Huge.
+    
+    destruct (rev s) eqn:Erevs.
+    + (* rev s = nil, contradiction *)
+      apply (f_equal (@length bool)) in Erevs.
+      rewrite rev_length in Erevs.
+      simpl in Erevs.
+      
+      pose proof (bits_size s) as Hsize_lemma.
+      unfold bits in Hsize_lemma.
+      rewrite Erevs in Hsize_lemma.
+      simpl in Hsize_lemma.
+      rewrite Hs in Hsize_lemma.
+      
+      destruct n.
+      * (* Case n=0 *)
+        lia.
+      * (* Case n=positive *)
+        simpl in Hsize_lemma.
+        symmetry in Hsize_lemma.
+        pose proof (Pos2Nat.is_pos p) as Hpos.
+        rewrite Hsize_lemma in Hpos.
+        inversion Hpos.
+      
+    + (* rev s = b :: l *)
+      unfold hd. (* Goal becomes 'b = true' *)
+      
+      (* FIX STARTS HERE *)
+      rewrite En in Huge. (* Replace N.to_nat n with S n0 *)
+      simpl in Huge.      (* Unfold smin_big_endian and uge_list *)
+      
+      (* Huge should now imply b is true. 
+         If b is false, we are comparing 0xxxx >= 10000, which fails. *)
+      destruct b.
+      * reflexivity.
+      * simpl in Huge. discriminate.
+Qed.
+
+(* Lemma: if s has MSB = 1, then s >=u signed_min *)
+Lemma bv_msb_implies_uge_signed_min : forall n s,
+  size s = n ->
+  (0 < n)%N ->
+  last (bits s) false = true ->
+  bv_uge s (signed_min n) = true.
+Proof.
+  intros n s Hs Hn Hmsb.
+
+  (* 1. Prepare the comparison *)
+  unfold bv_uge.
+  rewrite Hs, signed_min_size. rewrite N.eqb_refl.
+
+  (* 2. Convert MSB hypothesis to Big-Endian *)
+  rewrite <- hd_rev in Hmsb.
+
+  (* 3. Expose the structure of s *)
+  destruct (rev (bits s)) eqn:Erev.
+  - (* Case: Empty list *)
+    simpl in Hmsb.
+    discriminate.
+  - (* Case: b :: l *)
+    simpl in Hmsb. subst b.
+    
+    (* 4. Expose the structure of signed_min *)
+    unfold signed_min, uge_list.
+    destruct (N.to_nat n) eqn:En.
+    + (* Case: n=0 *)
+      assert (n = 0%N). { rewrite <- (N2Nat.id n), En. reflexivity. }
+      lia.
+    + (* Case: n = S n0 *)
+      unfold smin_big_endian.
+      
+      (* Simplify RHS: rev (rev X) -> X *)
+      rewrite rev_involutive.
+      
+      (* Simplify LHS: rev s -> true :: l *)
+      replace (rev s) with (rev (bits s)) by reflexivity.
+      rewrite Erev.
+      
+      (* Logic: true vs true simplifies to checking tails *)
+      simpl.
+      rewrite Bool.orb_false_r.
+
+      (* 5. Prove tail >= zeros *)
+      assert (H_uge_zeros: forall l_arb, uge_list_big_endian l_arb (mk_list_false (length l_arb)) = true).
+      {
+         intros l_arb. induction l_arb as [|b' l' IH]; simpl.
+         - reflexivity.
+         - destruct b'; simpl.
+           * reflexivity. 
+           * rewrite Bool.orb_false_r. apply IH.
+      }
+
+      (* 6. Align lengths *)
+      assert (Hlen: length l = n0).
+      {
+         apply (f_equal (@length bool)) in Erev.
+         rewrite rev_length in Erev.
+         pose proof (bits_size s) as Hsz.
+         rewrite Hs in Hsz.
+         rewrite En in Hsz.
+         rewrite Hsz in Erev.
+         simpl in Erev. inversion Erev. reflexivity.
+      }
+
+      rewrite <- Hlen.
+      apply H_uge_zeros.
+Qed.
+
+(* Lemma: anything is >=u zeros *)
+Lemma bv_uge_zeros : forall n s,
+  size s = n ->
+  bv_uge s (zeros n) = true.
+Proof.
+  intros n s Hs.
+  unfold bv_uge.
+  rewrite Hs, zeros_size.
+  rewrite N.eqb_refl.
+  unfold zeros.
+
+  (* Helper: Comparing any list against all-falses is true *)
+  assert (H_uge_zeros: forall l, uge_list_big_endian l (mk_list_false (length l)) = true).
+  {
+    intros l.
+    induction l as [|b l' IH].
+    - simpl. reflexivity.
+    - simpl. destruct b.
+      + reflexivity.
+      + simpl. rewrite Bool.orb_false_r. apply IH.
+  }
+
+  (* Helper: rev(zeros) = zeros *)
+  assert (Hzeros_rev: forall k, rev (mk_list_false k) = mk_list_false k).
+  {
+    intro k. induction k.
+    - reflexivity.
+    - simpl. rewrite IHk.
+      clear IHk. induction k.
+      * reflexivity.
+      * simpl. rewrite IHk. reflexivity.
+  }
+
+  (* Prepare the goal *)
+  unfold uge_list.
+  rewrite Hzeros_rev.
+  
+  assert (Hlen: N.to_nat n = length (rev s)).
+  {
+    rewrite rev_length.
+    rewrite <- Hs.
+    symmetry.
+    apply bits_size.
+  }
+  rewrite Hlen.
+  apply H_uge_zeros.
+Qed.
+
+(*End: & <=s *)
+
+
+(**)
 
 
 End RAWBITVECTOR_LIST.
