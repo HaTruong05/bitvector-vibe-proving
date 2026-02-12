@@ -120,6 +120,35 @@ Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
 Proof.
 Admitted.
 
+(* Arjun -- Added for CSC490W26 *)
+Theorem bvand_sgt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+  (bv_slt t (bv_and s (signed_max n)) = true)
+  (exists (x : bitvector), (size x  = n) /\ ((bv_sgt (bv_and x s) t) = true)).
+Proof.
+  intros n s t Hs Ht. split.
+  + intros. exists (signed_max n). split.
+    - apply signed_max_size.
+    - rewrite (@bv_and_comm n (signed_max n) s).
+      assert (bv_ult_slt_symm : forall (x y : bitvector), bv_slt x y = bv_sgt y x).
+      { admit. }
+      rewrite bv_ult_slt_symm in H. apply H. apply signed_max_size. apply Hs.
+  + intros (x, (Hx, H)).
+    assert (bv_ult_slt_symm : forall (x y : bitvector), bv_slt x y = bv_sgt y x).
+      { admit. }
+    rewrite <- bv_ult_slt_symm in H. rewrite (@bv_and_comm n x s) in H.
+    assert (bv_and_sle_maxs : forall (n : N) (x y : bitvector), 
+          size x = n -> size y = n -> bv_sle (bv_and x y) 
+          (bv_and x (signed_max n)) = true).
+    { admit. }
+    specialize (@bv_and_sle_maxs n s x Hs Hx).
+Admitted. 
+(* Theorem bvor_sge : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+  (bv_and s t)
+  (exists (x : bitvector), (size x  = n) /\ ((bv_ule (bv_or x s) t) = true)). *) 
+(* End Arjun -- Added for CSC490W26 *)
+
 
 (*------------------------------Neg------------------------------*)
 (* -x = t <=> True *)

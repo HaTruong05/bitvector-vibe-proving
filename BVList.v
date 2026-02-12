@@ -1231,7 +1231,7 @@ Definition sgt_list (x y: list bool) :=
   sgt_list_big_endian (List.rev x) (List.rev y).
 
 Definition bv_sgt (a b : bitvector) : bool :=
-  if @size a =? @size b then sle_list a b else false.
+  if @size a =? @size b then sgt_list a b else false.
 
 (* Prop output *)
 Definition sgt_listP (x y: list bool) :=
@@ -10951,8 +10951,72 @@ Proof.
   now apply divide_mod_pow2_int.
 Qed.
 
+(* Arjun -- Added for CSC490W26 *)
+(* MSB(a) = 0 -> MSB(a && b) = 0
+   In other words, anding with a positive number returns a positive number *)
 
+Lemma pos_bvand_pos : forall (x y : bitvector) (n : N), size x = n -> size y = n -> last x false = false -> last (bv_and x y) false = false.
+Proof.
+intros x y n Hx Hy H. rewrite <- hd_rev in *.
+unfold bv_and. rewrite Hx, Hy. assert (n =? n = true) by apply N.eqb_refl. rewrite H0.
+rewrite rev_map2_and. unfold bits. induction (rev x).
++ induction (rev y).
+  - easy.
+  - easy.
++ unfold hd in H. rewrite H. unfold hd. induction (rev y).
+  - easy.
+  - case a0; easy.
++ pose proof bits_size as bits_size.
+  rewrite !bits_size. rewrite Hx, Hy. easy.
+Qed.
 
+(* For Ha
+Lemma bv_neg_is_not_plus_one : forall (a : bitvector) (n : N), 
+  size a = n -> 
+  bv_neg a = bv_add (bv_not a) (one n).
+Proof.
+  intros a n Hs.
+  unfold bv_neg.
+  unfold twos_complement.
+  unfold bv_add.
+  (* 1. Force the check to be true *)
+  match goal with
+  | [ |- _ = (if ?CHECK then _ else _) ] => replace CHECK with true
+  end.
+
+  (* 2. Prove that the sizes actually match (Side Goal) *)
+  2: {
+    symmetry. 
+    apply N.eqb_eq. (* Switches from boolean (=?) to logical (=) *)
+    
+    (* Show LHS size is n *)
+    apply bv_not_size.
+    rewrite one_size. easy.
+    }
+  unfold add_list.
+  unfold bv_not.
+  (*Search add_list_ingr.
+  Search one. Compute (one 4). Compute one.*)
+  unfold bits. unfold one. 
+  Search mk_list_one.
+  Search add_list_ingr. unfold size in Hs. 
+  induction (map negb a).
+  + easy.
+  + rewrite <- Hs. rewrite Nat2N.id.
+    assert (rev (mk_list_one (length a)) = add_list_ingr (mk_list_false (length a)) (mk_list_false (length a)) true) by admit.
+    simpl. pose proof Hs as Hs2. rewrite <- N2Nat.id in Hs2. apply Nat2N.inj in Hs2. 
+    simpl. case (length a).
+    - easy.
+    - intros. simpl. case a0, b2, c.
+      * simpl.
+    case (mk_list_false (length a)).
+    - simpl. 
+rewrite H. Search add_list_ingr. simpl.
+ Search (N.to_nat (N.of_nat _)). Search mk_list_one. unfold add_list_ingr. simpl.
+  admit.
+Admitted.*)
+
+(* End Arjun -- Added for CSC490W26 *)
 
 End RAWBITVECTOR_LIST.
  
