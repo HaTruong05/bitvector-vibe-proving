@@ -142,11 +142,20 @@ Proof.
           (bv_and x (signed_max n)) = true).
     { admit. }
     specialize (@bv_and_sle_maxs n s x Hs Hx).
-Admitted. 
+    Search bv_sle.
+    assert (bv_slt_sle_trans : forall (b1 b2 b3 : bitvector),
+    bv_slt b1 b2 = true -> bv_sle b2 b3 = true -> 
+    bv_slt b1 b3 = true).
+    { admit. (* Proof should be similar to bv_sle_slt_trans *) }
+    now apply (@bv_slt_sle_trans t (bv_and s x) (bv_and s (signed_max n))).
+    apply Hx. apply Hs.
+Admitted.
+
 (* Theorem bvor_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
   (bv_and s t)
   (exists (x : bitvector), (size x  = n) /\ ((bv_ule (bv_or x s) t) = true)). *) 
+
 (* End Arjun -- Added for CSC490W26 *)
 
 
