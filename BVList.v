@@ -11110,6 +11110,14 @@ rewrite rev_map2_and. unfold bits. induction (rev x).
   rewrite !bits_size. rewrite Hx, Hy. easy.
 Qed.
 
+Lemma bv_and_sle_maxs : forall (n : N) (x y : bitvector), 
+  size x = n -> size y = n -> 
+  bv_sle (bv_and x y) (bv_and x (signed_max n)) = true.
+Proof.
+  intros n x y Hx Hy.
+  (* Cases sign(x) = 0 and 1 *)
+Admitted.
+
 (* For Ha
 Lemma bv_neg_is_not_plus_one : forall (a : bitvector) (n : N), 
   size a = n -> 
