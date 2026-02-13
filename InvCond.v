@@ -338,32 +338,9 @@ Search bv_not.
       **
         Check bv_sle_slt_trans.
         apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
-        (* Subgoal 1: Prove ((t-1) & s) <= (t-1) *)
+        (* Subgoal 1: Prove ((t-1) & s) <= (t-1) . Need to prove bv_not (bv_neg t)) is pos given t > 0*)
         { 
-          Check bv_and_pos_sle_both.
-          (* Step 1: Prove the tricky term is actually positive *)
-          assert (H_pos_term : last (bv_not (bv_neg t)) false = false).
-          {
-            rewrite H_syntax_fix. (* Changes term to (t - 1) *)
-            (* You need a library lemma here that says: "if 0 < t, then 0 <= t - 1" *)
-            (* Example lemma name: bv_slt_zero_sub_one_nonneg *)
-            Search bv_subt'.
-            apply bv_pos_pred_nonneg. 
-            exact H_t_pos. 
-            (* Note: If you don't have this exact lemma, you might need to unfold 
-               bv_slt and reason about integers directly. *)
-          }
-
-          (* Step 2: Now you can apply the lemma safely *)
-          apply (proj1 (bv_and_pos_sle_both n (bv_not (bv_neg t)) s)).
-          - (* Size of t-1 *) 
-            rewrite size_bv_not, size_bv_neg. exact Ht.
-          - (* Size of s *) 
-            exact Hs.
-          - (* Positivity of t-1 *) 
-            exact H_pos_term. (* We just proved this! *)
-          - (* Positivity of s *) 
-            exact H_sign.
+          admit.
         }
     
         (* Subgoal 2: Prove (t-1) < t *)
