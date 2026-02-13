@@ -9327,6 +9327,18 @@ Proof.
   + now rewrite H.
 Qed.
 
+(* x < y => y <= z => x < z *)
+Lemma bv_slt_sle_trans : forall (b1 b2 b3 : bitvector),
+    bv_slt b1 b2 = true -> bv_sle b2 b3 = true -> 
+    bv_slt b1 b3 = true.
+Proof.
+  intros b1 b2 b3 Hb1b2 Hb2b3.
+  destruct (@bv_sle_eq b2 b3) as (bv_sle_ltr, bv_sle_rtl).
+  apply bv_sle_ltr in Hb2b3. destruct Hb2b3.
+  + now apply (@bv_slt_trans b1 b2 b3).
+  + now rewrite <- H.
+Qed.
+
 (* x <= y => y <= z => x <= z *)
 Lemma sle_list_big_endian_trans : forall (x y z : bitvector),
   sle_list_big_endian x y = true ->
