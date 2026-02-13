@@ -1231,7 +1231,7 @@ Definition sgt_list (x y: list bool) :=
   sgt_list_big_endian (List.rev x) (List.rev y).
 
 Definition bv_sgt (a b : bitvector) : bool :=
-  if @size a =? @size b then sle_list a b else false.
+  if @size a =? @size b then sgt_list a b else false.
 
 (* Prop output *)
 Definition sgt_listP (x y: list bool) :=
@@ -11583,6 +11583,37 @@ Proof.
   }
   rewrite Hlen.
   apply H_uge_zeros.
+Qed.
+
+Lemma bv_sle_size_zero : forall s t,
+  size s = 0%N -> size t = 0%N ->
+  bv_sle s t = true.
+Proof.
+  intros s t Hs Ht.
+  assert (Heq: s = t).
+  {
+    pose proof (bits_size s) as Hbs.
+    pose proof (bits_size t) as Hbt.
+    rewrite Hs in Hbs. rewrite Ht in Hbt.
+    simpl in Hbs, Hbt.
+    apply length_zero_iff_nil in Hbs.
+    apply length_zero_iff_nil in Hbt.
+    
+    (* Use bv_eq_reflect *)
+    apply bv_eq_reflect.
+    unfold bv_eq.
+    
+    (* Check that sizes match *)
+    rewrite Hs, Ht.
+    rewrite N.eqb_refl.
+    
+    (* Check that bit lists match *)
+    rewrite Hbs, Hbt.
+    simpl.
+    reflexivity.
+  }
+  subst.
+  apply bv_sle_refl.
 Qed.
 
 (*End: & <=s *)
