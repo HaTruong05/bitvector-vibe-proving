@@ -113,6 +113,7 @@ Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
 Proof.
 Admitted. *)
 
+Search bv_slt.
 
 (*------------------------------Neg------------------------------*)
 (* -x = t <=> True *)
@@ -185,13 +186,33 @@ Search bv_not.
         +
         assumption. 
   - intro H_exists.
+  (*Pre-step: Normalize the syntax of "t minus 1" *)
+    assert (H_syntax_fix : bv_not (bv_neg t) = bv_subt' t (one n)).
+    {
+          (* 2. Apply algebra to move the subtraction *)
+          
+          assert (H_sizes : size (one n) = n /\ size t = n /\ size (bv_not (bv_neg t)) = n).
+          { 
+            split. apply one_size.
+            split. exact Ht.
+            apply bv_not_size, bv_neg_size; auto.
+          }
+          (* Only pass the proof H_sizes explicitly, let Coq infer the rest *)
+          apply (proj1 (bvadd_U H_sizes)).
+          Check bv_neg_involutive.  
+          rewrite <- bv_neg_involutive.
+          Check bv_neg_is_not_plus_one.
+          Search bv_not one.
+          symmetry. 
+          apply bv_neg_is_not_plus_one.
+          apply bv_neg_size. easy.
+    }
+    (* t <> signed_min *) 
     destruct H_exists as [x [Hx_size Hx_lt]].
-    destruct (bv_slt s (zeros n)) eqn:H_sign.
-    
-    + (* Case 1: s < 0 *)
-      assert (H_not_min : t <> signed_min n).
-      {
+    assert (H_not_min : t <> signed_min n).
+    {
          intro H_is_min.
+         
          
          rewrite H_is_min in Hx_lt.
          
@@ -208,7 +229,9 @@ Search bv_not.
           rewrite <- H_min_eq_val in Hx_lt.
           rewrite bv_slt_nrefl in Hx_lt.
           discriminate.
-      }
+    }
+    destruct (bv_slt s (zeros n)) eqn:H_sign.
+    + (* Case 1: s < 0 *)
       (* Step 2: Prove that (t - 1) is strictly less than t *)
       (* Reasoning: Since t != min, subtracting 1 stays smaller. *)
       assert (H_t_minus_1_lt : bv_slt (bv_not (bv_neg t)) t = true).
@@ -227,28 +250,6 @@ Search bv_not.
         
         (* Side goal 2: Prove size t = n *)
         2: { exact Ht. }
-        
-        (* 2a. Pre-step: Normalize the syntax of "t minus 1" *)
-        assert (H_syntax_fix : bv_not (bv_neg t) = bv_subt' t (one n)).
-        {
-          (* 2. Apply algebra to move the subtraction *)
-          
-          assert (H_sizes : size (one n) = n /\ size t = n /\ size (bv_not (bv_neg t)) = n).
-          { 
-            split. apply one_size.
-            split. exact Ht.
-            apply bv_not_size, bv_neg_size; auto.
-          }
-          (* Only pass the proof H_sizes explicitly, let Coq infer the rest *)
-          apply (proj1 (bvadd_U H_sizes)).
-          Check bv_neg_involutive.  
-          rewrite <- bv_neg_involutive.
-          Check bv_neg_is_not_plus_one.
-          Search bv_not one.
-          symmetry. 
-          apply bv_neg_is_not_plus_one.
-          apply bv_neg_size. easy.
-        }
         rewrite H_syntax_fix.
 
         (* 2. Arithmetic: Replace value of (t-1) with (val t) - 1 *)
@@ -270,11 +271,19 @@ Search bv_not.
       (* Step 3: Prove that ((t-1) & s) <= (t-1) *)
       (* This was your 'bvand_slt_helper1' *)
       assert (H_le : bv_sle (bv_and (bv_not (bv_neg t)) s) (bv_not (bv_neg t)) = true).
-      { 
-         (* Need bitwise lemma: a & b <= a (careful with signs here!) *)
-(*          bv_ule_and. USEFUL LATER *)
-         admit.
+      {
+        apply bv_and_neg_sle_itself with (n := n).
+        - (* 1. size (bv_not (bv_neg t)) = n *)
+          apply bv_not_size, bv_neg_size.
+          exact Ht.
+          
+        - (* 2. size s = n *)
+          exact Hs.
+          
+        - (* 3. bv_slt s (zeros n) = true *)
+          exact H_sign.
       }
+      
       
       apply (bv_sle_slt_trans H_le H_t_minus_1_lt).
     
@@ -330,14 +339,63 @@ Search bv_not.
         Check bv_sle_slt_trans.
         apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
         (* Subgoal 1: Prove ((t-1) & s) <= (t-1) *)
-        {
-          admit.
+        { 
+          Check bv_and_pos_sle_both.
+          (* Step 1: Prove the tricky term is actually positive *)
+          assert (H_pos_term : last (bv_not (bv_neg t)) false = false).
+          {
+            rewrite H_syntax_fix. (* Changes term to (t - 1) *)
+            (* You need a library lemma here that says: "if 0 < t, then 0 <= t - 1" *)
+            (* Example lemma name: bv_slt_zero_sub_one_nonneg *)
+            Search bv_subt'.
+            apply bv_pos_pred_nonneg. 
+            exact H_t_pos. 
+            (* Note: If you don't have this exact lemma, you might need to unfold 
+               bv_slt and reason about integers directly. *)
+          }
+
+          (* Step 2: Now you can apply the lemma safely *)
+          apply (proj1 (bv_and_pos_sle_both n (bv_not (bv_neg t)) s)).
+          - (* Size of t-1 *) 
+            rewrite size_bv_not, size_bv_neg. exact Ht.
+          - (* Size of s *) 
+            exact Hs.
+          - (* Positivity of t-1 *) 
+            exact H_pos_term. (* We just proved this! *)
+          - (* Positivity of s *) 
+            exact H_sign.
         }
     
         (* Subgoal 2: Prove (t-1) < t *)
-        { 
-           (* Since t > 0, subtracting 1 makes it smaller. *)
-          admit.
+        {
+          (* 1. Bridge: Convert signed bitvector comparison to Integer comparison *)
+          rewrite bv_slt_iff_sbv2int with (n := n).
+          
+          (* Side goal 1: Prove size (t-1) = n *)
+          2: { 
+          Search "bv_not_size".
+            apply bv_not_size. 
+            apply bv_neg_size.
+            exact Ht. 
+          }
+          
+          (* Side goal 2: Prove size t = n *)
+          2: { exact Ht. }
+          rewrite H_syntax_fix.
+
+          (* 2. Arithmetic: Replace value of (t-1) with (val t) - 1 *)
+          (* This requires proving t is not MIN_INT, which is H_not_min *)
+          
+          rewrite sbv2int_sub_one with (n := n).
+          
+          (* Side goal 3: Prove size conditions for the subtraction lemma *)
+          2: { exact Ht. }
+          
+          (* Side goal 4: Prove t <> min (The Guard) *)
+          2: { exact H_not_min. }
+
+          (* 3. Solve: The goal is now (val t - 1 < val t)%Z *)
+          lia.
         }             
       **
         (* 1. Replace t with 0 everywhere *)

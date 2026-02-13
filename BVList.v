@@ -1226,19 +1226,18 @@ Definition sgt_list_big_endian (x y: list bool) :=
           (andb (negb xi) yi)
   end.
 
-(* bool output *)
 Definition sgt_list (x y: list bool) :=
   sgt_list_big_endian (List.rev x) (List.rev y).
 
 Definition bv_sgt (a b : bitvector) : bool :=
-  if @size a =? @size b then sle_list a b else false.
+  if @size a =? @size b then sgt_list a b else false.
 
 (* Prop output *)
 Definition sgt_listP (x y: list bool) :=
-  if slt_list x y then True else False.
+  if sgt_list x y then True else False.
 
 Definition bv_sgtP (a b : bitvector) : Prop :=
-  if @size a =? @size b then slt_listP a b else False.
+  if @size a =? @size b then sgt_listP a b else False.
 
 
 
@@ -10973,6 +10972,13 @@ Lemma sbv2int_sub_one : forall n (t : bitvector),
 Proof. 
 Admitted.
 
+Lemma sbv2int_sge_0_iff_last_false : forall n (v : bitvector),
+  size v = n ->
+  (0 <= sbv2int n v)%Z <-> last v false = false.
+Proof.
+Admitted.
+
+
 (*-t = ~t + 1 *)
 Lemma bv_neg_is_not_plus_one : forall (a : bitvector) (n : N), 
   size a = n -> 
@@ -11075,18 +11081,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma bv_and_neg_sle_itself : forall n (a s : bitvector),
-  size a = n -> size s = n ->
-  bv_slt s (zeros n) = true ->  
-  bv_sle (bv_and a s) a = true.
-Proof.
-  admit.
-Admitted.
-
-(* End: bvand_slt *)
-
-
-
 (* MSB(a) = 0 -> MSB(a && b) = 0
    In other words, anding with a positive number returns a positive number *)
 
@@ -11104,6 +11098,267 @@ About rev_map2_and. rewrite rev_map2_and. unfold bits. induction (rev x).
 + pose proof bits_size as bits_size.
   rewrite !bits_size. rewrite Hx, Hy. easy.
 Qed.
+
+Lemma neg_bvand_neg : forall (x y : bitvector) (n : N), 
+  size x = n -> size y = n -> 
+  last x false = true ->   (* x is negative *)
+  last y false = true ->   (* y is negative *)
+  last (bv_and x y) false = true.
+Proof.
+  intros x y n Hx Hy Hx_neg Hy_neg.
+  
+  (* 1. Convert 'last' to 'hd rev' to access the list head *)
+  rewrite <- hd_rev.
+  rewrite <- hd_rev in Hx_neg, Hy_neg.
+
+  (* 2. Unfold definitions *)
+  unfold bv_and.
+  rewrite Hx, Hy.
+  rewrite N.eqb_refl. (* simplifies (n =? n) to true *)
+
+  (* 3. Move 'rev' inside 'map2' *)
+  (* You used this in pos_bvand_pos, so I assume you have it *)
+  (* ... (previous steps) ... *)
+  rewrite rev_map2_and. 
+  unfold bits.
+
+  (* NEW: Break the lists down to expose the heads *)
+  destruct (rev x) as [|hx tx] eqn:Hrx.
+  - (* Case: Empty list *)
+    (* If list is empty, hd returns default (false). Hx_neg says it's true. Contradiction. *)
+    simpl in Hx_neg. 
+
+    (* 3. Now Hx_neg is 'false = true', which is discriminable *)
+    discriminate.
+  - (* Case: Non-empty list *)
+    destruct (rev  y) as [|hy ty] eqn:Hry.
+    + (* Case: Empty list *)
+      simpl in Hy_neg. discriminate Hy_neg.
+    + (* Case: Both non-empty *)
+      (* Now map2 reduces: hd (map2 f (x::xs) (y::ys)) -> f x y *)
+      simpl. 
+      (* Hx_neg is now "hx = true" *)
+      (* Hy_neg is now "hy = true" *)
+      simpl in Hx_neg, Hy_neg.
+      rewrite Hx_neg, Hy_neg.
+      reflexivity.
+  - 
+    unfold bits. 
+    apply size_len_eq.
+    rewrite Hx, Hy.
+    reflexivity.
+Qed.
+
+Lemma bv_sle_ule_same_sign : forall (n : N) (a b : bitvector),
+  size a = n ->
+  size b = n ->
+  last a false = last b false ->
+  bv_sle a b = bv_ule a b.
+Proof.
+  intros n a b Ha Hb Hsign.
+  unfold bv_sle, bv_ule.
+  (* 1. Handle the size checks on both sides *)
+  rewrite Ha, Hb.
+  rewrite (N.eqb_refl n).
+  
+  (* 2. Expose sle_list and ule_list *)
+  unfold sle_list.
+  unfold sle_list_big_endian.
+  unfold ule_list.
+  unfold ule_list_big_endian.
+  
+  (* 1. Break down the lists *)
+  destruct (rev a) as [|xi x'] eqn:Ra;
+  destruct (rev b) as [|yi y'] eqn:Rb.
+
+- (* Case: Both are empty *)
+  reflexivity.
+
+- (* Case: a is empty, b is not - Size Contradiction *)
+  (* Since size a = n and size b = n, they must have same length *)
+  exfalso. 
+  assert (Hlen : length (rev a) = length (rev b)).
+  { rewrite Ra, Rb. simpl. (* this will show 0 = S (length y') *)
+    unfold size in Ha, Hb. 
+    (* 1. Use the fact that length a = length (rev a) *)
+  rewrite <- (length_rev a) in Ha.
+  rewrite <- (length_rev b) in Hb.
+
+  (* 2. Now you have 'rev a' and 'rev b' inside Ha and Hb. Rewrite them! *)
+  rewrite Ra in Ha. (* Ha becomes N.of_nat 0 = n *)
+  rewrite Rb in Hb. (* Hb becomes N.of_nat (S (length y')) = n *)
+
+  (* 3. Simplify the N conversion *)
+  simpl in Ha. (* Ha: 0%N = n *)
+  subst n.    (* Replaces n with 0%N in Hb *)
+
+  (* 4. Now Hb is: N.of_nat (S (length y')) = 0%N *)
+  (* To get your goal 0 = S (length y'), inject the equality from N to nat *)
+  apply (Nat2N.inj_iff (S (length y')) 0) in Hb.
+
+  (* 5. Flip the equality to match your goal and solve *)
+  symmetry.
+  exact Hb.
+  }
+    (* 1. Substitute the actual list structures into the length equality *)
+  rewrite Ra, Rb in Hlen.
+
+  (* 2. Hlen now looks like: length [] = length (yi :: y') *)
+  (* Simplify it to see the numeric contradiction *)
+  simpl in Hlen.
+
+  (* 3. Hlen is now: 0 = S (length y') *)
+  (* Since 0 can never equal a Successor, this finishes the branch *)
+  discriminate Hlen.
+
+- (* Case: b is empty, a is not - Size Contradiction *)
+  (* Same logic as above *)
+  exfalso. 
+  assert (Hlen : length (rev a) = length (rev b)).
+  { rewrite Ra, Rb. simpl. (* this will show 0 = S (length y') *)
+    unfold size in Ha, Hb. 
+    (* 1. Use the fact that length a = length (rev a) *)
+  rewrite <- (length_rev a) in Ha.
+  rewrite <- (length_rev b) in Hb.
+
+  (* 2. Now you have 'rev a' and 'rev b' inside Ha and Hb. Rewrite them! *)
+  rewrite Ra in Ha. (* Ha becomes N.of_nat 0 = n *)
+  rewrite Rb in Hb. (* Hb becomes N.of_nat (S (length y')) = n *)
+
+  (* 3. Simplify the N conversion *)
+  simpl in Ha. (* Ha: 0%N = n *)
+  subst n.    (* Replaces n with 0%N in Hb *)
+  
+  (* 1. Simplify Hb so it looks like 0%N = N.pos ... *)
+  simpl in Hb.
+
+  (* 2. Coq sees that the constructor for 0 (N0) is equal to 
+        the constructor for positive numbers (Npos). 
+        This is a primitive contradiction. *)
+  discriminate Hb.
+
+  }
+    (* 1. Substitute the actual list structures into the length equality *)
+  rewrite Ra, Rb in Hlen.
+
+  (* 2. Hlen now looks like: length [] = length (yi :: y') *)
+  (* Simplify it to see the numeric contradiction *)
+  simpl in Hlen.
+
+  (* 3. Hlen is now: 0 = S (length y') *)
+  (* Since 0 can never equal a Successor, this finishes the branch *)
+  discriminate Hlen.
+
+- (* Case: Both have bits! This is the core logic. *)
+  (* First, use Hsign to prove the heads (sign bits) are equal *)
+  rewrite <- hd_rev in Hsign. (* Rewrites 'a' *)
+  rewrite <- hd_rev in Hsign. (* Rewrites 'b' *)
+  rewrite Ra, Rb in Hsign.
+  simpl in Hsign. 
+  subst xi. 
+  (* 1. Destruct yi to force all boolean functions to evaluate *)
+  destruct yi.
+
+  * (* Case: yi = true *)
+    simpl. 
+    (* Both sides will now have 'true && ... || false' and 'true && ... || false' *)
+    reflexivity.
+
+  * (* Case: yi = false *)
+    simpl.
+    (* Both sides will now have 'true && ... || false' and 'true && ... || false' *)
+    reflexivity.
+Qed.
+ 
+Lemma bv_and_neg_sle_itself : forall n (a s : bitvector),
+  size a = n -> size s = n ->
+  bv_slt s (zeros n) = true ->  
+  bv_sle (bv_and a s) a = true.
+Proof.
+  intros n a s Ha Hs Hs_neg.
+
+  (* 1. Simplify the hypothesis: 's' is definitely negative *)
+  rewrite <- Hs in Hs_neg. 
+  rewrite bv_slt_zeros in Hs_neg.
+  (* Now Hs_neg is: last s false = true *)
+
+  (* 2. Case Analysis: Is 'a' positive or negative? *)
+  destruct (last a false) eqn:Ha_sign.
+
+  (* ======================================================= *)
+  (* CASE 1: 'a' is NEGATIVE (true) *)
+  (* ======================================================= *)
+  - assert (H_res_sign : last (bv_and a s) false = true).
+    { apply (neg_bvand_neg Ha Hs Ha_sign Hs_neg). }
+
+    (* Apply the Bridge Lemma! *)
+    rewrite bv_sle_ule_same_sign with (n := n).
+    + apply bv_ule_and; rewrite Ha, Hs; reflexivity.
+    + apply (bv_and_size Ha Hs).
+    + exact Ha.
+    + rewrite H_res_sign, Ha_sign. reflexivity.
+
+  (* ======================================================= *)
+  (* CASE 2: 'a' is POSITIVE (false) *)
+  (* ======================================================= *)
+  - assert (H_res_sign : last (bv_and a s) false = false).
+    { apply (pos_bvand_pos Ha Hs). assumption. }
+
+    (* Apply the Bridge Lemma again! *)
+    rewrite bv_sle_ule_same_sign with (n := n).
+    + apply bv_ule_and; rewrite Ha, Hs; reflexivity.
+    + apply (bv_and_size Ha Hs).
+    + exact Ha.
+    + rewrite H_res_sign, Ha_sign. reflexivity.
+Qed.
+
+Lemma bv_and_pos_sle_both: forall n (a b : bitvector),
+  size a = n -> size b = n ->
+  last a false = false -> (* a is positive *)
+  last b false = false -> (* b is positive *)
+  bv_sle (bv_and a b) a = true /\ bv_sle (bv_and a b) b = true.
+Proof.
+  intros.
+  split.
+  - (* Proving a & b <= a *)
+    (* 1. Convert to unsigned comparison because inputs are positive *)
+    rewrite bv_sle_ule_same_sign with (n := n).
+    2: { apply bv_and_size. easy. easy. }
+    2: { easy. }
+    2: 
+      { 
+        rewrite pos_bvand_pos with (n := n).
+        - easy.
+        - easy.
+        - easy.
+        - easy.
+      }
+    apply bv_ule_and.
+    rewrite H, H0. easy.
+  - (* Proving a & b <= b *)
+    rewrite bv_sle_ule_same_sign with (n := n).
+      2: { apply bv_and_size. easy. easy. }
+      2: { easy. }
+      2: 
+        { 
+          rewrite pos_bvand_pos with (n := n).
+          - easy.
+          - easy.
+          - easy.
+          - easy.
+        }
+    Search bv_and.
+    rewrite bv_and_comm with (n := n).
+    + apply bv_ule_and; rewrite H, H0; easy.
+    + easy.
+    + easy. 
+Qed.
+
+(* End: bvand_slt *)
+
+
+
+
 
 
 End RAWBITVECTOR_LIST.
