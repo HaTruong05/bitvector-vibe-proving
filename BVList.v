@@ -1235,10 +1235,10 @@ Definition bv_sgt (a b : bitvector) : bool :=
 
 (* Prop output *)
 Definition sgt_listP (x y: list bool) :=
-  if slt_list x y then True else False.
+  if sgt_list x y then True else False.
 
 Definition bv_sgtP (a b : bitvector) : Prop :=
-  if @size a =? @size b then slt_listP a b else False.
+  if @size a =? @size b then sgt_listP a b else False.
 
 
 
@@ -3789,6 +3789,134 @@ Proof.
   intros. pose proof (@bv_uleP_1_size x). unfold size in H.
   rewrite Nat2N.id in H. apply H.
 Qed.
+
+
+(* a <s b -> b >s a *)
+
+Lemma slt_list_big_endian_sgt_list_big_endian : forall x y, 
+  slt_list_big_endian x y = true -> sgt_list_big_endian y x = true.
+Proof.
+  intros x. induction x.
+  + simpl. easy. 
+  + intros y. case y.
+    - intros. case a; case x in *; simpl in H; now contradict H.
+    - intros b l. simpl.
+      specialize (IHx l). case x in *.
+      * simpl. case l in *.
+        { case a; case b; simpl; easy. }
+        { case a; case b; simpl; easy. }
+      * rewrite !orb_true_iff, !andb_true_iff. intro. destruct H.
+        { destruct H. unfold slt_list_big_endian in IHx.
+          unfold sgt_list_big_endian in IHx. case l in *; 
+          left; split.
+            - apply Bool.eqb_prop in H; rewrite H. apply eqb_reflx.
+            - now apply ult_list_big_endian_ugt_list_big_endian.
+            - apply Bool.eqb_prop in H. rewrite H. apply eqb_reflx.
+            - now apply ult_list_big_endian_ugt_list_big_endian.
+        }
+        destruct H. apply negb_true_iff in H0. subst. now right.
+Qed. 
+
+Lemma slt_list_sgt_list : forall x y, slt_list x y = true -> sgt_list y x = true.
+Proof.
+  intros x y. unfold slt_list. intros. 
+  apply slt_list_big_endian_sgt_list_big_endian in H.
+  unfold sgt_list. apply H.
+Qed.
+
+Lemma bv_slt_bv_sgt : forall x y, bv_slt x y = true -> bv_sgt y x = true.
+Proof.
+  intros x y. unfold bv_slt.
+  case_eq (size x =? size y); intros.
+  - apply slt_list_sgt_list in H0. unfold bv_sgt.
+    case_eq (size y =? size x ); intros. easy.
+    rewrite N.eqb_eq in H.
+    rewrite H in H1.
+    now rewrite N.eqb_refl in H1.
+  - easy.
+Qed.
+
+Lemma slt_listP_sgt_listP : forall x y, slt_listP x y -> sgt_listP y x.
+Proof.
+  unfold slt_listP, sgt_listP.
+  intros. unfold sgt_list, slt_list in *.
+  case_eq (slt_list_big_endian (List.rev x) (List.rev y)).
+  + intros. apply (@slt_list_big_endian_sgt_list_big_endian (List.rev x) (List.rev y)) in H0. now rewrite H0.
+  + intros. rewrite H0 in H. now contradict H.
+Qed.
+
+Lemma bv_sltP_bv_sgtP : forall x y, bv_sltP x y -> (bv_sgtP y x).
+Proof.
+  intros x y. unfold bv_sltP, bv_sgtP.
+  case_eq (size x =? size y ); intros.
+  - rewrite N.eqb_eq in H. rewrite H.
+    rewrite N.eqb_refl.
+    now apply slt_listP_sgt_listP.
+  - easy.
+Qed.
+
+
+(*a >s b -> b <s a *)
+Lemma sgt_list_big_endian_slt_list_big_endian : forall x y,
+  sgt_list_big_endian x y = true -> slt_list_big_endian y x = true.
+Proof.
+  intros x. induction x.
+  + simpl. easy. 
+  + intros y. case y.
+    - intros. case a; case x in *; simpl in H; now contradict H.
+    - intros b l. simpl. 
+      specialize (IHx l). case x in *.
+      * simpl. case l in *.
+        { case a; case b; simpl; easy. }
+        { case a; case b; simpl; easy. }
+      * rewrite !orb_true_iff, !andb_true_iff. intro. destruct H.
+        { destruct H. unfold sgt_list_big_endian in IHx.
+          unfold slt_list_big_endian in IHx. case l in *; left; split.
+          - apply Bool.eqb_prop in H; rewrite H. apply eqb_reflx.
+          - now apply ugt_list_big_endian_ult_list_big_endian. 
+          - apply Bool.eqb_prop in H. rewrite H. apply eqb_reflx.
+          - now apply ugt_list_big_endian_ult_list_big_endian. }
+        destruct H. apply negb_true_iff in H. subst. now right.
+Qed.
+ 
+Lemma sgt_list_slt_list : forall x y, sgt_list x y = true -> slt_list y x = true.
+Proof.
+  intros x y. unfold sgt_list. intros. 
+  apply sgt_list_big_endian_slt_list_big_endian in H.
+  unfold slt_list. apply H.
+Qed.
+
+Lemma bv_sgt_bv_slt : forall x y, bv_sgt x y = true -> bv_slt y x = true.
+Proof.
+  intros x y. unfold bv_sgt.
+  case_eq (size x =? size y); intros.
+  - apply sgt_list_slt_list in H0. unfold bv_slt.
+    rewrite N.eqb_eq in H.
+    rewrite H. now rewrite N.eqb_refl.
+  - easy. 
+Qed.
+
+Lemma sgt_listP_slt_listP : forall x y, sgt_listP x y -> slt_listP y x.
+Proof.
+  unfold sgt_listP.
+  intros. unfold sgt_list in H.
+  case_eq (sgt_list_big_endian (List.rev x) (List.rev y)).
+  + intros. unfold slt_listP. unfold slt_list. 
+    apply (@sgt_list_big_endian_slt_list_big_endian (List.rev x) (List.rev y)) in H0.
+    rewrite H0. easy.
+  + intros. rewrite H0 in H. now contradict H.
+Qed.
+ 
+Lemma bv_sgtP_bv_sltP : forall x y, bv_sgtP x y -> (bv_sltP y x).
+Proof.
+  intros x y. unfold bv_sgtP, bv_sltP.
+  case_eq (size x =? size y); intros.
+  - rewrite N.eqb_eq in H.
+    rewrite H, N.eqb_refl.
+    now apply sgt_listP_slt_listP.
+  - easy.
+Qed.
+
 
 (* bv_and x y <= y *)
 

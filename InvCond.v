@@ -130,13 +130,9 @@ Proof.
   + intros. exists (signed_max n). split.
     - apply signed_max_size.
     - rewrite (@bv_and_comm n (signed_max n) s).
-      assert (bv_ult_slt_symm : forall (x y : bitvector), bv_slt x y = bv_sgt y x).
-      { admit. }
-      rewrite bv_ult_slt_symm in H. apply H. apply signed_max_size. apply Hs.
+      apply bv_slt_bv_sgt in H. apply H. apply signed_max_size. apply Hs.
   + intros (x, (Hx, H)).
-    assert (bv_ult_slt_symm : forall (x y : bitvector), bv_slt x y = bv_sgt y x).
-      { admit. }
-    rewrite <- bv_ult_slt_symm in H. rewrite (@bv_and_comm n x s) in H.
+    apply bv_sgt_bv_slt in H. rewrite (@bv_and_comm n x s) in H.
     assert (bv_and_sle_maxs : forall (n : N) (x y : bitvector), 
           size x = n -> size y = n -> bv_sle (bv_and x y) 
           (bv_and x (signed_max n)) = true).
