@@ -151,6 +151,284 @@ Qed.
 
 
 (*------------------------------And------------------------------*)
+
+Lemma size_rev : forall (l : bitvector), size (rev l) = size l.
+Proof.
+  intros l.
+  unfold size. 
+  rewrite length_rev.
+  reflexivity.
+Qed.
+
+Lemma bv_and_sle_maxs : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  bv_sle (bv_and x y) (bv_and x (signed_max n)) = true.
+Proof.
+  intros n x y Hx Hy.
+  unfold bv_sle, sle_list.
+  
+  unfold bv_and.
+  (* Handle the size checks inside bv_and *)
+  rewrite Hx, Hy. rewrite (signed_max_size n). rewrite N.eqb_refl.
+  unfold bits.
+  (* Rewrite the size equality directly using Hx and size_signed_max *)
+  replace (size (map2 andb x y)) with n.
+  2: { rewrite <- Hx. apply size_len_eq. apply map2_and_length. apply size_len_eq. rewrite Hx, Hy. reflexivity. }
+
+  replace (size (map2 andb x (signed_max n))) with n.
+  2: 
+    { 
+     rewrite <- Hx. apply size_len_eq. apply map2_and_length. 
+     apply size_len_eq. rewrite Hx. rewrite (signed_max_size n). easy. 
+    }
+
+  (* The if condition becomes (n =? n), which simplifies to true *)
+  rewrite N.eqb_refl.
+
+  (* 2. Use YOUR lemma to push 'rev' inside *)
+  (* rev (map2 andb x y) -> map2 andb (rev x) (rev y) *)
+  rewrite rev_map2_and; auto.
+  rewrite rev_map2_and; auto. 
+  
+  2: { apply size_len_eq. rewrite (signed_max_size n). easy. }
+
+  (* 3. Define the reversed components *)
+  remember (rev x) as rx.
+  remember (rev y) as ry.
+  remember (rev (signed_max n)) as rmax.
+  
+  2: { apply size_len_eq. rewrite Hx, Hy. easy. }
+
+  (* 4. Analyze the structure of 'rmax' (Reversed Signed Max) *)
+  (* rmax must be [0; 1; 1; ... 1] because signed_max is [1..1; 0] *)
+  destruct rmax as [| m_head m_tail].
+  {
+    (* 1. Deduce that n = 0 from the empty max list *)
+    (* We look at the length of the reversed max list *)
+    assert (Hn_zero : n = 0%N).
+    {
+      (* Apply length/size logic to Heqrmax *)
+      apply (f_equal (@length bool)) in Heqrmax. 
+      apply size_len_eq in Heqrmax.
+      unfold size in Heqrmax.
+      simpl in Heqrmax.
+      (* length (rev ...) = length ... *)
+      rewrite length_rev in Heqrmax.
+      change (N.of_nat (length (signed_max n))) with (size (signed_max n)) in Heqrmax.
+      rewrite signed_max_size in Heqrmax.
+      symmetry.
+      easy.
+    }
+
+    (* 2. Substitute n=0 everywhere *)
+    subst n.
+
+    (* 3. Show rx and ry are nil because their size is 0 *)
+    (* If size x = 0, x is nil. rx is rev nil = nil. *)
+    destruct rx.
+    - (* Case rx = nil: Good! *)
+      destruct ry.
+      + (* Case ry = nil: Good! *)
+        (* Goal: sle_list (map2 nil nil) (map2 nil nil) *)
+        simpl. reflexivity.
+      + (* Case ry is not nil: Impossible size mismatch *)
+        (* 1. Apply size to both sides of the rev equations *)
+        apply (f_equal size) in Heqrx.
+        apply (f_equal size) in Heqry.
+        (* 1. Apply your new lemma to fix the hypothesis *)
+        (* Heqry was: size (b :: ry) = size (rev y) *)
+        rewrite size_rev in Heqry. 
+        (* Now Heqry is: size (b :: ry) = size y *)
+
+        (* 2. Combine with the fact that size x = 0 *)
+        rewrite Hy in Heqry.      (* size (b :: ry) = size x *)
+        rewrite Hn_zero in Heqry. (* size (b :: ry) = 0%N *)
+
+        (* 3. Expose that a non-empty list cannot have size 0 *)
+        (* Unfold size to see the 'length' inside *)
+        unfold size in Heqry. simpl in Heqry.
+
+        (* 4. Now you have something like (N.pos ... = 0) or (S ... = 0) *)
+        discriminate.
+    - 
+      (* 1. Apply size to the reverse equation *)
+      apply (f_equal size) in Heqrx.
+
+      (* 2. Use your size_rev lemma (or length_rev logic) *)
+      rewrite size_rev in Heqrx.
+
+      (* 3. Substitute the known size of x *)
+      rewrite Hn_zero in Heqrx.
+
+      (* Now Heqrx says: size (b :: rx) = 0 *)
+      (* 5. Finish it *)
+      discriminate.
+
+  }
+  
+  (* We know m_head (MSB of max) is false (0) *)
+  assert (Hm_head : m_head = false). {
+    (* 1. Unfold definitions to expose the structure *)
+    unfold signed_max in Heqrmax.
+    unfold smax_big_endian in Heqrmax.
+
+    (* 2. Eliminate the double reverse *)
+    (* rev (rev X) is just X. *)
+    rewrite rev_involutive in Heqrmax.
+
+    (* 3. Handle the 'n=0' vs 'n=S k' cases *)
+    (* Since rmax is a cons (m_head :: m_tail), n cannot be 0 *)
+    destruct (N.to_nat n) as [| k] eqn:Hnat.
+    - (* Case n=0: Impossible *)
+      discriminate.
+    - (* Case n=S k: Matches perfectly *)
+      (* 4. Extract the head value *)
+      (* Heqrmax is now: m_head :: m_tail = false :: mk_list_true k *)
+      injection Heqrmax as Htail Hhead.
+      
+      (* 5. Apply it *)
+      subst m_head.
+      easy.
+  }
+  subst m_head.
+
+  (* 5. Analyze x and y *)
+  destruct rx as [| hx tx]. 
+  - simpl. easy.
+  -
+    destruct ry as [| hy ty].
+    + (* Case 1: ry is empty. Prove contradiction using lengths *)
+      (* Case: ry is nil. Impossible because size y = size x > 0 *)
+      exfalso.
+      (* Convert the list equations into length equations *)
+      apply f_equal with (f := size) in Heqrx.
+      apply f_equal with (f := size) in Heqry.
+      
+      (* Simplify length (rev ...) if using standard lists *)
+      rewrite size_rev in *. 
+      
+      (* Substitute the sizes *)
+      rewrite Hx in Heqrx.
+      rewrite Hy in Heqry.
+      
+      (* Now you have:
+         Heqrx : S (length tx) = n
+         Heqry : 0 = n 
+         Combine them to find a contradiction *)
+      rewrite <- Heqry in Heqrx.
+      discriminate.
+    + 
+      simpl.
+      destruct hx.
+      *
+        simpl.
+        destruct hy.
+        ** (* Case: hy = true. 
+             LHS head is true (negative). RHS head is false (positive).
+             sle true::... false::... is true by definition. *)
+          reflexivity.
+        ** (* Case: hy = false.
+             LHS head is false. RHS head is false.
+             Both positive. We need to prove the tails: 
+             ule (map2 ...) (map2 ...) *)
+          simpl.
+          rewrite Bool.orb_false_r.
+          replace (map2 andb tx m_tail) with tx.
+          *** 
+            apply ule_list_big_endian_map2_and.
+            (* Convert the list equations into length equations *)
+            apply f_equal with (f := size) in Heqrx.
+            apply f_equal with (f := size) in Heqry.
+            
+            (* 1. Convert the size equations to nat so we can use your lemma *)
+            apply f_equal with (f := N.to_nat) in Heqrx.
+            apply f_equal with (f := N.to_nat) in Heqry.
+            
+            (* 2. Apply your lemma to break down the cons (h :: t) *)
+            rewrite non_empty_list_size in Heqrx.
+            rewrite non_empty_list_size in Heqry.
+            
+            rewrite size_rev in Heqrx.
+            rewrite size_rev in Heqry.
+           
+            rewrite Hx in Heqrx. 
+            rewrite Hy in Heqry.
+            rewrite <- Heqry in Heqrx.
+            injection Heqrx as H_size_eq.
+            apply size_len_eq.
+            apply N2Nat.inj.
+            easy.
+          *** 
+            symmetry.
+            replace m_tail with (mk_list_true (length tx)).
+            **** apply map2_and_1_neutral.
+            **** 
+              unfold signed_max in Heqrmax. 
+              unfold smax_big_endian in Heqrmax.
+              rewrite rev_involutive in Heqrmax.
+              (* Convert Heqrx to length: length (true :: tx) = length (rev x) *)
+              apply f_equal with (f := size) in Heqrx.
+              rewrite size_rev in Heqrx.
+              apply f_equal with (f := N.to_nat) in Heqrx.
+              rewrite non_empty_list_size in Heqrx.
+              rewrite Hx in Heqrx.
+              rewrite <- Heqrx in Heqrmax.
+              injection Heqrmax as H_tail_eq.
+              rewrite H_tail_eq.
+              f_equal.
+              unfold size.
+              rewrite Nnat.Nat2N.id.
+              easy.
+      * 
+        simpl. 
+        rewrite Bool.orb_false_r.
+        replace (map2 andb tx m_tail) with tx.
+        **(* Main Goal: Prove (tx & ty) <= tx *)
+          apply ule_list_big_endian_map2_and.
+          (* Subgoal: Prove lengths are equal *)
+          apply f_equal with (f:=size) in Heqrx.
+          apply f_equal with (f:=size) in Heqry.
+          (* 1. Convert the size equations to nat so we can use your lemma *)
+          apply f_equal with (f := N.to_nat) in Heqrx.
+          apply f_equal with (f := N.to_nat) in Heqry.
+          
+          (* 2. Apply your lemma to break down the cons (h :: t) *)
+          rewrite non_empty_list_size in Heqrx.
+          rewrite non_empty_list_size in Heqry.
+          
+          rewrite size_rev in Heqrx.
+          rewrite size_rev in Heqry.
+          
+          rewrite Hx in Heqrx. 
+          rewrite Hy in Heqry.
+          rewrite <- Heqry in Heqrx.
+          injection Heqrx as H_size_eq.
+          apply size_len_eq.
+          apply N2Nat.inj.
+          easy.
+        **
+          symmetry.
+          replace m_tail with (mk_list_true (length tx)).
+          **** apply map2_and_1_neutral.
+          **** 
+            unfold signed_max in Heqrmax. 
+            unfold smax_big_endian in Heqrmax.
+            rewrite rev_involutive in Heqrmax.
+            (* Convert Heqrx to length: length (true :: tx) = length (rev x) *)
+            apply f_equal with (f := size) in Heqrx.
+            rewrite size_rev in Heqrx.
+            apply f_equal with (f := N.to_nat) in Heqrx.
+            rewrite non_empty_list_size in Heqrx.
+            rewrite Hx in Heqrx.
+            rewrite <- Heqrx in Heqrmax.
+            injection Heqrmax as H_tail_eq.
+            rewrite H_tail_eq.
+            f_equal.
+            unfold size.
+            rewrite Nnat.Nat2N.id.
+            easy.
+Qed.
+
 (* t & s = t <=> (exists x, x & s = t) *)
 Theorem bvand_eq : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -163,6 +441,55 @@ Proof. intros n s t Hs Ht.
          + apply A.
        - destruct A as (x, (Hx, A)). rewrite <- A.
          now rewrite (@bv_and_comm n x s Hx Hs), (@bv_and_idem1 s x n Hs Hx).
+Qed.
+
+Lemma bv_and_sle_maxs : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
+  bv_sle (bv_and x y) (bv_and x (signed_max n)) = true.
+Proof.
+  intros n x y Hx Hy.
+
+  (* 1. Case Split on x *)
+  destruct (last x false) eqn:H_sign_x.
+
+  - (* Case: x is Negative (true) *)
+    (* CANNOT use your lemma because x is not positive. *)
+    (* Logic: RHS clears the sign bit -> RHS is Positive. *)
+    (* LHS (x & y) is either negative or positive. *)
+    (* Negative <= Positive is always true. *)
+    admit. (* Solved by bv_sle_neg_pos or similar *)
+
+  - (* Case: x is Positive (false) *)
+    (* Step A: Simplify the RHS *)
+    (* Since x is positive, (x & signed_max) is just x. *)
+    assert (H_rhs : bv_and x (signed_max n) = x).
+    { 
+       (* Proof that x & 011...1 = x when x is positive *) 
+       admit. 
+    }
+    rewrite H_rhs.
+    
+    (* Goal is now: bv_sle (x & y) x *)
+
+    (* Step B: Case Split on y *)
+    destruct (last y false) eqn:H_sign_y.
+
+    + (* Case: y is Negative (true) *)
+      (* CANNOT use your lemma because y is not positive. *)
+      (* But x is positive, so (x & y) is positive. *)
+      (* Positive & Anything <= Positive is true by unsigned logic. *)
+      
+      apply bv_sle_ule_same_sign; auto.
+      apply bv_and_ule_l. (* Unsigned lemma: a & b <= a *)
+
+    + (* Case: y is Positive (false) *)
+      (* HERE IS YOUR LEMMA! *)
+      (* Both x and y are positive. *)
+      apply (proj1 (bv_and_pos_sle_both n x y)).
+      * exact Hx.
+      * exact Hy.
+      * exact H_sign_x.
+      * exact H_sign_y.
 Qed.
 
 (* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
