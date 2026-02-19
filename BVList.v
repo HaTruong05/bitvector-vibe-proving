@@ -1231,7 +1231,7 @@ Definition sgt_list (x y: list bool) :=
   sgt_list_big_endian (List.rev x) (List.rev y).
 
 Definition bv_sgt (a b : bitvector) : bool :=
-  if @size a =? @size b then sle_list a b else false.
+  if @size a =? @size b then sgt_list a b else false.
 
 (* Prop output *)
 Definition sgt_listP (x y: list bool) :=
@@ -11665,6 +11665,19 @@ Proof.
         destruct (n <? length (shr_n_bits (signed_max (N.of_nat n)) n))%nat eqn:Hlt.
         -- apply Nat.ltb_lt in Hlt. lia.
         -- rewrite Hshr_len. apply bv_sle_refl.
+Qed.
+
+Lemma bv_sle_trans : forall (b1 b2 b3 : bitvector),
+  bv_sle b1 b2 = true -> bv_sle b2 b3 = true -> bv_sle b1 b3 = true.
+Proof.
+  intros b1 b2 b3 H1 H2.
+  apply bv_sle_eq in H1.
+  apply bv_sle_eq in H2.
+  destruct H1 as [Hslt1 | Heq1].
+  - destruct H2 as [Hslt2 | Heq2].
+    + apply bv_sle_eq. left. apply bv_slt_trans with (b2 := b2); assumption.
+    + subst b3. apply bv_sle_eq. left. exact Hslt1.
+  - subst b2. apply bv_sle_eq. exact H2.
 Qed.
 
 (* End - Liam Secrist *)
