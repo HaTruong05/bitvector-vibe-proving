@@ -11356,6 +11356,8 @@ Qed.
 
 (* End: bvand_slt *)
 
+(* Start: bvand_sgt *)
+
 Lemma size_rev : forall (l : bitvector), size (rev l) = size l.
 Proof.
   intros l.
@@ -11544,7 +11546,7 @@ Proof.
             easy.
 Qed.
 
-
+(* End: bvand_sgt *)
 
 End RAWBITVECTOR_LIST.
  
