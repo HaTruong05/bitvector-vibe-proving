@@ -631,6 +631,14 @@ Definition bits (a:bitvector) : list bool := a.
 Definition size (a:bitvector) := N.of_nat (List.length a).
 Definition of_bits (a:list bool) : bitvector := a.
 
+Lemma size_rev : forall (l : bitvector), size (rev l) = size l.
+Proof.
+  intros l.
+  unfold size. 
+  rewrite length_rev.
+  reflexivity.
+Qed.
+
 Lemma bits_size bv : List.length (bits bv) = N.to_nat (size bv).
 Proof. unfold bits, size. now rewrite Nat2N.id. Qed.
 
@@ -11110,13 +11118,185 @@ rewrite rev_map2_and. unfold bits. induction (rev x).
   rewrite !bits_size. rewrite Hx, Hy. easy.
 Qed.
 
-Lemma bv_and_sle_maxs : forall (n : N) (x y : bitvector), 
-  size x = n -> size y = n -> 
+Lemma bv_and_sle_maxs : forall (n : N) (x y : bitvector),
+  size x = n -> size y = n ->
   bv_sle (bv_and x y) (bv_and x (signed_max n)) = true.
 Proof.
   intros n x y Hx Hy.
-  (* Cases sign(x) = 0 and 1 *)
-Admitted.
+  unfold bv_sle, sle_list.
+  unfold bv_and.
+  rewrite Hx, Hy. rewrite (signed_max_size n). rewrite N.eqb_refl.
+  unfold bits.
+  replace (size (map2 andb x y)) with n.
+  2: { rewrite <- Hx. apply size_len_eq. apply map2_and_length. apply size_len_eq. rewrite Hx, Hy. reflexivity. }
+
+  replace (size (map2 andb x (signed_max n))) with n.
+  2: 
+    { 
+     rewrite <- Hx. apply size_len_eq. apply map2_and_length. 
+     apply size_len_eq. rewrite Hx. rewrite (signed_max_size n). easy. 
+    }
+  rewrite N.eqb_refl.
+  rewrite rev_map2_and; auto.
+  rewrite rev_map2_and; auto. 
+  
+  2: { apply size_len_eq. rewrite (signed_max_size n). easy. }
+  
+  remember (rev x) as rx.
+  remember (rev y) as ry.
+  remember (rev (signed_max n)) as rmax.
+
+  2: { apply size_len_eq. rewrite Hx, Hy. easy. }
+  destruct rmax as [| m_head m_tail].
+  {
+    assert (Hn_zero : n = 0%N).
+    {
+      apply (f_equal (@length bool)) in Heqrmax. 
+      apply size_len_eq in Heqrmax.
+      unfold size in Heqrmax.
+      simpl in Heqrmax.
+      rewrite length_rev in Heqrmax.
+      change (N.of_nat (length (signed_max n))) with (size (signed_max n)) in Heqrmax.
+      rewrite signed_max_size in Heqrmax.
+      symmetry.
+      easy.
+    }
+    subst n.
+    destruct rx.
+    -
+      destruct ry.
+      + 
+        simpl. reflexivity.
+      + 
+        apply (f_equal size) in Heqrx.
+        apply (f_equal size) in Heqry.
+        rewrite size_rev in Heqry. 
+        rewrite Hy in Heqry.
+        rewrite Hn_zero in Heqry.
+        unfold size in Heqry. simpl in Heqry.
+        discriminate.
+    -
+      apply (f_equal size) in Heqrx.
+      rewrite size_rev in Heqrx.
+      rewrite Hn_zero in Heqrx.
+      discriminate.
+
+  }
+  assert (Hm_head : m_head = false). {
+  unfold signed_max in Heqrmax.
+  unfold smax_big_endian in Heqrmax.
+  rewrite rev_involutive in Heqrmax.
+  destruct (N.to_nat n) as [| k] eqn:Hnat.
+  - discriminate.
+  -
+    injection Heqrmax as Htail Hhead.
+    subst m_head.
+    easy.
+  }
+  subst m_head.
+  destruct rx as [| hx tx].
+  - simpl. easy.
+  -
+    destruct ry as [| hy ty].
+    +
+      exfalso.
+      apply f_equal with (f := size) in Heqrx.
+      apply f_equal with (f := size) in Heqry.
+      rewrite size_rev in *. 
+      rewrite Hx in Heqrx.
+      rewrite Hy in Heqry.
+      rewrite <- Heqry in Heqrx.
+      discriminate.
+    + 
+      simpl.
+      destruct hx.
+      *
+        simpl.
+        destruct hy.
+        ** reflexivity.
+        ** 
+          simpl.
+          rewrite Bool.orb_false_r.
+          replace (map2 andb tx m_tail) with tx.
+          *** 
+            apply ule_list_big_endian_map2_and.
+            apply f_equal with (f := size) in Heqrx.
+            apply f_equal with (f := size) in Heqry.
+            apply f_equal with (f := N.to_nat) in Heqrx.
+            apply f_equal with (f := N.to_nat) in Heqry.
+            rewrite non_empty_list_size in Heqrx.
+            rewrite non_empty_list_size in Heqry.
+            rewrite size_rev in Heqrx.
+            rewrite size_rev in Heqry.
+            rewrite Hx in Heqrx.
+            rewrite Hy in Heqry.
+            rewrite <- Heqry in Heqrx.
+            injection Heqrx as H_size_eq.
+            apply size_len_eq.
+            apply N2Nat.inj.
+            easy.
+          *** 
+            symmetry.
+            replace m_tail with (mk_list_true (length tx)).
+            **** apply map2_and_1_neutral.
+            **** 
+              unfold signed_max in Heqrmax. 
+              unfold smax_big_endian in Heqrmax.
+              rewrite rev_involutive in Heqrmax.
+              apply f_equal with (f := size) in Heqrx.
+              rewrite size_rev in Heqrx.
+              apply f_equal with (f := N.to_nat) in Heqrx.
+              rewrite non_empty_list_size in Heqrx.
+              rewrite Hx in Heqrx.
+              rewrite <- Heqrx in Heqrmax.
+              injection Heqrmax as H_tail_eq.
+              rewrite H_tail_eq.
+              f_equal.
+              unfold size.
+              rewrite Nnat.Nat2N.id.
+              easy.
+      * 
+        simpl. 
+        rewrite Bool.orb_false_r.
+        replace (map2 andb tx m_tail) with tx.
+        **
+          apply ule_list_big_endian_map2_and.
+          apply f_equal with (f:=size) in Heqrx.
+          apply f_equal with (f:=size) in Heqry.
+          apply f_equal with (f := N.to_nat) in Heqrx.
+          apply f_equal with (f := N.to_nat) in Heqry.
+          rewrite non_empty_list_size in Heqrx.
+          rewrite non_empty_list_size in Heqry.
+          rewrite size_rev in Heqrx.
+          rewrite size_rev in Heqry.
+          rewrite Hx in Heqrx. 
+          rewrite Hy in Heqry.
+          rewrite <- Heqry in Heqrx.
+          injection Heqrx as H_size_eq.
+          apply size_len_eq.
+          apply N2Nat.inj.
+          easy.
+        **
+          symmetry.
+          replace m_tail with (mk_list_true (length tx)).
+          **** apply map2_and_1_neutral.
+          **** 
+            unfold signed_max in Heqrmax. 
+            unfold smax_big_endian in Heqrmax.
+            rewrite rev_involutive in Heqrmax.
+            apply f_equal with (f := size) in Heqrx.
+            rewrite size_rev in Heqrx.
+            apply f_equal with (f := N.to_nat) in Heqrx.
+            rewrite non_empty_list_size in Heqrx.
+            rewrite Hx in Heqrx.
+            rewrite <- Heqrx in Heqrmax.
+            injection Heqrmax as H_tail_eq.
+            rewrite H_tail_eq.
+            f_equal.
+            unfold size.
+            rewrite Nnat.Nat2N.id.
+            easy.
+Qed.
 
 (* For Ha
 Lemma bv_neg_is_not_plus_one : forall (a : bitvector) (n : N), 

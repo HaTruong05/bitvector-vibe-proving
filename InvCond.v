@@ -133,20 +133,18 @@ Proof.
       apply bv_slt_bv_sgt in H. apply H. apply signed_max_size. apply Hs.
   + intros (x, (Hx, H)).
     apply bv_sgt_bv_slt in H. rewrite (@bv_and_comm n x s) in H.
-    assert (bv_and_sle_maxs : forall (n : N) (x y : bitvector), 
-          size x = n -> size y = n -> bv_sle (bv_and x y) 
-          (bv_and x (signed_max n)) = true).
-    { admit. }
-    specialize (@bv_and_sle_maxs n s x Hs Hx).
-    now apply (@bv_slt_sle_trans t (bv_and s x) (bv_and s (signed_max n))).
+    apply (@bv_slt_sle_trans t (bv_and s x) (bv_and s (signed_max n))).
+    apply H. apply (@bv_and_sle_maxs n s x Hs Hx).
     apply Hx. apply Hs.
-Admitted.
+Qed.
 
-(* Theorem bvor_sge : forall (n : N), forall (s t : bitvector),
+(*Theorem bvor_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-  (bv_and s t)
-  (exists (x : bitvector), (size x  = n) /\ ((bv_ule (bv_or x s) t) = true)). *) 
-
+  (bv_sge s (bv_and s t) = true)
+  (exists (x : bitvector), (size x  = n) /\ ((bv_ule (bv_or x s) t) = true)).
+Proof.
+  intros n s t Hs Ht. split.
+  + intros. *)
 (* End Arjun -- Added for CSC490W26 *)
 
 
