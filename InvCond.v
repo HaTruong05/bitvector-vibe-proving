@@ -44,14 +44,6 @@ Theorem bvshl_sle2 : forall (n : N), forall (s t : bitvector),
 Proof.
 Admitted.
 
-(* t <s (~0 >> s) <=> (exists x, t <s (x >> s)) *)
-Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_slt t (bv_shr (bv_not (zeros (size s))) s) = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_slt t (bv_shr x s) = true)).
-Proof.
-Admitted.
-
 (* t <=s (~0 >> s) <=> (exists x, t <=s (x >> s)) *)
 Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -147,6 +139,68 @@ Proof.
   + intros. *)
 (* End Arjun -- Added for CSC490W26 *)
 
+(* THIS STATEMENT IS WRONG *)
+(* t <s (~0 >> s) <=> (exists x, t <s (x >> s)) *)
+Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_slt t (bv_shr (bv_not (zeros (size s))) s) = true)
+    (exists (x : bitvector), (size x = n) /\ (bv_slt t (bv_shr x s) = true)).
+Proof.
+  intros n s t Hs Ht. 
+  assert (Hbvn0 : size (bv_not (zeros (size s))) = n).
+  { apply bv_not_size. rewrite Hs. apply zeros_size. }
+ split.
+  + intros. exists (bv_not (zeros (size s))). split.
+    - apply Hbvn0.
+    - apply H.
+  + intros. destruct H as (x, (Hx, H)). rewrite bv_shr_eq in *.
+    unfold bv_slt in *. rewrite Ht in *. 
+    unfold slt_list in *. rewrite <- (@bv_shr_a_size n x s Hx Hs) in H.
+    rewrite <- (@bv_shr_a_size n (bv_not (zeros (size s))) s Hbvn0 Hs).
+    rewrite N.eqb_refl in *.
+    unfold bv_shr_a in *. rewrite Hs, Hx in *. rewrite Hbvn0.
+    rewrite N.eqb_refl in *. unfold shr_n_bits_a in *.
+    pose proof Hx as Hx2.
+    pose proof Hbvn0 as Hnots. pose proof Hs as Hs2.
+    unfold size in Hx2, Hnots, Hs2. apply N2Nat.inj_iff in Hx2. 
+    apply N2Nat.inj_iff in Hnots. apply N2Nat.inj_iff in Hs2.
+    rewrite Nat2N.id in Hx2, Hnots, Hs2.
+    case_eq (list2nat_be_a s <? length x); intros case.
+    - pose proof Hbvn0 as len. pose proof Hx as Hxlen.
+      unfold size in len, Hxlen. apply N2Nat.inj_iff in len. 
+      apply N2Nat.inj_iff in Hxlen. rewrite Nat2N.id in len, Hxlen.
+      rewrite len. rewrite <- Hxlen. rewrite case in *. 
+      rewrite rev_app_distr in *. rewrite rev_mk_list_false in *.
+      apply Nat.ltb_lt in case.
+      rewrite (@rev_skipn x (list2nat_be_a s) case) in H.
+      pose proof rev_skipn as rev_skipn. 
+      specialize (@rev_skipn (bv_not (zeros n)) (list2nat_be_a s)).
+      rewrite len in rev_skipn. rewrite <- Hx2 in rev_skipn.
+      specialize (@rev_skipn case). rewrite rev_skipn.
+      rewrite Hx2 in case. rewrite <- Hs2 in case.
+      unfold list2nat_be_a in case.
+      assert (sle_list_big_endian 
+              (mk_list_false (list2nat_be_a s) ++
+                firstn (length x - list2nat_be_a s) (rev x))
+              (mk_list_false (list2nat_be_a s) ++
+                firstn (length x - list2nat_be_a s) (rev (bv_not (zeros n)))) = true) as sle.
+      { admit. 
+        (* We need app_sle_list_big_endian *)
+      }
+      assert (slt_sle_list_big_endian_trans : forall x y z : list bool,
+              slt_list_big_endian x y = true -> 
+              sle_list_big_endian y z = true ->
+              slt_list_big_endian x z = true).
+      { admit. 
+        (* Similar to ult_ule_list_big_endian_trans *)}
+      specialize(@slt_sle_list_big_endian_trans (rev t)
+                 (mk_list_false (list2nat_be_a s) ++
+                 firstn (length x - list2nat_be_a s) (rev x))
+                 (mk_list_false (list2nat_be_a s) ++ 
+                 firstn (length x - list2nat_be_a s) (rev (bv_not (zeros n)))) H sle). apply slt_sle_list_big_endian_trans.
+   - rewrite case in *. rewrite Hnots. rewrite <- Hx2. rewrite case.
+    apply H. 
+Admitted.
 
 (*------------------------------Neg------------------------------*)
 (* -x = t <=> True *)
