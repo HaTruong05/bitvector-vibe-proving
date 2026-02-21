@@ -1811,33 +1811,18 @@ Proof.
   intros n s t Hs Ht.
   split; intro H.
   
-  (* ===== Direction 1: Left to Right ===== *)
-  - (* Given: s >=u (t & signed_min) *)
-    (* Show: exists x such that (x & s) <=s t *)
-    
-    (* Witness: x = signed_min n *)
-    exists (signed_min n).
+  - exists (signed_min n).
     split.
     { apply signed_min_size. }
-    
-    (* Commutativity: (signed_min & s) <=s t *)
-    (* We pass the size proofs explicitly to satisfy the lemma *)
     rewrite (bv_and_comm (signed_min_size n) Hs).
-    
-    (* Case analysis on sign of t *)
     destruct (last (bits t) false) eqn:Hsign_t.
     
-    + (* Case: t is negative (MSB = 1) *)
-      (* t & signed_min = signed_min *)
-      assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      About bv_and_signed_min_pos.
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
       { apply bv_and_signed_min_neg; assumption. }
       rewrite Hmask in H.
-      
-      (* We know s >=u signed_min. We need to check if n=0 to safely handle MSB logic. *)
       destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-      * (* n = 0 *)
-        subst n.
+      
+      * subst n.
         assert (Ht0: size t = 0%N) by (rewrite Ht; assumption).
         
         assert (Hand_size: size (bv_and s (signed_min (size s))) = 0%N).
@@ -1848,41 +1833,31 @@ Proof.
         }
         
         apply bv_sle_size_zero; assumption.
-      * (* n > 0 *)
-        assert (Hn_gt_0: (0 < n)%N) by lia.
         
-        (* If s >=u signed_min, s must be negative *)
+      * assert (Hn_gt_0: (0 < n)%N) by lia.
+
         assert (Hs_neg: last (bits s) false = true).
         { eapply bv_uge_signed_min_implies_msb; eassumption. }
-        
-        (* Thus s & signed_min = signed_min *)
+
         assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
         { apply bv_and_signed_min_neg; assumption. }
         rewrite Hmask_s.
-        
-        (* signed_min is the smallest signed integer, so it is <=s t *)
+
         rewrite <- Ht.
         apply signed_min_sle; assumption.
         
-    + (* Case: t is positive (MSB = 0) *)
-      (* t & signed_min = zeros *)
-      assert (Hmask: bv_and t (signed_min n) = zeros n).
+    + assert (Hmask: bv_and t (signed_min n) = zeros n).
       { apply bv_and_signed_min_pos; assumption. }
       rewrite Hmask in H.
-      
-      (* s >=u zeros is trivial. Let's look at s to determine (s & signed_min). *)
+
       destruct (last (bits s) false) eqn:Hsign_s.
-      * (* s is negative *)
-        (* s & signed_min = signed_min *)
-        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
+      * assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
         { apply bv_and_signed_min_neg; assumption. }
         rewrite Hmask_s.
-        
-        (* signed_min (neg) <=s t (pos). Negative is always <= Positive *)
+
         destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
         { 
           subst. 
-          (* Derive contradiction: size 0 means empty list, so MSB can't be true *)
           pose proof (bits_size s) as Hbs.
           rewrite Hn0 in Hbs.
           simpl in Hbs.
@@ -1895,35 +1870,22 @@ Proof.
         rewrite <- Ht.
         apply signed_min_sle.
         
-      * (* s is positive *)
-        (* s & signed_min = zeros *)
-        assert (Hmask_s: bv_and s (signed_min n) = zeros n).
+      * assert (Hmask_s: bv_and s (signed_min n) = zeros n).
         { apply bv_and_signed_min_pos; assumption. }
         rewrite Hmask_s.
-        
-        (* zeros <=s t (where t is positive) *)
         apply zeros_sle_nonneg; assumption.
 
-  (* ===== Direction 2: Right to Left ===== *)
-  - (* Given: exists x, x & s <=s t *)
-    destruct H as [x [Hx Hsle]].
+  - destruct H as [x [Hx Hsle]].
     
     destruct (last (bits t) false) eqn:Hsign_t.
-    + (* t is negative *)
-      (* Goal: s >=u signed_min *)
-      
-      (* Simplification: t & signed_min = signed_min *)
-      assert (Hmask: bv_and t (signed_min n) = signed_min n).
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
       { apply bv_and_signed_min_neg; assumption. }
       rewrite Hmask.
 
-      (* We must prove s is negative. *)
       destruct (last (bits s) false) eqn:Hs_case.
-      * (* s is negative. Then s >=u signed_min holds. *)
-        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+      * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
         { 
           subst. 
-          (* Contradiction: size 0 but MSB is true *)
           pose proof (bits_size s) as Hbs.
           rewrite Hn0 in Hbs.
           simpl in Hbs.
@@ -1934,92 +1896,60 @@ Proof.
         }
         { apply bv_msb_implies_uge_signed_min; try assumption. lia. }
         
-      * (* s is positive. Derive contradiction. *)
-        exfalso.
+      * exfalso.
 
-        (* 1. Establish that n > 0. *)
         assert (Hn_pos: (0 < n)%N).
         {
           destruct (N.eq_dec n 0) as [Hn0|Hnneq].
-          - (* Case n = 0: Contradiction *)
-            rewrite Hn0 in Ht. (* Now Ht says size t = 0 *)
-            
-            (* Use bits_size to prove the list length is 0 *)
+          - rewrite Hn0 in Ht. 
+          
             assert (Hlen: length (bits t) = 0%nat).
             { 
               rewrite bits_size. 
               rewrite Ht. 
               simpl. reflexivity. 
             }
-            
-            (* Now destruct t. It must be nil, but Hsign_t says it has a sign bit. *)
+
             destruct (bits t).
-            + (* Case nil: contradicts sign bit *)
-              simpl in Hsign_t. 
+            + simpl in Hsign_t. 
               discriminate.
-            + (* Case cons: contradicts length = 0 *)
-              simpl in Hlen. 
+            + simpl in Hlen. 
               discriminate.
               
-          - (* Case n <> 0: implies n > 0 *)
-            apply N.neq_0_lt_0. 
+          - apply N.neq_0_lt_0. 
             assumption. 
         }
 
-        (* 2. Prove (x & s) is positive (MSB = 0) *)
         assert (Hxs_pos: last (bits (bv_and x s)) false = false).
         {
-           (* 1. Swap x and s so the positive 's' is on the left *)
            rewrite (@bv_and_comm n x s Hx Hs).
-           
-           (* 2. Apply the lemma using eapply *)
            eapply pos_bvand_pos.
-           
-           (* 3. Solve the specific subgoals generated by eapply *)
-           - apply Hs.        (* Matches 'size s = ?n', unifies ?n with n *)
-           - apply Hx.        (* Matches 'size x = n' *)
-           - try assumption.  (* Matches 'last (bits s) false = false' (Hs_case) *)
+
+           - apply Hs.      
+           - apply Hx.      
+           - try assumption.  
         }
 
-        (* 3. Unfold bv_sle to look at the list comparison *)
         unfold bv_sle in Hsle.
 
-        (* Clean up the size check inside bv_sle *)
         assert (Hsz_xs: size (bv_and x s) = n).
         { apply bv_and_size; assumption. }
         rewrite Hsz_xs, Ht in Hsle.
         rewrite N.eqb_refl in Hsle.
 
-        (* 4. Expose the MSBs by looking at the reversed lists *)
         unfold sle_list in Hsle.
-        
-        (* Define names for the reversed lists to make destructing clean *)
+
         remember (rev (bits (bv_and x s))) as l_xs.
         remember (rev (bits t)) as l_t.
-
-        (* Destruct the lists to see the heads (which are the MSBs) *)
         destruct l_xs as [|msb_xs rest_xs]; destruct l_t as [|msb_t rest_t].
-
-        (* Case A: Lists are empty. Contradicts n > 0 *)
         {
-          (* 1. Apply length to the equality "nil = rev ..." *)
           apply (f_equal (@length bool)) in Heql_t. 
-          
-          (* 2. Simplify: length nil is 0. length (rev l) is length l. *)
           simpl in Heql_t.
           rewrite rev_length in Heql_t.
-          
-          (* 3. Convert length to size using the bits_size lemma *)
-          (* We rewrite in Heql_t, not apply in Ht *)
           rewrite bits_size in Heql_t.
-          
-          (* 4. Use the known size of t (which is n) *)
           rewrite Ht in Heql_t.
-          
-          (* 5. Now Heql_t says 0 = N.to_nat n. But we know n > 0. *)
           lia.
         }
-        (* Case B: xs is empty, t is not. Impossible since sizes match n > 0 *)
         { 
           apply (f_equal (@length bool)) in Heql_xs.
           simpl in Heql_xs.
@@ -2028,8 +1958,6 @@ Proof.
           rewrite Hsz_xs in Heql_xs.
           lia. 
         }
-
-        (* Case C: xs is not empty, t is empty. Impossible since sizes match n > 0 *)
         { 
           apply (f_equal (@length bool)) in Heql_t.
           simpl in Heql_t.
@@ -2038,40 +1966,29 @@ Proof.
           rewrite Ht in Heql_t.
           lia. 
         }
-
-        (* Case D: Both have heads. Check the MSB values. *)
         {
-           (* 1. Fix the 'hd_rev' usage by removing extra arguments *)
            rewrite <- (hd_rev (bits (bv_and x s))) in Hxs_pos.
            rewrite <- Heql_xs in Hxs_pos. simpl in Hxs_pos.
            
            rewrite <- (hd_rev (bits t)) in Hsign_t.
            rewrite <- Heql_t in Hsign_t. simpl in Hsign_t.
-           
-           (* 2. Establish MSBs: false (pos) vs true (neg) *)
+
            subst msb_xs msb_t.
 
-           (* 3. Fix the Rewrite Error: *)
-           (* Explicitly expose the 'bits' function in Hsle so it matches the Heql equations *)
            change (rev (bv_and x s)) with (rev (bits (bv_and x s))) in Hsle.
            change (rev t) with (rev (bits t)) in Hsle.
-           
-           (* 4. Now the rewrite works because the terms match exactly *)
+
            rewrite <- Heql_xs in Hsle.
            rewrite <- Heql_t in Hsle.
-           
-           (* 5. Simplify: sle_list false true -> implies contradiction *)
+
            simpl in Hsle.
            discriminate.
         }
         
-    + (* t is positive *)
-      (* Goal: s >=u zeros *)
-      assert (Hmask: bv_and t (signed_min n) = zeros n).
+    + assert (Hmask: bv_and t (signed_min n) = zeros n).
       { apply bv_and_signed_min_pos; assumption. }
       rewrite Hmask.
-      
-      (* Anything is >=u zeros *)
+
       apply bv_uge_zeros.
       assumption.
 Qed.
@@ -2113,9 +2030,11 @@ Theorem bvor_sgt_signed_max :
 Proof.
 Admitted.
 
-(* t >=s s | signed_min <=> (exists x, x | s <=s t) *)
-Theorem bvor_sle_signed_min :
+(* Jordin *)
+(* t >=s (s | signed_min) <=> (exists x, x | s <=s t) *)
+Theorem bvor_sle :
   forall (n : N), forall (s t : bitvector),
+    (0 < n)%N ->
     (size s) = n ->
     (size t) = n ->
     iff
@@ -2124,7 +2043,31 @@ Theorem bvor_sle_signed_min :
           (size x = n) /\
           ((bv_sle (bv_or x s) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hn_pos Hs Ht.
+  split.
+  
+  - intro Hge.
+    exists (signed_min n).
+    split.
+    + apply signed_min_size.
+    + rewrite bv_sge_iff_sle in Hge.
+      rewrite (@bv_or_comm n (signed_min n) s).
+      * exact Hge.
+      * apply signed_min_size.
+      * exact Hs.
+
+  - intro Hex.
+    destruct Hex as [x [Hx_size Hle]].
+    rewrite bv_sge_iff_sle.
+    eapply bv_sle_trans.
+
+    + apply bv_or_signed_min_lower_bound with (x := x).
+      * lia.
+      * exact Hs.
+      * exact Hx_size.
+
+    + exact Hle.
+Qed.
 
 (* NOT SURE IF THIS IS CORRECT *)
 (* s & t <=> (exists x, x | s >=s t) *)
