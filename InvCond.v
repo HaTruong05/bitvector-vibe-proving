@@ -612,7 +612,66 @@ Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
     (bv_slt t (bv_shr (bv_shl (signed_max n) s) s) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_shr x s)) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split.
+  - intros H.
+    exists (bv_shl (signed_max n) s).
+    split.
+    + apply bv_shl_size.
+      * apply signed_max_size.
+      * exact Hs.
+    + exact H.
+  - intros [x [Hx Hlt]].
+    set (M := bv_shr (bv_shl (signed_max n) s) s).
+    set (v := bv_shr x s).
+    assert (Hsv : size v = n).
+    { unfold v. apply bv_shr_size.
+      - exact Hx.
+      - exact Hs.
+    }
+    assert (Hle : bv_sle v M = true).
+    { unfold v, M.
+      destruct (Nat.leb (N.to_nat n) (bv2nat_a s)) eqn:Hshift.
+      - apply Nat.leb_le in Hshift.
+        rewrite shr_ge_size with (n := n).
+        + rewrite shr_ge_size with (n := n).
+          * apply bv_sle_refl.
+          * apply bv_shl_size. apply signed_max_size. exact Hs.
+          * exact Hs.
+          * apply Nat.leb_le. exact Hshift.
+        + exact Hx.
+        + exact Hs.
+        + apply Nat.leb_le. exact Hshift.
+      - apply Nat.leb_gt in Hshift.
+        rewrite bv_shr_eq_shr_n_bits by (rewrite Hx; symmetry; exact Hs).
+        assert (Hshl_size : size (bv_shl (signed_max n) s) = n).
+        { apply bv_shl_size. apply signed_max_size. exact Hs. }
+        rewrite bv_shr_eq_shr_n_bits by (rewrite Hshl_size; symmetry; exact Hs).
+        rewrite bv_shl_eq_shl_n_bits by (rewrite signed_max_size; symmetry; exact Hs).
+        assert (Hx_len : length x = N.to_nat n).
+        { unfold size in Hx. rewrite <- Hx. rewrite Nat2N.id. reflexivity. }
+        assert (Hsm_len : length (signed_max n) = N.to_nat n).
+        { assert (Hsm : size (signed_max n) = n) by apply signed_max_size.
+          unfold size in Hsm.
+          apply f_equal with (f := N.to_nat) in Hsm.
+          rewrite Nat2N.id in Hsm. exact Hsm. }
+        rewrite <- N2Nat.id with (a := n).
+        apply M_is_max_for_shr_general.
+        + lia.
+        + lia.
+        + rewrite length_shr_n_bits. exact Hx_len.
+        + replace (N.to_nat n) with (length x) by lia.
+          apply shr_n_bits_high_bits_false. lia.
+    }
+    assert (HsM : size M = n).
+    { unfold M. apply bv_shr_size.
+      - apply bv_shl_size. apply signed_max_size. exact Hs.
+      - exact Hs.
+    }
+    eapply bv_slt_sle_trans.
+    + exact Hlt.
+    + exact Hle.
+Qed.
 
 (* s != 0 => ~0 >> s >=s t <=> (exists x, x >> s >=s t) *)
 Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),

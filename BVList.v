@@ -11810,6 +11810,204 @@ Proof.
              apply nth_mk_list_true. lia. }
            rewrite Htrue. reflexivity.
 Qed.
+
+Lemma shl_signed_max_bit_pattern : forall (n : nat) (k : nat),
+  (0 < n)%nat ->
+  (0 < k)%nat ->
+  (k < n)%nat ->
+  shl_n_bits (signed_max (N.of_nat n)) k = mk_list_false k ++ mk_list_true (n - k).
+Proof.
+  intros n k Hn Hk Hkn.
+  assert (Hsm_len : length (signed_max (N.of_nat n)) = n).
+  { assert (Hsm : size (signed_max (N.of_nat n)) = N.of_nat n) by apply signed_max_size.
+    unfold size in Hsm.
+    apply f_equal with (f := N.to_nat) in Hsm.
+    rewrite !Nat2N.id in Hsm. exact Hsm. }
+  assert (Hsm_eq : signed_max (N.of_nat n) = mk_list_true (n - 1) ++ [false]).
+  { apply signed_max_structure. lia. }
+  apply list_eq_nth with (d := false).
+  - rewrite length_shl_n_bits. rewrite Hsm_len.
+    rewrite app_length. rewrite length_mk_list_false. rewrite length_mk_list_true.
+    lia.
+  - intros i Hi.
+    rewrite length_shl_n_bits in Hi. rewrite Hsm_len in Hi.
+    destruct (Nat.ltb_spec i k) as [Hik | Hik].
+    + rewrite shl_n_bits_nth_low_bits_zero by lia.
+      rewrite app_nth1 by (rewrite length_mk_list_false; lia).
+      rewrite nth_mk_list_false by lia.
+      reflexivity.
+    + rewrite shl_n_bits_nth_high by lia.
+      assert (Hsmbit : nth (i - k) (signed_max (N.of_nat n)) false = true).
+      { rewrite Hsm_eq.
+        rewrite app_nth1 by (rewrite length_mk_list_true; lia).
+        apply nth_mk_list_true. lia. }
+      rewrite Hsmbit.
+      rewrite app_nth2 by (rewrite length_mk_list_false; lia).
+      rewrite length_mk_list_false.
+      symmetry. apply nth_mk_list_true. lia.
+Qed.
+
+Lemma shr_shl_signed_max_bit_pattern : forall (n : nat) (k : nat),
+  (0 < n)%nat ->
+  (0 < k)%nat ->
+  (k < n)%nat ->
+  shr_n_bits (shl_n_bits (signed_max (N.of_nat n)) k) k =
+  mk_list_true (n - k) ++ mk_list_false k.
+Proof.
+  intros n k Hn Hk Hkn.
+  rewrite shl_signed_max_bit_pattern by lia.
+  rewrite shr_n_bits_skipn_append.
+  - rewrite skipn_jo. reflexivity.
+  - rewrite app_length. rewrite length_mk_list_false. rewrite length_mk_list_true.
+    lia.
+Qed.
+
+Lemma shr_n_bits_high_bits_false : forall (k : nat) (v : list bool),
+  (k <= length v)%nat ->
+  skipn (length v - k) (shr_n_bits v k) = mk_list_false k.
+Proof.
+  intros k v Hlen.
+  rewrite shr_n_bits_skipn_append by lia.
+  rewrite skipn_app_le.
+  - replace (skipn (length v - k) (skipn k v)) with (@nil bool).
+    + simpl. reflexivity.
+    + symmetry. apply skipn_all.
+      rewrite length_skipn. apply Nat.leb_le. lia.
+  - rewrite length_skipn. lia.
+Qed.
+
+Lemma M_is_max_for_shr_general : forall (n : nat) (k : nat) (v : list bool),
+  (0 < n)%nat ->
+  (k <= n)%nat ->
+  length v = n ->
+  skipn (n - k) v = mk_list_false k ->
+  bv_sle v (shr_n_bits (shl_n_bits (signed_max (N.of_nat n)) k) k) = true.
+Proof.
+  intros n k v Hn Hkn Hlen Hhigh.
+  destruct (Nat.eq_dec k 0) as [Hk0 | Hkne0].
+  - subst k. simpl.
+    apply signed_max_is_max.
+    + unfold size. rewrite Hlen. reflexivity.
+    + rewrite Nat2N.id. exact Hn.
+  - destruct (Nat.eq_dec k n) as [Hkn_eq | Hkn_ne].
+    + subst k.
+      assert (Hv : v = mk_list_false n).
+      { rewrite <- Hhigh. rewrite Nat.sub_diag. reflexivity. }
+      rewrite Hv.
+      assert (Hsm_len : length (signed_max (N.of_nat n)) = n).
+      { assert (Hsm : size (signed_max (N.of_nat n)) = N.of_nat n) by apply signed_max_size.
+        unfold size in Hsm.
+        apply f_equal with (f := N.to_nat) in Hsm.
+        rewrite !Nat2N.id in Hsm. exact Hsm. }
+      assert (Heq : mk_list_false n = shr_n_bits (shl_n_bits (signed_max (N.of_nat n)) n) n).
+      { apply list_eq_nth with (d := false).
+        - rewrite length_mk_list_false. rewrite length_shr_n_bits.
+          rewrite length_shl_n_bits. rewrite Hsm_len. reflexivity.
+        - intros i Hi.
+          rewrite length_mk_list_false in Hi.
+          rewrite nth_mk_list_false by lia.
+          rewrite shr_n_bits_skipn_append
+            by (rewrite length_shl_n_bits; rewrite Hsm_len; lia).
+          rewrite app_nth2
+            by (rewrite length_skipn; rewrite length_shl_n_bits; rewrite Hsm_len; lia).
+          rewrite length_skipn. rewrite length_shl_n_bits. rewrite Hsm_len.
+          replace (n - n)%nat with 0%nat by lia. simpl.
+          replace (i - 0)%nat with i by lia.
+          symmetry. apply nth_mk_list_false. lia. }
+      rewrite Heq. apply bv_sle_refl.
+    + assert (Hk : (0 < k)%nat) by lia.
+      assert (Hklt : (k < n)%nat) by lia.
+      rewrite shr_shl_signed_max_bit_pattern by lia.
+      assert (Hv_decomp : v = firstn (n - k) v ++ skipn (n - k) v).
+      { symmetry. apply firstn_skipn. }
+      rewrite Hhigh in Hv_decomp.
+      assert (Hfirst_len : length (firstn (n - k) v) = (n - k)%nat).
+      { rewrite firstn_length_le. reflexivity. lia. }
+      assert (Hv_last : last v false = false).
+      { rewrite Hv_decomp.
+        rewrite last_append.
+        - apply last_mk_list_false.
+        - destruct k. lia. rewrite mk_list_false_succ. discriminate. }
+      assert (HM_last : last (mk_list_true (n - k) ++ mk_list_false k) false = false).
+      { rewrite last_append.
+        - apply last_mk_list_false.
+        - destruct k. lia. rewrite mk_list_false_succ. discriminate. }
+      rewrite bv_sle_ule_equiv_when_msb_zero.
+      * rewrite Hv_decomp.
+        apply bv_ule_B2P.
+        apply bv_uleP_post_append.
+        apply bv_ule_B2P.
+        pose proof (bv_ule_1_length (firstn (n - k) v)) as Hule.
+        rewrite Hfirst_len in Hule.
+        exact Hule.
+      * exact Hv_last.
+      * exact HM_last.
+Qed.
+
+Lemma shr_one_bit_mk_list_false : forall (n : nat),
+  shr_one_bit (mk_list_false n) = mk_list_false n.
+Proof.
+  intros n.
+  pose proof (shr_one_bit_all_false (mk_list_false n)) as H.
+  rewrite length_mk_list_false in H.
+  exact H.
+Qed.
+
+Lemma shr_n_bits_all_false : forall (k n : nat),
+  shr_n_bits (mk_list_false n) k = mk_list_false n.
+Proof.
+  induction k as [| k' IHk].
+  - intros n. simpl. reflexivity.
+  - intros n.
+    rewrite <- shr_n_shr_one.
+    rewrite shr_one_bit_mk_list_false.
+    apply IHk.
+Qed.
+
+Lemma shr_n_bits_compose : forall (j k : nat) (a : list bool),
+  shr_n_bits a (j + k) = shr_n_bits (shr_n_bits a j) k.
+Proof.
+  induction j as [| j' IHj].
+  - intros k a. simpl. reflexivity.
+  - intros k a.
+    replace (S j' + k)%nat with (S (j' + k))%nat by lia.
+    rewrite <- shr_n_shr_one.
+    rewrite <- (shr_n_shr_one j' a).
+    apply IHj.
+Qed.
+
+Lemma shr_n_bits_ge_length : forall (k : nat) (a : list bool),
+  (length a <= k)%nat ->
+  shr_n_bits a k = mk_list_false (length a).
+Proof.
+  intros k a Hlen.
+  replace k with (length a + (k - length a))%nat by lia.
+  rewrite shr_n_bits_compose.
+  assert (Hinner : shr_n_bits a (length a) = mk_list_false (length a)).
+  { rewrite shr_n_bits_skipn_append by lia.
+    rewrite skipn_all by (apply Nat.leb_refl).
+    simpl. reflexivity. }
+  rewrite Hinner.
+  apply shr_n_bits_all_false.
+Qed.
+
+Lemma shr_ge_size : forall (n : N) (a s : bitvector),
+  size a = n ->
+  size s = n ->
+  (N.to_nat n <=? bv2nat_a s)%nat = true ->
+  bv_shr a s = zeros n.
+Proof.
+  intros n a s Ha Hs Hge.
+  apply Nat.leb_le in Hge.
+  assert (Ha_len : length a = N.to_nat n).
+  { unfold size in Ha.
+    apply f_equal with (f := N.to_nat) in Ha.
+    rewrite Nat2N.id in Ha. exact Ha. }
+  rewrite bv_shr_eq_shr_n_bits by (rewrite Ha; symmetry; exact Hs).
+  rewrite shr_n_bits_ge_length by lia.
+  unfold zeros. rewrite Ha_len. reflexivity.
+Qed.
+
 (* End - Liam Secrist *)
 
 
