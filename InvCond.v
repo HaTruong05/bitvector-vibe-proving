@@ -606,6 +606,8 @@ Proof.
     apply H.
 Qed.
 
+(* Liam Secrist *)
+
 (* t <s (maxs << s) >> s <=> (exists x, x >> s >s t) *)
 Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
