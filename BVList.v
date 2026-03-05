@@ -12201,6 +12201,76 @@ Qed.
 
 (*End: | <=s *)
 
+(*Start: | >=s *)
+
+Lemma map2_orb_app : forall (a b c d : list bool),
+  length a = length c ->
+  map2 orb (a ++ b) (c ++ d) = map2 orb a c ++ map2 orb b d.
+Proof.
+  intros a. induction a as [|x xs IH].
+  
+  - intros b c d H_len.
+    destruct c as [|y ys].
+    + simpl. reflexivity.
+    + simpl in H_len. discriminate H_len.
+
+  - intros b c d H_len.
+    destruct c as [|y ys].
+    + simpl in H_len. discriminate H_len.
+    + simpl in H_len. inversion H_len as [H_len_xs].
+
+      simpl.
+      rewrite (IH b ys d H_len_xs). 
+      reflexivity.
+Qed.
+
+Lemma rev_map2_orb : forall (a b : list bool),
+  length a = length b -> 
+  rev (map2 orb a b) = map2 orb (rev a) (rev b).
+Proof.
+  induction a as [|x xs IH].
+  
+  - intros b H_len. 
+    destruct b as [|y ys].
+    + reflexivity.
+    + discriminate H_len.
+
+  - intros b H_len. 
+    destruct b as [|y ys].
+    + discriminate H_len.
+    + simpl in H_len. inversion H_len as [H_len_xs].
+      
+      simpl.
+      rewrite IH by assumption.
+      change [x || y] with (map2 orb [x] [y]).
+      rewrite <- map2_orb_app.
+      
+      * reflexivity.
+      * rewrite rev_length.
+        rewrite rev_length.
+        exact H_len_xs.
+Qed.
+
+Lemma rev_bv_or : forall (a b : bitvector),
+  size a = size b ->
+  rev (bv_or a b) = bv_or (rev a) (rev b).
+Proof.
+  intros a b H_size.
+  unfold bv_or.
+  rewrite H_size.
+  rewrite N.eqb_refl.
+  unfold size.
+  unfold bits.
+  rewrite !rev_length.
+  unfold size in H_size.
+  rewrite H_size.
+  rewrite N.eqb_refl.
+  apply rev_map2_orb.
+  lia.
+Qed.
+
+(*End: | >=s *)
+
 (**)
 
 
