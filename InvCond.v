@@ -2242,6 +2242,48 @@ Proof.
          destruct b_s; destruct b_t; simpl; try (rewrite orb_false_r; apply IH; lia); reflexivity.
 Qed.
 
+(* t >> (t >> s) <u signed_min <=> exists x, x << s <=s t *)
+
+(* t >> s <u signed_min <=> exists x, s << x <=s t *)
+
+(* Jordin *)
+(* t >=s ~(signed_max >> s) <=> exists x, x >>a s <=s t *)
+Theorem bvxashrs_sle:
+  forall (n : N) (t s : bitvector),
+    (0 < n)%N ->
+    size t = n ->
+    size s = n ->
+    iff
+      (bv_sge t (bv_not (bv_shr (signed_max n) s)) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          (bv_sle (bv_ashr x s) t = true)).
+Proof.
+  intros n t s H_pos H_size_t H_size_s.
+  split.
+  
+  - intro H_sge.
+    exists (signed_min n).
+    split.
+    
+    + apply signed_min_size.
+      
+    + rewrite <- (ashr_smin_eq_not_shr_smax H_pos H_size_s) in H_sge.
+      rewrite bv_sge_iff_sle in H_sge. 
+      exact H_sge.
+
+  - intros [x [H_size_x H_sle]].
+    rewrite bv_sge_iff_sle. 
+    rewrite <- (ashr_smin_eq_not_shr_smax H_pos H_size_s).
+    pose proof (ashr_smin_is_minimal H_pos H_size_x H_size_s) as H_min_is_bottom.
+
+    eapply bv_sle_trans.
+    * exact H_min_is_bottom. 
+    * exact H_sle.           
+Qed.
+
+(* t >=s 0 V t >=s s <=> exists x, s >>a x <=s t *)
+
 
 
 

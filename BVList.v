@@ -12271,6 +12271,138 @@ Qed.
 
 (*End: | >=s *)
 
+
+(*Start: x >>a s <=s *)
+
+Lemma signed_min_eq_not_smax : forall (n : N),
+  (0 < n)%N ->
+  signed_min n = bv_not (signed_max n).
+Proof.
+  intros n H_pos.
+  unfold signed_min, signed_max, bv_not.
+  unfold bits. 
+  rewrite map_rev.
+  f_equal. 
+  
+  destruct (N.to_nat n) as [| n'] eqn:Heq.
+  - lia. 
+  - simpl.
+    f_equal.
+    
+    assert (H_lists : forall k : nat, mk_list_false k = map negb (mk_list_true k)).
+    { 
+      intro k. induction k as [| k' IHk].
+      - reflexivity.
+      - simpl. 
+        f_equal. 
+        apply IHk. 
+    }
+    apply H_lists.
+Qed.
+
+Lemma map_negb_ashr_one_bit : forall (a : list bool) (sign : bool),
+  map negb (ashr_one_bit a sign) = ashr_one_bit (map negb a) (negb sign).
+Proof.
+  intros a sign.
+  destruct a as [| b t].
+  - reflexivity.
+  - simpl. 
+    rewrite map_app. 
+    reflexivity.
+Qed.
+
+Lemma map_negb_ashr_n_bits : forall (k : nat) (a : list bool) (sign : bool),
+  map negb (ashr_n_bits a k sign) = ashr_n_bits (map negb a) k (negb sign).
+Proof.
+  intros n. induction n as [| n' IHn].
+  - intros a sign. reflexivity.
+  - intros a sign. 
+    simpl.
+    rewrite IHn.
+    rewrite map_negb_ashr_one_bit.
+    reflexivity.
+Qed.
+
+Lemma shr_n_bits_eq_ashr_false : forall (n : nat) (a : list bool),
+  shr_n_bits a n = ashr_n_bits a n false.
+Proof.
+  intros n. induction n as [| n' IHn].
+  - intros a. reflexivity.
+  - intros a. simpl.
+    
+    assert (H_one_bit: shr_one_bit a = ashr_one_bit a false).
+    { destruct a as [| b t].
+      - reflexivity.
+      - reflexivity. }
+    
+    rewrite H_one_bit.
+    apply IHn.
+Qed.
+
+Lemma last_signed_min : forall n : N,
+  (0 < n)%N ->
+  last (signed_min n) false = true.
+Proof.
+  intros n H_pos.
+  unfold signed_min.
+  unfold bits. 
+  
+  destruct (N.to_nat n) as [| n'] eqn:Heq.
+  - lia. 
+  - simpl. 
+    rewrite last_last. 
+    reflexivity.
+Qed.
+
+Lemma ashr_smin_eq_not_shr_smax :
+  forall (n : N) (s : bitvector),
+    (0 < n)%N ->
+    size s = n ->
+    bv_ashr (signed_min n) s = bv_not (bv_shr (signed_max n) s).
+Proof.
+  intros n s H_pos H_size.
+  unfold bv_ashr, bv_shr.
+  
+  rewrite signed_min_size. 
+  rewrite signed_max_size.
+  rewrite H_size.
+  rewrite N.eqb_refl. 
+  
+  unfold ashr_aux, shr_aux.
+  rewrite shr_n_bits_eq_ashr_false.
+  unfold bv_not.
+  unfold bits. 
+  rewrite map_negb_ashr_n_bits.
+  simpl (negb false).
+  rewrite last_signed_min; auto.
+  f_equal. 
+  rewrite signed_min_eq_not_smax.
+  
+  - unfold bv_not.
+    reflexivity.
+  - exact H_pos.
+Qed.
+
+Lemma ashr_smin_is_minimal :
+  forall (n : N) (x s : bitvector),
+    (0 < n)%N ->
+    size x = n ->
+    size s = n ->
+    bv_sle (bv_ashr (signed_min n) s) (bv_ashr x s) = true.
+Proof.
+  intros n x s H_pos H_size_x H_size_s.
+  eapply sle_ashr.
+  
+  - apply signed_min_size.
+  - exact H_size_x.
+  - exact H_size_s.
+  - pose proof (signed_min_sle x) as H_min.
+    rewrite H_size_x in H_min.
+    exact H_min.
+Qed.
+
+(*End: x >>a s <=s *)
+
 (**)
 
 
