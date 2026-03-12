@@ -368,11 +368,6 @@ Proof.
             rewrite app_nil_r. reflexivity.
           * apply Nat.ltb_ge in Hlt2. rewrite Hx_len in Hlt2. lia.
     }
-    assert (HsM : size M = n).
-    { unfold M. apply bv_shl_size.
-      - apply bv_shr_size. apply signed_max_size. exact Hs.
-      - exact Hs.
-    }
     eapply bv_slt_sle_trans.
     + exact Hlt.
     + exact Hle.
@@ -665,15 +660,12 @@ Proof.
         + replace (N.to_nat n) with (length x) by lia.
           apply shr_n_bits_high_bits_false. lia.
     }
-    assert (HsM : size M = n).
-    { unfold M. apply bv_shr_size.
-      - apply bv_shl_size. apply signed_max_size. exact Hs.
-      - exact Hs.
-    }
     eapply bv_slt_sle_trans.
     + exact Hlt.
     + exact Hle.
 Qed.
+
+(* Liam Secrist *)
 
 (* s != 0 => ~0 >> s >=s t <=> (exists x, x >> s >=s t) *)
 Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
@@ -681,7 +673,117 @@ Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
     (bv_eq s (zeros n) = false -> bv_sle t (bv_shr (bv_not (zeros n)) s) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sle t (bv_shr x s)) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split.
+  - intros H.
+    destruct (bv_eq s (zeros n)) eqn:Hsz.
+    + apply bv_eq_reflect in Hsz. subst s.
+      exists (signed_max n).
+      split.
+      * apply signed_max_size.
+      * assert (Hsm_size : size (signed_max n) = n) by apply signed_max_size.
+        rewrite bv_shr_eq_shr_n_bits
+          by (rewrite Hsm_size; symmetry; exact Hs).
+        unfold bv2nat_a.
+        assert (Hzeros_eq : zeros n = mk_list_false (N.to_nat n)).
+        { unfold zeros. reflexivity. }
+        rewrite Hzeros_eq.
+        unfold list2nat_be_a.
+        rewrite list2N_mk_list_false.
+        simpl.
+        destruct (N.to_nat n) eqn:Hnn.
+        --- assert (Ht_empty : t = nil).
+           { unfold size in Ht.
+             apply f_equal with (f := N.to_nat) in Ht.
+             rewrite Nat2N.id in Ht. rewrite Hnn in Ht.
+             destruct t; simpl in Ht; [reflexivity | lia]. }
+           assert (Hsm_nil : signed_max n = nil).
+           { unfold signed_max, smax_big_endian. rewrite Hnn. simpl. reflexivity. }
+           subst t. rewrite Hsm_nil. apply bv_sle_refl.
+        --- apply signed_max_is_max.
+           ++ exact Ht.
+           ++ lia.
+    + exists (bv_not (zeros n)).
+      split.
+      * apply bv_not_size. apply zeros_size.
+      * apply H. reflexivity.
+  - intros [x [Hx Hle]] Hsne.
+    assert (Hle2 : bv_sle (bv_shr x s) (bv_shr (bv_not (zeros n)) s) = true).
+    { set (k := bv2nat_a s).
+      destruct (Nat.leb (N.to_nat n) k) eqn:Hshift.
+      - apply Nat.leb_le in Hshift.
+        rewrite shr_ge_size with (n := n) (a := x).
+        + rewrite shr_ge_size with (n := n) (a := bv_not (zeros n)).
+          * apply bv_sle_refl.
+          * apply bv_not_size. apply zeros_size.
+          * exact Hs.
+          * apply Nat.leb_le. exact Hshift.
+        + exact Hx.
+        + exact Hs.
+        + apply Nat.leb_le. exact Hshift.
+      - apply Nat.leb_gt in Hshift.
+        rewrite bv_shr_eq_shr_n_bits by (rewrite Hx; symmetry; exact Hs).
+        assert (Hones_size : size (bv_not (zeros n)) = n).
+        { apply bv_not_size. apply zeros_size. }
+        rewrite bv_shr_eq_shr_n_bits
+          by (rewrite Hones_size; symmetry; exact Hs).
+        fold k.
+        assert (Hx_len : length x = N.to_nat n).
+        { unfold size in Hx.
+          apply f_equal with (f := N.to_nat) in Hx.
+          rewrite Nat2N.id in Hx. exact Hx. }
+        assert (Hones_len : length (bv_not (zeros n)) = N.to_nat n).
+        { unfold size in Hones_size.
+          apply f_equal with (f := N.to_nat) in Hones_size.
+          rewrite Nat2N.id in Hones_size. exact Hones_size. }
+        assert (Hk_pos : (0 < k)%nat).
+        { unfold k.
+          assert (Hs_len : length s = N.to_nat n).
+          { unfold size in Hs.
+            apply f_equal with (f := N.to_nat) in Hs.
+            rewrite Nat2N.id in Hs. exact Hs. }
+          assert (Hs_neq_mlf : s <> mk_list_false (length s)).
+          { intro Hcontra.
+            assert (s = zeros n).
+            { rewrite Hcontra. unfold zeros. rewrite Hs_len. reflexivity. }
+            rewrite H in Hsne.
+            rewrite bv_eq_refl in Hsne. discriminate. }
+          apply gt0_nmk_list_false in Hs_neq_mlf.
+          apply Nat.ltb_lt in Hs_neq_mlf.
+          unfold bv2nat_a, list2nat_be_a. lia.
+        }
+        assert (Hv_last : last (shr_n_bits x k) false = false).
+        { rewrite shr_n_bits_skipn_append by lia.
+          rewrite last_append.
+          - apply last_mk_list_false.
+          - destruct k; [lia | rewrite mk_list_false_succ; discriminate].
+        }
+        assert (HM_last : last (shr_n_bits (bv_not (zeros n)) k) false = false).
+        { rewrite shr_n_bits_skipn_append by lia.
+          rewrite last_append.
+          - apply last_mk_list_false.
+          - destruct k; [lia | rewrite mk_list_false_succ; discriminate].
+        }
+        rewrite bv_sle_ule_equiv_when_msb_zero by assumption.
+        rewrite shr_n_bits_skipn_append by lia.
+        rewrite shr_n_bits_skipn_append by lia.
+        assert (Hones_eq : bv_not (zeros n) = mk_list_true (N.to_nat n)).
+        { unfold zeros. rewrite bv_not_false_true. reflexivity. }
+        rewrite Hones_eq.
+        rewrite skipn_mk_list_true by lia.
+        apply bv_ule_B2P.
+        apply bv_uleP_post_append.
+        apply bv_ule_B2P.
+        assert (Hskip_len : length (skipn k x) = (N.to_nat n - k)%nat).
+        { rewrite length_skipn. lia. }
+        pose proof (bv_ule_1_length (skipn k x)) as Hule.
+        rewrite Hskip_len in Hule.
+        exact Hule.
+    }
+    eapply bv_sle_trans.
+    + exact Hle.
+    + exact Hle2.
+Qed.
 
 (*------------------------------------------------------------*)
 

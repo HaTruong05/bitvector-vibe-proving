@@ -11118,20 +11118,6 @@ Proof.
   - reflexivity.
 Qed.
 
-Lemma last_shr_n_bits_zero : forall (k : nat) (v : list bool),
-  (0 < k)%nat ->
-  (k <= length v)%nat ->
-  last (shr_n_bits v k) false = false.
-Proof.
-  intros k v Hk Hlen.
-  rewrite shr_n_bits_skipn_append by lia.
-  rewrite last_append.
-  - apply last_mk_list_false.
-  - destruct k.
-    + lia.
-    + rewrite mk_list_false_succ. discriminate.
-Qed.
-
 Lemma last_rev : forall {A : Type} (l : list A) (d : A),
   l <> [] ->
   last (rev l) d = hd d l.
@@ -11273,23 +11259,6 @@ Proof.
   - rewrite length_mk_list_true. lia.
 Qed.
 
-Lemma M_msb_zero : forall (n : nat) (k : nat),
-  (0 < n)%nat ->
-  (0 < k)%nat ->
-  (k < n - 1)%nat ->
-  last (shl_n_bits_a (shr_n_bits (signed_max (N.of_nat n)) k) k) false = false.
-Proof.
-  intros n k Hn Hk Hkn.
-  rewrite M_bit_pattern by lia.
-  rewrite last_append.
-  - rewrite last_append.
-    + simpl. reflexivity.
-    + discriminate.
-  - destruct (n - 1 - k)%nat eqn:Heq.
-    + simpl. discriminate.
-    + rewrite mk_list_true_succ. discriminate.
-Qed.
-
 
 Lemma nth_last : forall {A : Type} (l : list A) (d : A),
   l <> [] ->
@@ -11321,7 +11290,7 @@ Proof.
       pose proof (signed_max_size (N.of_nat n)) as Hsize.
       unfold size in Hsize. lia.
     + exact Hvsign.
-    + apply M_msb_zero; lia.
+    + apply msb_shl_shr_signed_max_zero; lia.
   - rewrite bv_sle_ule_equiv_when_msb_zero.
     + unfold M. rewrite M_bit_pattern by lia.
       assert (Hmiddle_len : length (firstn (n - 1 - k) (skipn k v)) = (n - 1 - k)%nat).
@@ -11346,7 +11315,7 @@ Proof.
       rewrite Hmiddle_len in Hule.
       exact Hule.
     + exact Hvsign.
-    + apply M_msb_zero; lia.
+    + apply msb_shl_shr_signed_max_zero; lia.
 Qed.
 
 Lemma bv_slt_sle_trans : forall (b1 b2 b3 : bitvector),
