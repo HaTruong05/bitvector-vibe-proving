@@ -3789,6 +3789,132 @@ Proof.
   rewrite Nat2N.id in H. apply H.
 Qed.
 
+(* a <s b -> b >s a *)
+
+Lemma slt_list_big_endian_sgt_list_big_endian : forall x y, 
+  slt_list_big_endian x y = true -> sgt_list_big_endian y x = true.
+Proof.
+  intros x. induction x.
+  + simpl. easy. 
+  + intros y. case y.
+    - intros. case a; case x in *; simpl in H; now contradict H.
+    - intros b l. simpl.
+      specialize (IHx l). case x in *.
+      * simpl. case l in *.
+        { case a; case b; simpl; easy. }
+        { case a; case b; simpl; easy. }
+      * rewrite !orb_true_iff, !andb_true_iff. intro. destruct H.
+        { destruct H. unfold slt_list_big_endian in IHx.
+          unfold sgt_list_big_endian in IHx. case l in *; 
+          left; split.
+            - apply Bool.eqb_prop in H; rewrite H. apply eqb_reflx.
+            - now apply ult_list_big_endian_ugt_list_big_endian.
+            - apply Bool.eqb_prop in H. rewrite H. apply eqb_reflx.
+            - now apply ult_list_big_endian_ugt_list_big_endian.
+        }
+        destruct H. apply negb_true_iff in H0. subst. now right.
+Qed. 
+
+Lemma slt_list_sgt_list : forall x y, slt_list x y = true -> sgt_list y x = true.
+Proof.
+  intros x y. unfold slt_list. intros. 
+  apply slt_list_big_endian_sgt_list_big_endian in H.
+  unfold sgt_list. apply H.
+Qed.
+
+Lemma bv_slt_bv_sgt : forall x y, bv_slt x y = true -> bv_sgt y x = true.
+Proof.
+  intros x y. unfold bv_slt.
+  case_eq (size x =? size y); intros.
+  - apply slt_list_sgt_list in H0. unfold bv_sgt.
+    case_eq (size y =? size x ); intros. easy.
+    rewrite N.eqb_eq in H.
+    rewrite H in H1.
+    now rewrite N.eqb_refl in H1.
+  - easy.
+Qed.
+
+Lemma slt_listP_sgt_listP : forall x y, slt_listP x y -> sgt_listP y x.
+Proof.
+  unfold slt_listP, sgt_listP.
+  intros. unfold sgt_list, slt_list in *.
+  case_eq (slt_list_big_endian (List.rev x) (List.rev y)).
+  + intros. apply (@slt_list_big_endian_sgt_list_big_endian (List.rev x) (List.rev y)) in H0. now rewrite H0.
+  + intros. rewrite H0 in H. now contradict H.
+Qed.
+
+Lemma bv_sltP_bv_sgtP : forall x y, bv_sltP x y -> (bv_sgtP y x).
+Proof.
+  intros x y. unfold bv_sltP, bv_sgtP.
+  case_eq (size x =? size y ); intros.
+  - rewrite N.eqb_eq in H. rewrite H.
+    rewrite N.eqb_refl.
+    now apply slt_listP_sgt_listP.
+  - easy.
+Qed.
+
+
+(*a >s b -> b <s a *)
+Lemma sgt_list_big_endian_slt_list_big_endian : forall x y,
+  sgt_list_big_endian x y = true -> slt_list_big_endian y x = true.
+Proof.
+  intros x. induction x.
+  + simpl. easy. 
+  + intros y. case y.
+    - intros. case a; case x in *; simpl in H; now contradict H.
+    - intros b l. simpl. 
+      specialize (IHx l). case x in *.
+      * simpl. case l in *.
+        { case a; case b; simpl; easy. }
+        { case a; case b; simpl; easy. }
+      * rewrite !orb_true_iff, !andb_true_iff. intro. destruct H.
+        { destruct H. unfold sgt_list_big_endian in IHx.
+          unfold slt_list_big_endian in IHx. case l in *; left; split.
+          - apply Bool.eqb_prop in H; rewrite H. apply eqb_reflx.
+          - now apply ugt_list_big_endian_ult_list_big_endian. 
+          - apply Bool.eqb_prop in H. rewrite H. apply eqb_reflx.
+          - now apply ugt_list_big_endian_ult_list_big_endian. }
+        destruct H. apply negb_true_iff in H. subst. now right.
+Qed.
+ 
+Lemma sgt_list_slt_list : forall x y, sgt_list x y = true -> slt_list y x = true.
+Proof.
+  intros x y. unfold sgt_list. intros. 
+  apply sgt_list_big_endian_slt_list_big_endian in H.
+  unfold slt_list. apply H.
+Qed.
+
+Lemma bv_sgt_bv_slt : forall x y, bv_sgt x y = true -> bv_slt y x = true.
+Proof.
+  intros x y. unfold bv_sgt.
+  case_eq (size x =? size y); intros.
+  - apply sgt_list_slt_list in H0. unfold bv_slt.
+    rewrite N.eqb_eq in H.
+    rewrite H. now rewrite N.eqb_refl.
+  - easy. 
+Qed.
+
+Lemma sgt_listP_slt_listP : forall x y, sgt_listP x y -> slt_listP y x.
+Proof.
+  unfold sgt_listP.
+  intros. unfold sgt_list in H.
+  case_eq (sgt_list_big_endian (List.rev x) (List.rev y)).
+  + intros. unfold slt_listP. unfold slt_list. 
+    apply (@sgt_list_big_endian_slt_list_big_endian (List.rev x) (List.rev y)) in H0.
+    rewrite H0. easy.
+  + intros. rewrite H0 in H. now contradict H.
+Qed.
+ 
+Lemma bv_sgtP_bv_sltP : forall x y, bv_sgtP x y -> (bv_sltP y x).
+Proof.
+  intros x y. unfold bv_sgtP, bv_sltP.
+  case_eq (size x =? size y); intros.
+  - rewrite N.eqb_eq in H.
+    rewrite H, N.eqb_refl.
+    now apply sgt_listP_slt_listP.
+  - easy.
+Qed.
+
 (* bv_and x y <= y *)
 
 Lemma ule_list_big_endian_map2_and : forall (x y : list bool),
@@ -9326,6 +9452,18 @@ Proof.
   + now rewrite H.
 Qed.
 
+(* x < y => y <= z => x < z *)
+Lemma bv_slt_sle_trans : forall (b1 b2 b3 : bitvector), 
+  bv_slt b1 b2 = true -> bv_sle b2 b3 = true -> bv_slt b1 b3 = true.
+Proof.
+  intros b1 b2 b3 H_slt H_sle.
+  destruct (@bv_sle_eq b2 b3) as [H_eq_fwd _].
+  apply H_eq_fwd in H_sle.
+  destruct H_sle as [H_strict | H_eq].
+  + now apply (@bv_slt_trans b1 b2 b3).
+  + now rewrite <- H_eq.
+Qed.
+
 (* x <= y => y <= z => x <= z *)
 Lemma sle_list_big_endian_trans : forall (x y z : bitvector),
   sle_list_big_endian x y = true ->
@@ -10951,32 +11089,2092 @@ Proof.
 Qed.
 
 (* Start: bvand_slt *)
-
-(* signed *)
 Definition sbv2int (n : N) (v : bitvector) : Z :=
-  let u := bv2int v in
-  let half := pow2_int_N (n - 1) in
-  if (u <? half)%Z then u else (u - pow2_int_N n)%Z.
+  if last v false then 
+    (bv2int v - pow2_int_N n)%Z   (* Negative case: sign bit is 1 *)
+  else 
+    (bv2int v)%Z.                 (* Positive case: sign bit is 0 *)
+
+Lemma ult_list_big_endian_list2int : forall l1 l2,
+  length l1 = length l2 ->
+  ult_list_big_endian l1 l2 = true ->
+  (list2int (rev l1) < list2int (rev l2))%Z.
+Proof.
+  (* Standard induction works here because l1 is big-endian! *)
+  induction l1 as [| a l1 IHl1]; intros l2 Hlen Hult.
+  
+  - (* Base Case: [] *)
+    destruct l2 as [| b l2]; [| discriminate Hlen].
+    (* ult_list_big_endian [] [] is false, contradicting Hult *)
+    simpl in Hult. discriminate Hult. 
+
+  - (* Inductive Step: l1 is (a :: l1) *)
+    destruct l2 as [| b l2]; [discriminate Hlen |].
+    
+    (* Simplify lengths *)
+    simpl in Hlen. injection Hlen as Hlen'.
+    
+    (* Unfold the boolean step *)
+    rewrite ult_list_big_endian_unf in Hult.
+    
+    (* Now we push the MSBs ('a' and 'b') to the end of the little-endian lists *)
+    (* rev (a :: l1) becomes (rev l1 ++ [a]) *)
+    simpl. 
+    
+    (* Use your list2int_app lemma to break out the math! *)
+    rewrite !list2int_app.
+    simpl. (* evaluates list2int [a] to bool2int a *)
+    
+    (* Now we destruct the MSBs to see which is larger *)
+    destruct a, b.
+    
+    + (* Both 1 (True) *)
+      (* Simplify the boolean logic to get ult_list_big_endian l1 l2 = true *)
+      simpl in Hult. 
+      rewrite orb_false_r in Hult.
+      (* Apply the inductive hypothesis *)
+      apply IHl1 in Hult; [| exact Hlen'].
+
+      (* Align the lengths for the pow2_int multipliers *)
+      rewrite !length_rev. rewrite Hlen'.
+      (* lia cancels out the equal MSBs and uses Hult *)
+      lia.
+
+    + (* 1 vs 0 (True / False) *)
+      (* This simplifies to false = true, which is impossible *)
+      simpl in Hult. 
+      discriminate Hult.
+
+    + (* 0 vs 1 (False / True) *)
+      (* Convert MSBs to Z *)
+
+      rewrite !length_rev. rewrite Hlen'.
+      
+      (* To prove (pow2 * 0 + left) < (pow2 * 1 + right), we need bounds. *)
+      (* 1. The left side is strictly less than the power of 2 *)
+      assert (H_refl : length (rev l1) = length (rev l1)) by reflexivity.
+      pose proof (list2int_lt_pow2_int H_refl) as H_bound.
+      rewrite length_rev in H_bound.
+      
+      assert (H_rev_l2 : (0 <= list2int (rev l2))%Z).
+      { apply list2int_geq_zero. }
+      
+      (* 1. Tell Coq to explicitly evaluate the boolean to integer conversions *)
+      change (bool2int false) with 0%Z.
+      change (bool2int true) with 1%Z.
+      
+      (* 2. Replace 'length l2' in the goal with 'length l1' so it matches H_bound *)
+      rewrite <- Hlen'.
+      
+      (* Now the goal is: pow2 * 0 + left < pow2 * 1 + right *)
+      (* Since H_bound says left < pow2, and H_rev_l2 says 0 <= right, lia can finish it! *)
+      lia.
+    + (* Both 0 (False) *)
+      simpl in Hult.
+      rewrite orb_false_r in Hult.
+      apply IHl1 in Hult; [| exact Hlen'].
+      rewrite !length_rev. rewrite Hlen'.
+      lia.
+Qed.
+
+Lemma ult_list_list2int : forall x y : list bool,
+  length x = length y ->
+  ult_list x y = true ->
+  (list2int x < list2int y)%Z.
+Proof.
+  intros x y Hlen Hult.
+  
+  (* Expose the big-endian core of your little-endian function *)
+  unfold ult_list in Hult.
+  
+  (* Apply your hard-won lemma! 
+     Because Hult is applied to (rev x) and (rev y), 
+     the result will have double-reverses: rev (rev x) *)
+  apply ult_list_big_endian_list2int in Hult.
+  
+  - (* Hult is now: (list2int (rev (rev x)) < list2int (rev (rev y)))%Z *)
+    (* A double reverse is just the original list. Cancel them out! *)
+    rewrite !rev_involutive in Hult.
+    exact Hult.
+    
+  - (* Coq needs you to prove that the reversed lists have equal lengths. *)
+    rewrite !length_rev. 
+    exact Hlen.
+Qed.
+
   
 Lemma bv_slt_iff_sbv2int : forall n (x y : bitvector),
   size x = n -> size y = n ->
   bv_slt x y = true <-> (sbv2int n x < sbv2int n y)%Z.
-Proof. Admitted.
+Proof.
+  intros n x y Hx Hy.
+  
+  (* Unfold the definitions to expose the sign bits and underlying math *)
+  unfold bv_slt, sbv2int.
+  
+  (* We need to case-split on the sign bits of x and y.
+     In Coq, 'remember' helps keep the equations around in the context 
+     so we don't lose information when we destruct. *)
+  remember (last x false) as sign_x.
+  remember (last y false) as sign_y.
+  
+  (* Now destruct them to generate our 4 scenarios *)
+  destruct sign_x; destruct sign_y.
+  - (* Case 1: x and y are both Positive *)
+    (* Step 2: Establish that the sign bits are equal *)
+    assert (H_last_eq : last x false = last y false).
+    { rewrite <- Heqsign_x. exact Heqsign_y. }
+    rewrite Hx, Hy, N.eqb_refl.
+    split; intro H_side.
+    + (* Left-to-Right *)
+      (* 1. Manually build the bv_slt version of our hypothesis *)
+      assert (H_slt : bv_slt x y = true).
+      { 
+        unfold bv_slt. 
+        rewrite Hx, Hy, N.eqb_refl. 
+        exact H_side. 
+      }
+      
+      assert (H_ult : bv_ult x y = true).
+      { 
+        (* Plug x, y, false, and your equality hypothesis into the lemma *)
+        pose proof (bv_slt_ult_last_eq H_last_eq) as H_eq.
 
+        (* H_eq is now: bv_slt x y = bv_ult x y *)
+        (* Rewrite the goal from right-to-left (replace bv_ult with bv_slt) *)
+        rewrite <- H_eq.
 
-(* Bitvector minus one equals Integer minus one, IF we don't wrap around. *)
+        (* The goal is now bv_slt x y = true, which matches H_slt exactly *)
+        exact H_slt.
+      }
+      
+      assert (Hsize_xy: size x = size y). 
+      {
+        rewrite Hx, Hy. easy.
+      }
+      apply size_len_eq in Hsize_xy.
+      
+      
+      (* Isolate the clean unsigned inequality *)
+      assert (H_unsigned_lt : (bv2int x < bv2int y)%Z).
+      {
+        (* If bv2int is strictly defined as list2int, this will just apply. 
+           If it's a wrapper, you might need to 'unfold bv2int' first. *)
+        apply ult_list_list2int.
+        - (* Prove length x = length y. You likely have a hypothesis 
+             like 'size x = size y' or 'H_len' in your context already. *)
+          assumption. 
+        - (* Prove ult_list x y = true. This is also the core 
+             hypothesis of your original theorem! *)
+          unfold bv_ult in H_ult.
+          rewrite Hx, Hy, N.eqb_refl in H_ult.
+          assumption.
+      }
+      lia.
+    + (* Right-to-Left *)
+      (* Step 1: Clean up the integer math in H_side *)
+      assert (H_unsigned_lt : (bv2int x < bv2int y)%Z).
+      { lia. } (* lia easily cancels out the '- pow2_int_N n' on both sides *)
+
+      (* Step 3: Swap the signed comparison for unsigned *)
+  
+      (* 1. Instantiate the lemma exactly for x, y, and false, and save it as a hypothesis *)
+      pose proof (bv_slt_ult_last_eq H_last_eq) as H_swap.
+      
+      (* H_swap now says: bv_slt x y = bv_ult x y *)
+      
+      (* 2. Unfold the wrapper IN the new hypothesis so it perfectly matches your goal *)
+      unfold bv_slt in H_swap.
+      rewrite Hx, Hy, N.eqb_refl in H_swap.
+      
+      (* H_swap now says: slt_list x y = bv_ult x y *)
+      
+      (* 3. Rewrite using the perfectly matching equality! *)
+      rewrite H_swap.
+      
+      (* Step 4: The Boolean Contradiction Trap *)
+      (* Let's test the boolean target. If it's true, we are done. *)
+      destruct (bv_ult x y) eqn:H_ult.
+      * (* Case 1: It evaluates to true! Goal becomes true = true. *)
+        reflexivity.
+        
+      * (* Case 2: It evaluates to false. We must derive a contradiction. *)
+        (* We need lengths to be equal for our library lemmas *)
+        assert (H_len : length x = length y).
+        { apply size_len_eq. rewrite Hx, Hy. easy. }
+        
+        (* Now we check if the lists are exactly equal *)
+        destruct (beq_list x y) eqn:H_eq.
+        ** (* Subcase A: x = y *)
+          (* Use your library's standard lemma to turn beq_list into true equality *)
+          (* e.g., apply beq_list_true_iff in H_eq. *)
+          (* Once x = y, rewrite it in H_unsigned_lt. lia will see (y < y), which is impossible! *)
+          apply List_eq in H_eq.
+          
+          (* Substitute all instances of x with y in your context *)
+          subst x.
+          
+          (* H_unsigned_lt now literally says: (bv2int y < bv2int y)%Z.
+             lia instantly recognizes that a number cannot be strictly less than itself! *)
+          lia.
+        ** (* Subcase B: x <> y AND x is NOT strictly less than y. 
+             This means y MUST be strictly less than x! *)
+          (* We use the nlt_neq_gt lemma you found earlier *)
+          unfold bv_ult in H_ult.
+          rewrite Hx, Hy, N.eqb_refl in H_ult.
+          pose proof (nlt_neq_gt H_len H_ult H_eq) as H_y_lt_x.
+          symmetry in H_len.
+          
+          (* Now we cash in the lemma YOU just proved! *)
+          apply ult_list_list2int in H_y_lt_x; [| exact H_len].
+          unfold bv2int in H_unsigned_lt.
+          
+          (* H_y_lt_x is now (bv2int y < bv2int x)%Z. 
+             But H_unsigned_lt says (bv2int x < bv2int y)%Z. 
+             This is mathematically impossible! *)
+          lia.
+  - (* Case 2: x is Negative, y is Positive *)
+    split; intro H.
+    + (* Left-to-Right: We need to prove the math is true. *)
+      assert (Hlen_x : length x = N.to_nat n).
+      {
+        (* Depending on your library, 'size' is likely defined as N.of_nat (length x).
+           If so, replacing n with (size x) and using a conversion lemma solves this. *)
+        rewrite <- Hx.
+        unfold size.
+        rewrite Nat2N.id.
+        reflexivity. 
+      }
+      (* 1. x is negative, so it's less than 2^n *)
+      (* (Replace list2int_lt_pow2_int with your exact lemma if needed) *)
+      pose proof (list2int_lt_pow2_int Hlen_x) as Hx_upper.
+      (* 2. y is positive, so it's >= 0 *)
+      unfold bv2int.
+      
+      (* 2. Now apply your lower bound perfectly! *)
+      (* Force Coq to build the exact statement lia needs *)
+      assert (Hy_lower : (0 <= list2int y)%Z).
+      { apply list2int_geq_zero. }
+      unfold pow2_int_N.
+      
+      (* lia sees (x - 2^n) < 0 <= y, and instantly solves it! *)
+      lia.
+    + (* Right-to-Left: true = true is trivial *)
+      rewrite Hx, Hy. 
+      rewrite N.eqb_refl.
+      assert (H_slt: bv_slt x y = true).
+      {
+        apply bv_slt_tf.
+        - (* Prove size x = size y *)
+          rewrite Hx. rewrite Hy. reflexivity.
+        - (* Prove last x false = true *)
+          symmetry. exact Heqsign_x.
+        - (* Prove last y false = false *)
+          symmetry. exact Heqsign_y.
+      }
+      
+      (* 2. Right now, H_magic is exactly "bv_slt x y = true".
+            Let's unfold it so it exposes the 'size x =? size y' check. *)
+      unfold bv_slt in H_slt.
+      
+      (* 3. Substitute 'n' for 'size x' and 'size y' inside H_magic.
+            This makes H_magic perfectly match your actual goal! *)
+      rewrite Hx, Hy, N.eqb_refl in H_slt.
+      
+      (* 4. H_magic and your goal are now identical. Close it out! *)
+      exact H_slt.
+  - (* Case 3: x is Positive, y is Negative *)
+    split; intro H.
+    + (* Left-to-Right: Positive < Negative is impossible *)
+      
+      (* 1. Clean up the hypothesis so it matches our lemmas *)
+      change (bv_slt x y = true) in H.
+      
+      (* 2. Prove that y < 0 (using its sign bit) *)
+      pose proof (bv_slt_zeros y) as Hy_is_neg. 
+      (* Hy_is_neg: bv_slt y (zeros (size y)) = last y false *)
+      rewrite <- Heqsign_y in Hy_is_neg.
+      rewrite Hy in Hy_is_neg.
+      (* Hy_is_neg: bv_slt y (zeros n) = true *)
+      
+      (* 3. Use transitivity: if x < y and y < 0, then x < 0 *)
+      pose proof (bv_slt_trans H Hy_is_neg) as Hx_must_be_neg.
+      (* Hx_must_be_neg: bv_slt x (zeros n) = true *)
+      
+      (* 4. But wait! We know x is positive, so x < 0 should be false *)
+      pose proof (bv_slt_zeros x) as Hx_is_pos.
+      rewrite <- Heqsign_x in Hx_is_pos.
+      rewrite Hx in Hx_is_pos.
+      (* Hx_is_pos: bv_slt x (zeros n) = false *)
+      
+      (* 5. Contradiction: Rewrite 'false' into the 'true' hypothesis *)
+      rewrite Hx_is_pos in Hx_must_be_neg.
+      
+      (* 6. 'false = true' — game over! *)
+      discriminate.
+    + 
+      rewrite Hx, Hy, N.eqb_refl.
+      (* 1. Unfold the bitvector wrappers in H to expose the raw math *)
+      unfold bv2int in H.
+      unfold pow2_int_N in H.
+
+      (* 2. Get the lower bound for x (x >= 0) *)
+      assert (Hx_lower : (0 <= list2int x)%Z).
+      { apply list2int_geq_zero. }
+
+      (* 3. Get the length for y so we can bound it *)
+      assert (Hlen_y : length y = N.to_nat n).
+      { rewrite <- Hy. unfold size. rewrite Nat2N.id. reflexivity. }
+
+      (* 4. Get the upper bound for y (y < 2^n) *)
+      pose proof (list2int_lt_pow2_int Hlen_y) as Hy_upper.
+
+      (* 5. Now lia has all the pieces:
+            Hx_lower: 0 <= x
+            Hy_upper: y < 2^n
+            H: x < y - 2^n
+          Goal: slt_list x y = true
+          
+          lia will see that H is impossible and close the goal! *)
+      lia.
+
+  - (* Step 1: Prove the sizes are equal to clear the 'if' statement *)
+    rewrite Hx, Hy, N.eqb_refl.
+
+    (* Step 2: Establish that the sign bits are equal *)
+    assert (H_last_eq : last x false = last y false).
+    { rewrite <- Heqsign_x. exact Heqsign_y. }
+
+    (* Step 3: Split the <-> into two separate goals to prove both directions *)
+    split; intro H_side.
+
+    + (* Left-to-Right *)
+      (* 1. Manually build the bv_slt version of our hypothesis *)
+      assert (H_slt : bv_slt x y = true).
+      { 
+        unfold bv_slt. 
+        rewrite Hx, Hy, N.eqb_refl. 
+        exact H_side. 
+      }
+      
+      assert (H_ult : bv_ult x y = true).
+      { 
+        (* Plug x, y, false, and your equality hypothesis into the lemma *)
+        pose proof (bv_slt_ult_last_eq H_last_eq) as H_eq.
+
+        (* H_eq is now: bv_slt x y = bv_ult x y *)
+        (* Rewrite the goal from right-to-left (replace bv_ult with bv_slt) *)
+        rewrite <- H_eq.
+
+        (* The goal is now bv_slt x y = true, which matches H_slt exactly *)
+        exact H_slt.
+      }
+      
+      assert (Hsize_xy: size x = size y). 
+      {
+        rewrite Hx, Hy. easy.
+      }
+      apply size_len_eq in Hsize_xy.
+      
+      
+      (* Isolate the clean unsigned inequality *)
+      assert (H_unsigned_lt : (bv2int x < bv2int y)%Z).
+      {
+        (* If bv2int is strictly defined as list2int, this will just apply. 
+           If it's a wrapper, you might need to 'unfold bv2int' first. *)
+        apply ult_list_list2int.
+        - (* Prove length x = length y. You likely have a hypothesis 
+             like 'size x = size y' or 'H_len' in your context already. *)
+          assumption. 
+        - (* Prove ult_list x y = true. This is also the core 
+             hypothesis of your original theorem! *)
+          unfold bv_ult in H_ult.
+          rewrite Hx, Hy, N.eqb_refl in H_ult.
+          assumption.
+      }
+      lia.
+    + (* Right-to-Left *)
+      (* Step 1: Clean up the integer math in H_side *)
+      assert (H_unsigned_lt : (bv2int x < bv2int y)%Z).
+      { lia. } (* lia easily cancels out the '- pow2_int_N n' on both sides *)
+
+      (* Step 3: Swap the signed comparison for unsigned *)
+  
+      (* 1. Instantiate the lemma exactly for x, y, and false, and save it as a hypothesis *)
+      pose proof (bv_slt_ult_last_eq H_last_eq) as H_swap.
+      
+      (* H_swap now says: bv_slt x y = bv_ult x y *)
+      
+      (* 2. Unfold the wrapper IN the new hypothesis so it perfectly matches your goal *)
+      unfold bv_slt in H_swap.
+      rewrite Hx, Hy, N.eqb_refl in H_swap.
+      
+      (* H_swap now says: slt_list x y = bv_ult x y *)
+      
+      (* 3. Rewrite using the perfectly matching equality! *)
+      rewrite H_swap.
+      
+      (* Step 4: The Boolean Contradiction Trap *)
+      (* Let's test the boolean target. If it's true, we are done. *)
+      destruct (bv_ult x y) eqn:H_ult.
+      * (* Case 1: It evaluates to true! Goal becomes true = true. *)
+        reflexivity.
+        
+      * (* Case 2: It evaluates to false. We must derive a contradiction. *)
+        (* We need lengths to be equal for our library lemmas *)
+        assert (H_len : length x = length y).
+        { apply size_len_eq. rewrite Hx, Hy. easy. }
+        
+        (* Now we check if the lists are exactly equal *)
+        destruct (beq_list x y) eqn:H_eq.
+        ** (* Subcase A: x = y *)
+          (* Use your library's standard lemma to turn beq_list into true equality *)
+          (* e.g., apply beq_list_true_iff in H_eq. *)
+          (* Once x = y, rewrite it in H_unsigned_lt. lia will see (y < y), which is impossible! *)
+          apply List_eq in H_eq.
+          
+          (* Substitute all instances of x with y in your context *)
+          subst x.
+          
+          (* H_unsigned_lt now literally says: (bv2int y < bv2int y)%Z.
+             lia instantly recognizes that a number cannot be strictly less than itself! *)
+          lia.
+        ** (* Subcase B: x <> y AND x is NOT strictly less than y. 
+             This means y MUST be strictly less than x! *)
+          (* We use the nlt_neq_gt lemma you found earlier *)
+          unfold bv_ult in H_ult.
+          rewrite Hx, Hy, N.eqb_refl in H_ult.
+          pose proof (nlt_neq_gt H_len H_ult H_eq) as H_y_lt_x.
+          symmetry in H_len.
+          
+          (* Now we cash in the lemma YOU just proved! *)
+          apply ult_list_list2int in H_y_lt_x; [| exact H_len].
+          unfold bv2int in H_unsigned_lt.
+          
+          (* H_y_lt_x is now (bv2int y < bv2int x)%Z. 
+             But H_unsigned_lt says (bv2int x < bv2int y)%Z. 
+             This is mathematically impossible! *)
+          lia.
+Qed.
+
+Lemma mod_pow2_step : forall X D M, 
+  (M > 0)%Z ->
+  (0 <= D < 2)%Z ->
+  (2 * (X mod M) + D)%Z = ((2 * X + D) mod (2 * M))%Z.
+Proof.
+  intros X D M HM HD.
+  apply Z.mod_unique with (q := (X / M)%Z).
+  - 
+    assert (Hgt : (0 < M)%Z) by lia.
+    pose proof (Z.mod_pos_bound X M) as Hbound.
+    specialize (Hbound Hgt).
+    lia.
+  - 
+    assert (Hneq : M <> 0%Z) by lia.
+    pose proof (Z.div_mod X M) as Hdiv.
+    specialize (Hdiv Hneq).
+    remember (X / M)%Z as q.
+    remember (X mod M)%Z as r.
+
+    rewrite Hdiv.
+    ring.
+Qed.  
+
+(* First, let's build the missing bridge! *)
+Lemma list2int_add_list_ingr : forall bs1 bs2 c,
+  length bs1 = length bs2 ->
+  list2int (add_list_ingr bs1 bs2 c) = 
+  ((list2int bs1 + list2int bs2 + bool2int c) mod pow2_int (length bs1))%Z.
+Proof.
+  (* 1. Set up simultaneous induction on both lists *)
+  induction bs1 as [| b1 bs1 IH]; intros bs2 c Hlen.
+  - (* Base case: Empty lists *)
+    destruct bs2; try discriminate Hlen.
+    simpl.
+    (* Destruct c so Coq can compute the modulo of concrete numbers *)
+    destruct c; reflexivity.
+    
+  - (* Inductive step: b1 :: bs1 and b2 :: bs2 *)
+    destruct bs2 as [| b2 bs2]; try discriminate Hlen.
+    simpl in Hlen. injection Hlen as Hlen'.
+    
+    (* 2. Unfold one step of the binary adder *)
+    simpl add_list_ingr.
+    
+    (* Isolate the carry computation so we can evaluate it *)
+    destruct (add_carry b1 b2 c) as [r c0] eqn:Hcarry.
+    
+    (* 3. Convert the lists to integers using the lemma you found earlier *)
+    (* The '!' tells Coq to rewrite it as many times as possible *)
+    rewrite !list2int_cons.
+    
+    (* 4. Apply our inductive hypothesis for the rest of the list *)
+    rewrite IH; [| exact Hlen'].
+    
+    (* 5. The 8-Case Hammer: Brute-force the boolean logic *)
+    destruct b1; destruct b2; destruct c.
+    (* Evaluate add_carry, substitute the results (r and c0), and clean up *)
+    inversion Hcarry; subst; clear Hcarry; simpl bool2int.
+    + 
+      (* Replace 'pow2_int_pos' with whatever your library calls this theorem *)
+      pose proof (zero_lt_pow2_int (length bs1)). 
+      (* 1. Expose the S (length bs1) *)
+      simpl length.
+      
+      (* 2. Align the modulus on the Right Hand Side to match the 2 * M pattern *)
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 3. Fire the bit-shift lemma! 
+            Since you have exactly 1 main goal left, we can use standard bullets 
+            to handle the rewrite and its two side conditions. *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal strips the identical modulo, lia crushes the basic math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0): You already proved this! 'lia' will see 'H' and close it *)
+        lia.
+      * (* Side Condition 2 (0 <= D < 2): D is exactly 1 here. Trivial for lia. *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+    +
+      (* 1. Evaluate the addition and inject r and c0 into the goal *)
+      inversion Hcarry. subst. clear Hcarry.
+      
+      (* 2. Turn all the true/false booleans into 1s and 0s *)
+      simpl bool2int.
+      
+      (* 3. Align the modulus (just like last time) *)
+      simpl length.
+      replace (pow2_int (S (length bs1))) with (2 * pow2_int (length bs1))%Z by (simpl; lia).
+      
+      (* 4. Fire the bit-shift lemma! *)
+      rewrite mod_pow2_step.
+      * (* Main Goal: f_equal removes the mod, lia does the math *)
+        f_equal. lia.
+      * (* Side Condition 1 (M > 0) *)
+        pose proof (zero_lt_pow2_int (length bs1)).
+        lia. 
+      * (* Side Condition 2 (0 <= D < 2) *)
+        lia.
+Qed.
+
+(* The Bridge for Unsigned Subtraction *)
+Lemma list2int_subst_list : forall bs1 bs2,
+  length bs1 = length bs2 ->
+  list2int (subst_list' bs1 bs2) = 
+  ((list2int bs1 + list2int (twos_complement bs2)) mod pow2_int (length bs1))%Z.
+Proof.
+  intros bs1 bs2 Hlen.
+  
+  (* 1. Unfold the wrappers down to your mastered function *)
+  unfold subst_list', add_list.
+  
+  (* 2. Fire your hard-earned addition lemma! *)
+  rewrite list2int_add_list_ingr.
+  
+  (* 3. The carry 'c' is false, so bool2int c is 0. 
+        lia will clean up the + 0 effortlessly. *)
+  - simpl bool2int. f_equal. lia.
+    
+  (* 4. Prove the lengths match (twos_complement doesn't change length) *)
+  -
+    rewrite <- length_twos_complement.
+    easy.
+Qed.
+
+(* The integer value of two's complement *)
+Lemma list2int_twos_complement : forall b,
+  list2int (twos_complement b) = 
+  ((list2int (map negb b) + 1) mod pow2_int (length b))%Z.
+Proof.
+  intros b.
+  unfold twos_complement.
+  
+  (* 1. Fire your master addition lemma! *)
+  rewrite list2int_add_list_ingr.
+  
+  (* This will spawn two goals: proving the lengths match, 
+     and doing the algebra. Let's route them. *)
+  - (* Main Goal: The Algebra *)
+    simpl bool2int. 
+    (* At this point, you have 'list2int (mk_list_false ...)' in your goal.
+       You will need to rewrite with a lemma from your library that says a list 
+       of all false evaluates to 0. It might be called something like 
+       'list2int_false' or 'list2int_zeros'. *)
+    
+    (* Once that list is 0, lia will crush the remaining + 0 + 1 algebra. *)
+    (* rewrite list2int_zeros. *) 
+    (* f_equal. lia. *)
+    rewrite list2int_mk_list_false.
+    f_equal. lia. rewrite <- not_list_length. reflexivity. 
+  - (* Side Condition: The lengths must match *)
+    (* You need to prove: length (map negb b) = length (mk_list_false (length b)) *)
+    (* Use standard list length lemmas! *)
+    rewrite length_map. 
+    rewrite length_mk_list_false.
+    reflexivity.
+Qed. 
+
+Lemma list2int_twos_complement_one : forall n,
+  n <> 0%N -> 
+  ((1 + list2int (twos_complement (one n))) mod pow2_int_N n)%Z = 0%Z.
+Proof.
+  intros n Hneq_zero. 
+  
+  (* 1. Start with the hardware truth: 1 + (-1) = 0 *)
+  pose proof (add_neg_list_absorb (bits (one n))) as Hzero.
+  
+  (* 2. Convert both sides of that hardware equation to integers *)
+  apply (f_equal list2int) in Hzero.
+  
+  (* 3. The left side is add_list. Unfold it to fire our addition lemma! *)
+  unfold add_list in Hzero.
+  rewrite list2int_add_list_ingr in Hzero.
+  2:{ apply length_twos_complement. }
+  
+  (* ========================================== *)
+  (* ALIGNMENT 1: Evaluate the left-hand side   *)
+  (* ========================================== *)
+  simpl bool2int in Hzero.
+  replace (list2int (bits (one n)) + list2int (twos_complement (bits (one n))) + 0)%Z 
+    with (1 + list2int (twos_complement (bits (one n))))%Z in Hzero.
+  2:{ 
+    (* Assert our integer value and NAME it H *)
+    assert (H: list2int (one n) = 1%Z). {
+      unfold one.
+      rewrite list2int_mk_list_one.
+      symmetry. 
+      rewrite Z.mod_small. 
+      - (* 0 <= 1 *)
+        lia. 
+      - (* 1 < 2^n *)
+        destruct (N.to_nat n) as [| m] eqn:Hnat.
+        + lia. 
+        + rewrite pow2_int_succ.
+          pose proof (zero_lt_pow2_int m) as Hgt_zero.
+          lia.
+    }
+    
+    (* MOVED HERE: Replace the bits with 1 using H, then lia! *)
+    replace (list2int (bits (one n))) with 1%Z.
+    lia. 
+  }
+
+  (* ========================================== *)
+  (* ALIGNMENT 2: Evaluate the right-hand side  *)
+  (* ========================================== *)
+  replace (list2int (mk_list_false (length (bits (one n))))) with 0%Z in Hzero.
+  2:{ 
+    rewrite list2int_mk_list_false. 
+    reflexivity. 
+  }
+
+  (* ========================================== *)
+  (* ALIGNMENT 3: Align the pow2_int definitions*)
+  (* ========================================== *)
+  replace (pow2_int (length (bits (one n)))) with (pow2_int_N n) in Hzero.
+  2:{ 
+    unfold pow2_int_N. 
+    f_equal. 
+    unfold one. unfold bits. 
+    rewrite length_mk_list_one. 
+    reflexivity. 
+  }
+  
+  (* ========================================== *)
+  (* FINISH: Hzero is now identical to the goal *)
+  (* ========================================== *)
+  exact Hzero.
+  
+Qed.
+
+Lemma list2int_twos_complement_one_exact : forall n,
+  n <> 0%N ->
+  list2int (twos_complement (one n)) = (pow2_int_N n - 1)%Z.
+Proof.
+  intros n Hneq.
+  
+  (* 1. Bring in your modular hardware truth *)
+  pose proof (list2int_twos_complement_one Hneq) as Hmod.
+  
+  assert (Hbounds : (0 <= list2int (twos_complement (one n)) < pow2_int_N n)%Z).
+  {
+    (* Break the A <= B < C goal into two separate goals *)
+    split.
+    
+    - (* Goal 1: 0 <= list2int ... *)
+      (* This matches your generic lower-bound lemma perfectly! *)
+      apply list2int_geq_zero.
+      
+    - (* Goal 2: list2int ... < pow2_int_N n *)
+      (* First, swap pow2_int_N n to the standard pow2_int (length x) format *)
+      replace (pow2_int_N n) with (pow2_int (length (twos_complement (one n)))).
+      
+      + (* Now apply your generic upper-bound lemma! *)
+        apply list2int_lt_pow2_int.
+        (* It asks for a proof that length x = n. Since they are identical, 
+           reflexivity handles it instantly. *)
+        reflexivity.
+        
+      + (* Finally, prove that pow2_int_N n matches the length of the list 
+           (reusing your alignment logic from earlier) *)
+        unfold pow2_int_N.
+        f_equal. 
+        rewrite <- length_twos_complement.
+        unfold one. 
+        (* Note: add 'unfold bits.' here if 'one' is wrapped in bits *)
+        rewrite length_mk_list_one.
+        reflexivity.
+  }
+  
+  (* 3. Bring in the fact that P > 0 *)
+  assert (Hpos : (0 < pow2_int_N n)%Z).
+  { apply zero_lt_pow2_int. }
+  
+  (* 4. Now you have:
+        Hmod: (1 + TC) mod P = 0
+        Hbounds: 0 <= TC < P
+        Hpos: 0 < P
+        
+        This is pure integer arithmetic. We can use Z.div_mod_to_eqs to 
+        transform the modulo into a multiplier (1 + TC = P * q), and 
+        then nia can instantly solve it! *)
+  (* 4. Manually apply the fundamental theorem of Z division: a = b * (a/b) + a mod b *)
+  assert (Hneq_P : pow2_int_N n <> 0%Z) by lia.
+  pose proof (Z.div_mod (1 + list2int (twos_complement (one n))) (pow2_int_N n) Hneq_P) as Hdiv.
+  
+  (* 5. Rewrite your modulo fact (which is 0) into the division equation *)
+  rewrite Hmod in Hdiv.
+  
+  (* 6. Now Hdiv is essentially: 1 + X = P * q + 0.
+        Because of your bounds (0 <= X < P), nia can instantly deduce that 
+        the quotient q MUST be 1, which means 1 + X = P, so X = P - 1! *)
+  (* 7. Hide the explicit division from nia by packing it into a simple integer variable 'q' *)
+  remember (((1 + list2int (twos_complement (one n))) / pow2_int_N n)%Z) as q.
+
+  (* 8. Strip away ALL the complex function calls so the solvers just see variables *)
+  remember (list2int (twos_complement (one n))) as X.
+  remember (pow2_int_N n) as P.
+
+  (* 9. Use lia to lock in the bounds of the multiplication. 
+        Since 0 <= X < P, mathematically 1 <= 1 + X <= P. 
+        Because 1 + X = P * q + 0 (from Hdiv), lia easily proves this: *)
+  assert (H_mult_bounds : (1 <= P * q + 0 <= P)%Z) by lia.
+
+  (* 10. Now we hand nia a pure, beautiful math problem: 
+         If P > 0, and 1 <= P * q <= P, the ONLY possible integer for q is 1. *)
+  assert (H_q : q = 1%Z) by nia.
+
+  (* 11. Substitute q = 1 back into our division equation *)
+  rewrite H_q in Hdiv.
+
+  (* 12. The equation is now (1 + X) = (P * 1 + 0), which is perfectly linear. 
+         lia can instantly mop up the remaining algebra to prove X = P - 1! *)
+  lia.
+Qed.
+
 Lemma sbv2int_sub_one : forall n (t : bitvector),
   size t = n ->
   t <> signed_min n ->
   sbv2int n (bv_subt' t (one n)) = (sbv2int n t - 1)%Z.
-Proof. 
-Admitted.
-
-Lemma sbv2int_sge_0_iff_last_false : forall n (v : bitvector),
-  size v = n ->
-  (0 <= sbv2int n v)%Z <-> last v false = false.
 Proof.
-Admitted.
+  intros n t Hsize Hneq.
+  
+  (* 1. Unfold the signed evaluation and subtraction wrappers *)
+  unfold sbv2int, bv_subt'.
+  unfold bv2int.
+  
+  (* 2. bv_subt' has an if-statement checking if the sizes match. 
+        We know size t = n, and size (one n) = n. 
+        Let's force Coq to evaluate this to true. *)
+  (* Note: You might need to replace 'size_one n' with whatever your 
+     library actually calls the lemma that proves 'size (one n) = n' *)
+  replace (size t =? size (one n)) with true.
+  2:{ 
+    symmetry. apply N.eqb_eq. (* or Nat.eqb_eq depending on n's type *)
+    rewrite one_size.
+    apply Hsize. 
+  }
+  
+  (* 3. Now the subtraction is exposed as subst_list'. 
+        Fire the bridge lemma we just built! *)
+  (* rewrite list2int_subst_list. *)
+  
+  (* 4. We are now in pure integer math, but wrapped in 'if last ...' 
+        We need to destruct the sign bit of the original number 't' 
+        and the sign bit of the new number '(t - 1)'. *)
+  
+  destruct (last (bits t) false) eqn:Hsign_t;
+  destruct (last (subst_list' (bits t) (bits (one n))) false) eqn:Hsign_sub.
+  - (* ========================================== *)
+    (* GOAL 1: Negative -> Negative (True -> True)*)
+    (* ========================================== *)
+    
+    (* 1. Evaluate the if-statement on the right side.
+          'last t false' is technically 'last (bits t) false', so we use replace. *)
+    replace (last t false) with true.
+    
+    (* The goal right side is now cleanly: (list2int t - pow2_int_N n - 1)%Z *)
+    
+    (* 2. Convert bitvector subtraction to integer math on the left side *)
+    rewrite list2int_subst_list.
+    2:{
+      (* Prove the lengths match to use the lemma *)
+      unfold bits. 
+      apply size_len_eq. (* Or whatever links length to size in your library *)
+      rewrite one_size.
+      apply Hsize. 
+    }
+    
+    (* ========================================== *)
+    (* 1. Fix the pow2_int sizes to match         *)
+    (* ========================================== *)
+    replace (pow2_int (length (bits t))) with (pow2_int_N n).
+    2:{ 
+      unfold pow2_int_N. f_equal.
+      rewrite bits_size.
+      rewrite Hsize.
+      reflexivity.
+    }
+
+    (* ========================================== *)
+    (* 2. Prove n <> 0 to unlock the helper lemma *)
+    (* ========================================== *)
+    assert (Hneq_zero : n <> 0%N). {
+      intro Hzero.
+      (* 1. Push n=0 into Hsize so we explicitly lock in 'size t = 0' *)
+      rewrite Hzero in Hsize. 
+      
+      (* 2. Look at the bits to expose the contradiction *)
+      destruct (bits t) eqn:Hbits.
+      - (* Case 1: Empty list. 'last nil false = false', which contradicts Hsign_t *)
+        simpl in Hsign_t. 
+        discriminate.
+        
+      - (* Case 2: List has elements. This contradicts Hsize (size t = 0) *)
+        assert (Hcontra : length (bits t) = 0%nat). {
+          rewrite bits_size.
+          rewrite Hsize. 
+          reflexivity.
+        }
+        
+        (* Expose that length (b :: l) = 0 is impossible *)
+        rewrite Hbits in Hcontra.
+        simpl in Hcontra.
+        discriminate.
+    }
+    unfold bits.
+    pose proof (list2int_twos_complement_one Hneq_zero) as Hcomp.
+    (* ========================================== *)
+    (* 1. THE ALGEBRA TRICK: Group the 1 with C!  *)
+    (* ========================================== *)
+    replace (list2int t + list2int (twos_complement (one n)))%Z 
+       with (list2int t - 1 + (1 + list2int (twos_complement (one n))))%Z by lia.
+       
+    (* ========================================== *)
+    (* 2. Distribute modulo: (A+B) mod P = (A mod P + B mod P) mod P *)
+    (* ========================================== *)
+    assert (Hpow_pos : (0 < pow2_int_N n)%Z). {
+          apply zero_lt_pow2_int.
+    }
+    rewrite Z.add_mod.
+    2:{
+      lia.
+    }
+    
+    (* 3. Inject the helper lemma! The '(1 + C) mod P' becomes exactly 0 *)
+    rewrite Hcomp.
+    
+    (* 4. Clean up the '+ 0' inside the modulo *)
+    replace (((list2int t - 1) mod pow2_int_N n + 0)%Z) 
+       with ((list2int t - 1) mod pow2_int_N n)%Z by lia.
+       
+    (* 5. Collapse the nested modulo: (X mod P) mod P = X mod P *)
+    rewrite Z.mod_mod.
+    2:{ 
+      lia.
+    }
+    
+    (* ========================================== *)
+    (* 6. Strip the final modulo & Win            *)
+    (* ========================================== *)
+    rewrite Z.mod_small.
+    + (* THE MODULO IS GONE! *)
+      (* The goal is exactly (T - 1) - P = T - P - 1 *)
+      lia. 
+      
+    + (* Prove the bounds: 0 <= T - 1 < P *)
+      split.
+      * 
+        (* 1. Prove the list is not empty using the fact that its last element is true *)
+        assert (Hnot_empty : bits t <> []).
+        {
+          intros Hempty.
+          rewrite Hempty in Hsign_t.
+          simpl in Hsign_t. (* 'last [] false' simplifies to 'false' *)
+          discriminate.    (* false = true is a contradiction *)
+        }
+
+        (* 2. Now use exists_last, passing the proof Hnot_empty *)
+        destruct (exists_last Hnot_empty) as [front [last_bit Hdecomp]].
+
+        (* 3. Relate the sign bit to the integer value *)
+        rewrite Hdecomp in Hsign_t.
+        (* Note: You might need a lemma like 'last_app' or 'last_snoc' here *)
+        (* If 'simpl' doesn't turn 'last (front ++ [last_bit])' into 'last_bit', use: *)
+        assert (Hlast : last_bit = true).
+        { 
+          rewrite last_app in Hsign_t. (* Search for the app/last lemma if this fails *)
+          simpl in Hsign_t. 
+          assumption. 
+        }
+        subst last_bit.
+        unfold bits in Hdecomp.
+        (* 4. Final Algebraic Step *)
+        rewrite Hdecomp.
+        rewrite list2int_app.
+        rewrite list2int_bool.
+        unfold bool2int.
+        
+        (* At this point, your goal should be: (0 <= pow2_int (length front) * 1 + list2int front - 1)%Z *)
+        
+        pose proof list2int_geq_zero as Hfront_pos.
+        
+        (* We just need to show that 2^(length front) >= 1 *)
+        assert (Hpow_lb : (pow2_int (length front) >= 1)%Z).
+        {
+          Search pow2_int.
+          (* Use the lemma you found to prove the power of 2 is positive *)
+          pose proof (zero_lt_pow2_int (length front)) as Hpow_lb.
+
+          
+          (* This solves: (0 <= pow2_int (length front) * 1 + list2int front - 1)%Z *)
+          lia.
+        }
+        (* 1. Specialize the non-negativity to our specific 'front' list *)
+        specialize (Hfront_pos front).
+        
+        (* 2. Now lia has all the pieces: 
+              (1 * 1 + 0 - 1) is the absolute minimum, which is 0. *)
+        lia.
+      * (* 1. Expose the list of bits in the goal so we can use list2int lemmas *)
+        change (list2int t) with (list2int (bits t)).
+
+        (* 2. Use the lemma that says any list's integer value is < 2^(length) *)
+        set (m := length (bits t)).
+
+        (* 2. Apply the lemma specifically to (bits t) and its length m *)
+        (* We use @ to make the implicit arguments explicit to avoid the type error *)
+        pose proof (@list2int_lt_pow2_int (bits t) m eq_refl) as Hmax.
+
+        assert (Hm_n : pow2_int m = pow2_int_N n).
+        {
+          unfold m, pow2_int_N.
+          f_equal. (* Strips pow2_int from both sides, leaving length (bits t) = N.to_nat n *)
+          rewrite bits_size. (* Use your size-to-length bridge *)
+          rewrite Hsize.
+          reflexivity.
+        }
+
+        (* 2. Rewrite your bound using this equality *)
+        rewrite Hm_n in Hmax.
+
+        (* 3. Now the goal is trivial: if X < Y, then X - 1 < Y *)
+        lia.
+  -
+    exfalso.
+    
+    assert (Hnot_empty : bits t <> []).
+    {
+      intros Hempty.
+      rewrite Hempty in Hsign_t.
+      simpl in Hsign_t. (* 'last [] false' simplifies to 'false' *)
+      discriminate.    (* false = true is a contradiction *)
+    }
+
+    (* 1. Decompose 'bits t' into its front bits and the sign bit *)
+    (* Using Coq's standard list lemma: a non-empty list is removelast + last *)
+    assert (Hdecomp_t : bits t = removelast (bits t) ++ [true]).
+    {
+      rewrite <- Hsign_t.
+      (* Apply the standard library lemma for list decomposition *)
+      apply app_removelast_last.
+      easy.
+    }
+
+    (* 2. Expose the integer value of t using our decomposition *)
+    assert (Hval_t : list2int (bits t) = (pow2_int (length (removelast (bits t))) + list2int (removelast (bits t)))%Z).
+    {
+      rewrite Hdecomp_t.
+      rewrite list2int_app.
+      rewrite list2int_bool.
+      simpl (bool2int true).
+      (* Fold the list back up using our decomposition hypothesis *)
+      rewrite <- Hdecomp_t.
+      
+      (* Now the goal is purely integer arithmetic: X * 1 + Y = X + Y *)
+      lia.
+    }
+    (* 3. We know the 'front' value is >= 0 *)
+    (* 3. We know the 'front' value is >= 0 *)
+    (* The @ symbol lets us manually feed the list to the lemma *)
+    pose proof (@list2int_geq_zero (removelast (bits t))) as Hfront_pos.
+    
+    (* 1. Give the subtracted list a short name to keep the context clean *)
+    set (sub_list := subst_list' (bits t) (bits (one n))) in *.
+    
+    (* 1. Unify the lengths so nia knows all powers of 2 are identical *)
+    assert (Hlen_sub : length sub_list = length (bits t)).
+    {
+      unfold sub_list.
+      assert (size_eq: length (bits t) = length (bits (one n))). {
+        rewrite !bits_size.
+        rewrite one_size.
+        rewrite Hsize.
+        reflexivity.
+      }
+      Search length subst_list'.
+      rewrite <- (subst_list'_length size_eq).
+      reflexivity.
+    }
+
+    (* 2. Decompose sub_list into its front bits and the [false] sign bit *)
+    assert (Hdecomp_sub : sub_list = removelast sub_list ++ [false]).
+    {
+      rewrite <- Hsign_sub.
+      apply app_removelast_last.
+      (* If it asks for proof that sub_list <> [], admit it to keep momentum *)
+      (* Replaces the admit in Hdecomp_sub *)
+      intro Hempty.
+      (* If sub_list is empty, its length is 0 *)
+      assert (Hlen0 : length sub_list = (0)%nat) by (rewrite Hempty; reflexivity).
+      (* But its length equals the length of 'bits t' *)
+      rewrite Hlen_sub in Hlen0.
+      (* We already proved 'bits t' is not empty! *)
+      destruct (bits t) eqn:Heq_t.
+      - apply Hnot_empty. reflexivity.
+      - discriminate Hlen0.
+    }
+
+    (* 3. Expose the integer value. 
+       Because the sign bit is 0, the value is just the front bits! *)
+    assert (Hval_sub : list2int sub_list = list2int (removelast sub_list)).
+    {
+      rewrite Hdecomp_sub.
+      rewrite list2int_app.
+      rewrite list2int_bool.
+      simpl (bool2int false).
+      rewrite <- Hdecomp_sub.
+      lia.
+    }
+
+    (* 4. Trap the upper bound using the fundamental list lemma again *)
+    pose proof (@list2int_lt_pow2_int (removelast sub_list) (length (removelast sub_list)) eq_refl) as Hsub_upper.
+    (* 3. Bridge the two lists together using the modular subtraction lemma *)
+    assert (Hlen_eq : length (bits t) = length (bits (one n))).
+    {
+      apply size_len_eq.
+      unfold bits.
+      rewrite one_size.
+      easy.
+    }
+    pose proof (@list2int_subst_list (bits t) (bits (one n)) Hlen_eq) as Hsubst_mod.
+    
+    (* --- FINAL TRANSLATION BLOCK --- *)
+
+    (* 1. Link the lengths so lia understands the powers of 2 *)
+    assert (Hlen_t : length (bits t) = S (length (removelast (bits t)))).
+    { 
+      (* The 'at 1' tells Coq to only rewrite the left side *)
+      rewrite Hdecomp_t at 1. 
+      rewrite length_app. 
+      simpl. 
+      lia. 
+    }
+    
+    assert (Hpow_t : pow2_int (length (bits t)) = (2 * pow2_int (length (removelast (bits t))))%Z).
+    { rewrite Hlen_t. apply pow2_int_succ. }
+    
+    (* --- THE MATH PIVOT --- *)
+    
+    (* 1. Prove that length of sub_list is 1 greater than its removelast *)
+    assert (Hlen_sub_S : length sub_list = S (length (removelast sub_list))).
+    { rewrite Hdecomp_sub at 1. rewrite length_app. simpl. lia. }
+    
+    assert (Hlen_rem : length (removelast sub_list) = length (removelast (bits t))).
+    { lia. }
+    
+    (* 2. State the explicit integer value of the two's complement of 1 (-1 mod 2^n) *)
+    assert (Htc : list2int (twos_complement (bits (one n))) = (pow2_int_N n - 1)%Z).
+    { 
+      (* 1. Prove n <> 0 to satisfy the master lemma *)
+      assert (Hn_neq_0 : n <> 0%N).
+      {
+        intro Heq.
+        rewrite Heq in Hlen_eq.
+        simpl in Hlen_eq. 
+        rewrite Hlen_eq in Hlen_t.
+        discriminate Hlen_t.
+      }
+      
+      (* 2. The master lemma exactly matches this goal! *)
+      apply (list2int_twos_complement_one_exact Hn_neq_0).
+    }
+    
+    (* 3. Feed nia the fundamental bounds of the bitvector t *)
+    assert (Hpos_pow : (0 < pow2_int (length (bits t)))%Z).
+    { apply zero_lt_pow2_int. }
+    
+    assert (Ht_bound : (list2int (bits t) < pow2_int (length (bits t)))%Z).
+    { apply list2int_lt_pow2_int. reflexivity. }
+
+    (* 4. Trap the exact value of t using nia! *)
+    assert (Ht_val_exact : list2int (bits t) = pow2_int (length (removelast (bits t)))).
+    {
+      (* Align the sub_list variables to the bits t variables *)
+      rewrite Hlen_rem in Hsub_upper.
+      rewrite Htc in Hsubst_mod.
+      
+      (* Now nia has everything perfectly aligned to force t to exactly 2^(n-1) *)
+      Z.div_mod_to_equations.
+      (* 1. Prove the divisor is not zero (lia can easily deduce this from Hpos_pow) *)
+      assert (H_not_zero : pow2_int (length (bits t)) <> 0%Z) by lia.
+      
+      (* 2. Feed this proof into H to unlock the pure equation *)
+      specialize (H H_not_zero).
+      
+      (* 3. Now nia has all the pieces completely unlocked! *)
+      (* Connect 'r' to the sub_list upper bound so nia sees the tight constraints *)
+      assert (Hr_val : r = list2int (removelast sub_list)).
+      {
+        (* Rewrite r into the list2int formula *)
+        rewrite <- Hsubst_mod.
+        (* Because sub_list is defined as subst_list', Hval_sub perfectly matches this *)
+        exact Hval_sub.
+      }
+      
+      (* --- THE FINAL MATH CRACKER --- *)
+      
+      (* 1. Hide the complex functions from the solvers so they only see pure math variables *)
+      remember (list2int (bits t)) as X.
+      remember (pow2_int (length (removelast (bits t)))) as P.
+      remember (list2int (removelast (bits t))) as Y.
+      remember (list2int (removelast sub_list)) as R_sub.
+      
+      (* --- UNIFY THE POWERS OF 2 FOR NIA --- *)
+      (* nia sees pow2_int_N n as an opaque variable. We need to expose 
+         that it is perfectly equal to pow2_int (length (bits t)) *)
+      
+      (* Substitute it into the division equation H *)
+      assert (Hpow_eq : pow2_int_N n = pow2_int (length (bits t))).
+      {
+        unfold pow2_int_N.
+        f_equal.
+        rewrite bits_size.
+        rewrite Hsize.
+        easy.
+      }
+      rewrite Hpow_eq in *.
+
+      (* 3. Simplify the powers of 2 everywhere (2^n becomes 2 * 2^(n-1)) *)
+      rewrite Hpow_t in *.
+      
+      (* 4. Force nia to prove q = 1 by giving it the upper and lower bounds separately *)
+      assert (Hq_min : (0 < q)%Z). { nia. }
+      assert (Hq_max : (q < 2)%Z). { nia. }
+      assert (Hq : q = 1%Z). { lia. }
+      
+      (* 5. Destroy the non-linear multiplication by substituting q = 1 *)
+      rewrite Hq in H.
+      
+      (* 6. Finish the proof with basic linear arithmetic! *)
+      lia.
+    }
+    
+    (* --- THE FINAL BLOW --- *)
+    
+    assert (H_signed_min_val : list2int (bits (signed_min n)) = pow2_int (length (removelast (bits t)))).
+    {
+      (* 1. Link the binary size 'n' to the nat length of the list *)
+      assert (H_t_n : N.to_nat n = length (bits t)).
+      { 
+        rewrite bits_size, Hsize; easy.
+      }
+      
+      (* 2. Unfold to expose the N.to_nat n argument *)
+      unfold signed_min.
+      (* NOTE: If 'bits' is a function, you may need 'unfold bits' here too. *)
+      
+      (* 3. Substitute N.to_nat n with S (...) so the match evaluates instantly! *)
+      rewrite H_t_n.
+      rewrite Hlen_t.
+      
+      (* 4. Now the match sees an 'S' and beautifully unpacks into true :: mk_list_false *)
+      unfold smin_big_endian.
+      
+      unfold bits.
+      (* 5. Standard list lemma: rev (a :: L) = rev L ++ [a] *)
+      cbn.
+      
+      rewrite list2int_app. 
+      simpl.
+      (* 1. Simplify the length of the reversed list *)
+      (* Standard library lemma: length of reversed list is same as original *)
+      rewrite length_rev. 
+      
+      (* 2. Simplify the length of mk_list_false *)
+      (* You will need your library's specific lemma for this. 
+         Try: Search (length (mk_list_false _)). *)
+      assert (Hlen_false : length (mk_list_false (length (removelast t))) = length (removelast t)).
+      {
+        rewrite length_mk_list_false.
+        reflexivity.
+      }
+      rewrite Hlen_false.
+      
+      (* 3. Evaluate the list2int of purely false bits to 0 *)
+      (* You will need your library's lemma for this too. 
+         Try: Search (list2int (mk_list_false _)) or Search (list2int (rev _)). *)
+      assert (Hval_false : list2int (rev (mk_list_false (length (removelast t)))) = 0%Z).
+      { 
+        rewrite rev_mk_list_false.
+        apply list2int_mk_list_false.
+      }
+      rewrite Hval_false.
+      
+      (* 4. Now the goal is exactly: (pow2_int L * 1 + 0)%Z = pow2_int L *)
+      (* lia can instantly crush this purely algebraic statement! *)
+      lia.
+    }
+
+    (* 2. Link them together: t and signed_min n have the exact same integer value *)
+    assert (H_same_val : list2int (bits t) = list2int (bits (signed_min n))).
+    {
+      rewrite Ht_val_exact.
+      symmetry.
+      exact H_signed_min_val.
+    }
+
+    (* 3. Apply the injectivity of bitvectors to prove t MUST equal signed_min n *)
+    (* Note: The exact name of this lemma depends on your library 
+       (e.g., list2int_inj, to_Z_inj, or applying an equivalence theorem first) *)
+    apply list2int_inj in H_same_val.
+    +
+      contradiction (Hneq H_same_val).
+    +
+      apply size_len_eq.
+      unfold bits.
+      rewrite signed_min_size.
+      easy.
+  - 
+    unfold bits in Hsign_t.
+    rewrite Hsign_t.
+    (* 2. The goal is now cleanly: (list2int (subst_list' ...) - P) = list2int t - 1.
+        Let's bring in our modulo theorem for subtraction again. *)
+    assert (Hlen_eq : length (bits t) = length (bits (one n))).
+    { 
+      unfold bits.
+      apply size_len_eq.
+      rewrite one_size.
+      easy.
+    }
+    pose proof (list2int_subst_list Hlen_eq) as Hsubst_mod.
+
+    (* 3. Bring in the exact two's complement value we spent the last 5 messages proving! *)
+    assert (Htc : list2int (twos_complement (bits (one n))) = (pow2_int_N n - 1)%Z).
+    { 
+      (* 1. Prove n <> 0 to satisfy the master lemma *)
+      assert (Hn_neq_0 : n <> 0%N).
+      {
+        intro Heq.
+        (* 1. Push n = 0 into your length equality to force the list to be empty *)
+        rewrite Heq in Hlen_eq.
+        
+        (* 2. 'one 0' is trivially an empty list, so Coq can compute its length as 0 *)
+        simpl in Hlen_eq. 
+        (* Note: if simpl doesn't fully reduce it to 0, use 'compute in Hlen_eq.' *)
+        
+        (* 3. If the length of bits t is 0, the list itself MUST be empty. 
+              Let's destruct bits t to force Coq to realize this. *)
+        destruct (bits t) as [| b bs] eqn:Hbits_t.
+        - (* Case 1: bits t is [] *)
+          (* Push n = 0 into Hsign_sub *)
+          rewrite Heq in Hsign_sub.
+          
+          (* Hsign_sub is now asking for the last bit of (subst_list' [] []).
+             Coq can compute this whole thing directly! *)
+          compute in Hsign_sub. 
+          
+          (* Hsign_sub now says 'false = true', which is impossible! *)
+          discriminate Hsign_sub.
+          
+        - (* Case 2: bits t has at least one element (b :: bs) *)
+          (* But Hlen_eq says the length is 0! 
+             length (b :: bs) = 0 evaluates to S (...) = 0, which is impossible. *)
+          discriminate Hlen_eq.
+      }
+      
+      (* 2. The master lemma exactly matches this goal! *)
+      apply (list2int_twos_complement_one_exact Hn_neq_0).
+    }
+
+    (* 4. Substitute our exact value into the modulo equation, and then into the goal *)
+    rewrite Htc in Hsubst_mod.
+    rewrite Hsubst_mod.
+
+    (* 5. Now we have a pure Z arithmetic goal! 
+          Because t is positive and t-1 is negative, list2int t MUST be exactly 0.
+          We assert this so we can substitute it into the math. *)
+    assert (H_t_zero : list2int (bits t) = 0%Z).
+    {
+      
+      (* 1. Extract bounds from the Sign Bits *)
+      (* MSB = false means X < 2^(n-1) *)
+      assert (H_upper : (list2int (bits t) < pow2_int (length (bits t) - 1))%Z).
+      {
+        (* 1. Prove the list isn't empty so we can safely break it apart. 
+              (You can prove this via n <> 0 or your Hneq hypothesis) *)
+        assert (Hnot_empty : bits t <> []).
+        {
+          (* 1. Assume the opposite (that the list IS empty) to prove a contradiction *)
+          intro Hempty.
+
+          (* 2. Prove that if bits t is empty, bits (one n) must also be empty due to Hlen_eq *)
+          assert (Hone_empty : bits (one n) = []).
+          {
+            destruct (bits (one n)).
+            - reflexivity.
+            - (* If it has elements, the lengths wouldn't match 0 *)
+              rewrite Hempty in Hlen_eq. 
+              simpl in Hlen_eq. 
+              discriminate.
+          }
+
+          (* 3. Substitute these empty lists into your Hsign_sub hypothesis *)
+          rewrite Hempty in Hsign_sub.
+          rewrite Hone_empty in Hsign_sub.
+
+          (* 4. Force Coq to compute subst_list' [] [] and last [] false. 
+                It will evaluate perfectly to 'false = true' *)
+          simpl in Hsign_sub.
+
+          (* 5. False can never equal true. The contradiction is complete! *)
+          discriminate Hsign_sub.
+        }
+
+        (* 2. Deconstruct 'bits t' using your library's app_removelast_last *)
+        assert (Hdecomp : bits t = removelast (bits t) ++ [false]).
+        {
+          (* Break 'bits t' into removelast + its last bit *)
+          rewrite (app_removelast_last false Hnot_empty).
+          (* Replace the last bit with 'false' using your hypothesis *)
+          unfold bits.
+          rewrite Hsign_t.
+          rewrite rl_fact.
+          reflexivity.
+        }
+        
+        (* 3. Substitute this decomposed list into your goal *)
+        rewrite Hdecomp.
+
+        (* --- THE MAGIC STEPS --- *)
+        (* 4. Split the list2int evaluation using your list2int_app lemma! *)
+        rewrite list2int_app.
+        
+        (* 5. Convert [false] to an integer using list2int_bool *)
+        rewrite list2int_bool.
+        
+        (* 6. bool2int false perfectly evaluates to 0%Z *)
+        simpl bool2int. 
+        
+        (* 7. Clean up the basic algebra: (pow * 0) + Y = 0 + Y = Y *)
+        rewrite Z.mul_0_r.
+        rewrite Z.add_0_l.
+
+        (* 8. Align the lengths. 
+              'length (bits t) - 1' is perfectly equal to 'length (removelast (bits t))' *)
+        assert (Hlen_rem : (length (bits t) - 1)%nat = length (removelast (bits t))).
+        { 
+          (* 1. Substitute your decomposed list into the left side of the goal *)
+          rewrite Hdecomp at 1.
+
+          (* 2. Break down the length of the appended list: length (A ++ B) = length A + length B *)
+          rewrite length_app.
+
+          (* 3. Evaluate the length of the single-element list [false] into 1 *)
+          simpl (length [false]).
+
+          (* 4. The math is now exactly: (length (removelast (bits t)) + 1 - 1)%nat = length (removelast (bits t)).
+                lia can solve this instantly! *)
+          lia.
+        }
+        rewrite length_app.
+        simpl (length [false]).
+        replace (length (removelast (bits t)) + 1 - 1)%nat 
+         with (length (removelast (bits t))) by lia.
+
+        (* 9. The goal is now fundamentally: list2int X < pow2_int (length X).
+              Use your lemma! *)
+        apply list2int_lt_pow2_int.
+        reflexivity.
+      }
+
+      (* MSB = true means the subtracted value >= 2^(n-1) *)
+      assert (H_lower : (pow2_int (length (bits t) - 1) <= list2int (subst_list' (bits t) (bits (one n))))%Z).
+      {
+        (* 1. Assign a short name to the substituted list to keep the goal clean *)
+        remember (subst_list' (bits t) (bits (one n))) as sub_list.
+
+        (* 2. Prove the list isn't empty (same logic as Hnot_empty) *)
+        assert (Hnot_empty_sub : sub_list <> []).
+        {
+          (* 1. Assume the opposite (that sub_list IS empty) *)
+          intro Hempty.
+
+          (* 2. Substitute the empty list into your Hsign_sub hypothesis *)
+          rewrite Hempty in Hsign_sub.
+
+          (* 3. Force Coq to compute 'last [] false'. 
+                It will evaluate perfectly to 'false = true' *)
+          simpl in Hsign_sub.
+
+          (* 4. False can never equal true. The contradiction is complete! *)
+          discriminate Hsign_sub.
+        } 
+
+        (* 3. Deconstruct 'sub_list' using your library's app_removelast_last *)
+        assert (Hdecomp_sub : sub_list = removelast sub_list ++ [true]).
+        {
+          (* 1. Only expand the FIRST instance of sub_list *)
+          rewrite (app_removelast_last false Hnot_empty_sub) at 1.
+          
+          (* 2. Hsign_sub is already perfect. Substitute it in! *)
+          rewrite Hsign_sub.
+          
+          (* 3. The goal is perfectly balanced. Done! *)
+          reflexivity.
+        }
+        
+        (* 4. Substitute this decomposed list into your goal *)
+        (* We only rewrite the right side of the inequality *)
+        rewrite Hdecomp_sub at 1.
+
+        (* --- THE MAGIC STEPS (Part 2) --- *)
+        (* 5. Split the list2int evaluation using list2int_app! *)
+        rewrite list2int_app.
+        
+        (* 6. Convert [true] to an integer using list2int_bool *)
+        rewrite list2int_bool.
+        
+        (* 7. bool2int true perfectly evaluates to 1%Z *)
+        simpl bool2int. 
+        
+        (* 8. Clean up the basic algebra: (pow * 1) + Y = pow + Y *)
+        rewrite Z.mul_1_r.
+
+        (* 9. Align the lengths. 
+              length (removelast sub_list) perfectly matches length (bits t) - 1 *)
+        assert (Hlen_rem_sub : length (removelast sub_list) = (length (bits t) - 1)%nat).
+        {
+          (* 1. First, tell Coq that sub_list has the exact same length as bits t. *)
+          assert (Hlen_sub : length sub_list = length (bits t)).
+          {
+            rewrite Heqsub_list.
+            unfold bits.
+            assert (Hsize_eq: length t = length (one n)). 
+            { apply size_len_eq. rewrite one_size. easy. }
+            
+            rewrite (subst_list'_length Hsize_eq).
+            easy.
+          }
+          
+          (* 2. Next, calculate the length of sub_list using your decomposed version. *)
+          assert (Hlen_math : length sub_list = (length (removelast sub_list) + 1)%nat).
+          {
+            rewrite Hdecomp_sub at 1.
+            rewrite length_app.
+            simpl (length [true]).
+            lia.
+          }
+          
+          (* 3. The trap is sprung! 
+                If A = B, and A = C + 1, then C = B - 1. 
+                lia can see these two assertions and instantly solve the goal! *)
+          lia.
+        
+        }
+        
+        rewrite Hlen_rem_sub.
+
+        (* 10. The goal is now: 
+               pow2_int X <= pow2_int X + list2int (removelast sub_list)
+               We just need to tell Coq that list2int is always >= 0! *)
+        pose proof (@list2int_geq_zero (removelast sub_list)) as Hfront_pos.
+        lia.
+      }
+
+      (* 2. Establish baseline positive bounds *)
+      assert (H_t_pos : (0 <= list2int (bits t))%Z).
+      { apply list2int_geq_zero. } (* Usually list2int_pos or similar *)
+      
+      assert (H_half_pos : (0 < pow2_int (length (bits t) - 1))%Z).
+      { apply zero_lt_pow2_int.  } (* pow2_int is always > 0 *)
+
+      (* 3. Connect 2^n to 2 * 2^(n-1) for the solvers *)
+      assert (H_pow_split : pow2_int (length (bits t)) = (2 * pow2_int (length (bits t) - 1))%Z).
+      {
+        (* 2. Prove that L > 0 so that L - 1 is mathematically safe *)
+        assert (H_length_pos : (0 < (length (bits t)))%nat).
+        {
+          (* We do this by checking if 'bits t' is empty *)
+          (* 1. Hlen_eq says length [] = length (bits (one n)). 
+              Let's destruct bits (one n) to show this is impossible or leads to a contradiction. *)
+          (* 1. Force Coq to evaluate what bits t actually is *)
+          destruct (bits t) eqn:Heq_bits.
+          - (* Case 1: bits t is actually empty [] *)
+            (* Now Hsign_sub becomes subst_list' [] [], which simpl CAN compute! *)
+            simpl in Hsign_sub.
+            (* Hsign_sub is now 'false = true'. Crush it! *)
+            discriminate Hsign_sub.
+          - (* Case 2: bits t has at least one element (b :: l) *)
+            (* Now Hlen_eq becomes length (b :: l) = length [], which is S (...) = 0 *)
+            simpl.
+            lia.
+        }
+
+        (* 3. Because L > 0, we can rewrite L as (L - 1) + 1  *)
+        replace (length (bits t)) with (S (length (bits t) - 1)) at 1 by lia.
+
+        (* 4. Now the goal is: pow2_int (S (L - 1)) = 2 * pow2_int (L - 1).
+              If pow2_int is defined recursively, simpl will instantly compute this! *)
+        simpl pow2_int. 
+        
+        (* The left side is literally the definition of 2 * X. 
+         Coq recognizes they are identical by definition! *)
+        reflexivity.
+      }
+
+      (* 4. Unify the opaque pow2_int_N n so nia isn't confused *)
+      assert (Hpow_eq : pow2_int_N n = pow2_int (length (bits t))).
+      {
+        unfold pow2_int_N.
+        f_equal.
+        rewrite bits_size.
+        rewrite Hsize.
+        easy.
+      }
+
+      (* --- SET UP THE ALGEBRA --- *)
+      rewrite Hpow_eq in Hsubst_mod.
+      rewrite Hsubst_mod in H_lower.
+      
+      (* Hide the messy functions behind clean variables so the solver doesn't panic *)
+      remember (list2int (bits t)) as X.
+      remember (pow2_int (length (bits t) - 1)) as HalfP.
+      
+      rewrite H_pow_split in *.
+
+      (* --- UNLEASH THE SOLVER --- *)
+      (* This magically transforms the 'mod' inside H_lower into pure division equations! *)
+      Z.div_mod_to_equations.
+      
+      (* 1. Prove the preconditions that H and H0 are asking for *)
+      assert (H_2P_pos : (0 < 2 * HalfP)%Z) by lia.
+      assert (H_2P_neq : (2 * HalfP <> 0)%Z) by lia.
+
+      (* 2. "Unlock" the equations by specializing them with our proofs *)
+      specialize (H H_2P_neq).
+      specialize (H0 H_2P_pos). 
+
+      (* 3. The implications are gone! 
+            H and H0 are now pure, unconditional algebraic facts.
+            Because there is no non-linear multiplication between variables 
+            (HalfP is treated as a constant), even lia can instantly crush this! *)
+      (* 1. Isolate the non-linear variable q. 
+            Because X < HalfP and r >= HalfP, nia can easily deduce q must be 0 
+            if we ask it directly. *)
+      assert (Hq : q = 0%Z).
+      { nia. }
+
+      (* 2. Substitute q = 0 into H. 
+            This turns (2 * HalfP * q) into (2 * HalfP * 0), which is 0! *)
+      rewrite Hq in H.
+
+      (* 3. The non-linear multiplication is completely gone. 
+            H is now purely linear: X + 2*HalfP - 1 = r. 
+            Because H0 says r < 2*HalfP, lia easily deduces X - 1 < 0, 
+            meaning X MUST be 0! *)
+      lia.
+    }
+
+    (* 6. Substitute 0 in for t *)
+    rewrite H_t_zero.
+
+    (* 1. Fix the right side so it matches your hypothesis *)
+    (* Coq often hides coercions. This forces the goal to explicitly say 'bits t' *)
+    change (list2int t) with (list2int (bits t)).
+    rewrite H_t_zero.
+
+    (* 2. Unify the two pow2_int terms so nia/lia sees they are identical *)
+    assert (Hpow_eq : pow2_int (length (bits t)) = pow2_int_N n).
+    {
+      (* This is the exact same size/length alignment you did in the last subgoal! *)
+      unfold pow2_int_N.
+      f_equal.
+      rewrite bits_size.
+      rewrite Hsize.
+      easy.
+    }
+    rewrite Hpow_eq.
+
+    (* 3. The modulo is now: ((0 + (pow2_int_N n - 1)) mod pow2_int_N n)%Z. 
+          Because (P - 1) is strictly less than P, we can use Z.mod_small to erase the modulo! *)
+    rewrite Z.mod_small.
+    
+    + (* Goal 1: The modulo is gone! 
+         The goal is now: (0 + (P - 1)) - P = 0 - 1. 
+         This is perfectly linear, so lia handles it instantly. *)
+      lia.
+      
+    +  (* Goal 2: Prove the bounds for Z.mod_small: 0 <= 0 + (P - 1) < P. 
+         Since H_P_pos says P > 0, lia easily sees this is true! *)
+      (* 1. Assert that your power of 2 is strictly positive *)
+      assert (H_P_pos : (0 < pow2_int_N n)%Z).
+      {
+        apply zero_lt_pow2_int.
+      }
+
+      (* 2. Now lia has all the bounds it needs! *)
+      lia.   
+  -
+    unfold bits in Hsign_t.
+    rewrite Hsign_t.
+  (* 1. The 'if' condition is now false, so simpl deletes the messy subtraction branch! *)
+    (* 2. Convert the left side (subst_list') into modular integer arithmetic *)
+    assert (Hlen_eq : length (bits t) = length (bits (one n))).
+    { 
+      unfold bits.
+      apply size_len_eq.
+      rewrite one_size.
+      easy. 
+    }
+    rewrite (list2int_subst_list Hlen_eq).
+
+    (* 3. Substitute the exact integer value for the two's complement of 1 *)
+    assert (Htc : list2int (twos_complement (bits (one n))) = (pow2_int_N n - 1)%Z).
+    { 
+      apply list2int_twos_complement_one_exact.
+      intro Hzero.
+      
+      (* 1. Prove that if n = 0, the bits of t must be completely empty *)
+      assert (Ht_empty : bits t = []).
+      {
+        destruct (bits t) eqn:Heq_t.
+        - reflexivity.
+        - (* If the list has elements, its length cannot be 0 *)
+          assert (Hlen : length (bits t) = 0%nat).
+          { rewrite bits_size, Hsize, Hzero. reflexivity. }
+          rewrite Heq_t in Hlen. 
+          discriminate Hlen.
+      }
+      
+      (* 2. Prove that if n = 0, the bits of signed_min n must also be empty *)
+      assert (Hsmin_empty : bits (signed_min n) = []).
+      {
+        destruct (bits (signed_min n)) eqn:Heq_smin.
+        - reflexivity.
+        - (* Same logic: length of signed_min is n, which is 0 *)
+          assert (Hlen : length (bits (signed_min n)) = 0%nat).
+          { rewrite bits_size, signed_min_size, Hzero. reflexivity. }
+          rewrite Heq_smin in Hlen. 
+          discriminate Hlen.
+      }
+      
+      (* 3. Because both are empty lists, their bits are identical *)
+      assert (Hbits_eq : bits t = bits (signed_min n)).
+      {
+        rewrite Ht_empty.
+        rewrite Hsmin_empty.
+        reflexivity.
+      }
+      unfold bits in Hbits_eq.
+      
+      (* 4. Since their underlying bits are identical, the bitvectors themselves MUST be identical. 
+            This directly triggers your Hneq contradiction! *)
+      contradiction.
+    }
+    rewrite Htc.
+
+    (* 4. Unify the powers of 2 so Coq knows they are the same variable *)
+    assert (Hpow_eq : pow2_int (length (bits t)) = pow2_int_N n).
+    { 
+      unfold pow2_int_N.
+      f_equal.
+      rewrite bits_size.
+      rewrite Hsize.
+      easy.
+    }
+    rewrite Hpow_eq.
+
+    (* 5. Rearrange the math so Z.mod_add can delete the modulo wrap-around *)
+    replace (list2int (bits t) + (pow2_int_N n - 1))%Z 
+       with (list2int (bits t) - 1 + 1 * pow2_int_N n)%Z by lia.
+
+    assert (Hpow_neq_0 : pow2_int_N n <> 0%Z). 
+    { pose proof (zero_lt_pow2_int (length (bits t))); lia. }
+    
+    rewrite Z.mod_add by exact Hpow_neq_0.
+
+    (* 6. The goal is now exactly: (list2int t - 1) mod P = list2int t - 1.
+          Strip the modulo to win! *)
+    rewrite Z.mod_small.
+    + (* Goal 1: Modulo is gone! Pure linear algebra. *)
+      change (list2int t) with (list2int (bits t)).
+      lia.
+    + (* Goal 2: Prove bounds: 0 <= list2int t - 1 < pow2_int_N n *)
+      split.
+      * (* Lower Bound: list2int t >= 1. 
+           Hint: If it were 0, 0 - 1 mod P = P - 1 (all 1s), contradicting Hsign_sub! *)
+        (* 1. Bring in your baseline lower bound (X >= 0) *)
+         assert (H_t_pos : (0 <= list2int (bits t))%Z).
+         { apply list2int_geq_zero. } (* Usually list2int_pos or similar *)
+
+        (* 2. Trap and destroy the edge case where X = 0 *)
+        assert (Ht_not_zero : list2int (bits t) <> 0%Z).
+        {
+          intro Hzero.
+          
+          (* Step A: Bring in the master subtraction lemma *)
+          pose proof (list2int_subst_list Hlen_eq) as Hsub_mod.
+          rewrite Htc in Hsub_mod.
+          rewrite Hpow_eq in Hsub_mod.
+          
+          (* Step B: Inject t = 0 into the modulo equation. 
+             This makes the right side: (0 + pow2_int_N n - 1) mod pow2_int_N n *)
+          rewrite Hzero in Hsub_mod.
+          rewrite Z.add_0_l in Hsub_mod.
+          
+          (* Step C: Simplify the modulo. (P - 1) mod P is exactly P - 1 *)
+          rewrite Z.mod_small in Hsub_mod.
+          2: {
+            (* Prove 0 <= P - 1 < P for the modulo removal *)
+            pose proof (zero_lt_pow2_int (length (bits t))).
+            lia.
+          }
+          
+          (* 1. Give the substituted list a shorter name to keep the context clean *)
+          remember (subst_list' (bits t) (bits (one n))) as sub.
+
+          (* 2. Prove the list isn't empty, just like we did in the other branches *)
+          assert (Hnot_empty : sub <> []).
+          {
+            intro Hempty.
+            
+            (* 1. Push the empty list into your math hypothesis *)
+            rewrite Hempty in Hsub_mod.
+            simpl list2int in Hsub_mod. (* Transforms to: 0 = pow2_int_N n - 1 *)
+            
+            (* 2. Link it to the length of t *)
+            rewrite <- Hpow_eq in Hsub_mod. 
+            
+            (* 3. If 2^(length) - 1 = 0, the length MUST be 0 *)
+            assert (Hlen_0 : length (bits t) = 0%nat).
+            {
+              destruct (length (bits t)) eqn:Heq_len.
+              - reflexivity.
+              - (* If length > 0, 2^length >= 2, which contradicts 0 = 2^length - 1 *)
+                simpl pow2_int in Hsub_mod.
+                pose proof (zero_lt_pow2_int n0).
+                (* Fold Coq's internal binary shift back into standard integer multiplication *)
+                change (match pow2_int n0 with
+                        | 0%Z => 0%Z
+                        | Z.pos y' => Z.pos y'~0
+                        | Z.neg y' => Z.neg y'~0
+                        end) with (2 * pow2_int n0)%Z in Hsub_mod.
+                
+                (* Now Hsub_mod clearly says: 0 = 2 * pow2_int n0 - 1 *)
+                lia.
+            }
+            
+            (* 4. If length is 0, t's bits are completely empty *)
+            assert (Ht_empty : bits t = []).
+            { 
+              destruct (bits t).
+              - reflexivity.
+              - discriminate Hlen_0. 
+            }
+            
+            (* 5. Since t is empty, n is 0, making signed_min n empty too *)
+            assert (Hsmin_empty : bits (signed_min n) = []).
+            {
+              destruct (bits (signed_min n)) eqn:Heq_smin.
+              - reflexivity.
+              - assert (Hlen_smin : length (bits (signed_min n)) = 0%nat).
+                { 
+                  (* Link the sizes together using your size/length lemmas *)
+                  rewrite bits_size, signed_min_size, <- Hsize, <- bits_size.
+                  rewrite Ht_empty. 
+                  reflexivity. 
+                }
+                rewrite Heq_smin in Hlen_smin. 
+                discriminate Hlen_smin.
+            }
+            
+            (* 6. Prove they are equal, directly contradicting Hneq! *)
+            assert (Hbits_eq : t = signed_min n).
+            {
+              unfold bits in Ht_empty, Hsmin_empty.
+              rewrite Hsmin_empty.
+              easy.
+            }
+            contradiction (Hneq Hbits_eq).
+          }
+
+          (* 3. Decompose the list: sub = removelast sub ++ [false] *)
+          assert (Hdecomp : sub = removelast sub ++ [false]).
+          {
+            rewrite (app_removelast_last false Hnot_empty) at 1.
+            rewrite Hsign_sub.
+            reflexivity.
+          }
+
+          (* 4. Push this decomposition into your integer modulo hypothesis! *)
+          rewrite Hdecomp in Hsub_mod.
+          
+          (* Split the list evaluation using your standard list lemmas *)
+          rewrite list2int_app in Hsub_mod.
+          rewrite list2int_bool in Hsub_mod.
+          
+          (* bool2int false is 0, which zeroes out the multiplier! *)
+          simpl bool2int in Hsub_mod.
+          rewrite Z.mul_0_r in Hsub_mod.
+          rewrite Z.add_0_l in Hsub_mod.
+
+          (* Hsub_mod now says: list2int (removelast sub) = pow2_int_N n - 1 *)
+
+          (* 5. Bring in the fundamental upper bound for the front bits *)
+          pose proof (@list2int_lt_pow2_int (removelast sub) (length (removelast sub)) eq_refl) as Hmax.
+
+          (* 6. We need to align the lengths and powers of 2 for the solver *)
+          assert (Hlen_sub : length sub = length (bits t)).
+          {
+            rewrite Heqsub.
+            (* You used this exact lemma in the previous branch! *)
+            rewrite <- (subst_list'_length Hlen_eq).
+            reflexivity.
+          }
+
+          assert (Hlen_math : length sub = S (length (removelast sub))).
+          { 
+            rewrite Hdecomp at 1. 
+            rewrite length_app. 
+            simpl. 
+            lia. 
+          }
+
+          (* Break 2^n into 2 * 2^(n-1) *)
+          assert (Hpow_split : pow2_int_N n = (2 * pow2_int (length (removelast sub)))%Z).
+          {
+            rewrite <- Hpow_eq.
+            rewrite <- Hlen_sub.
+            rewrite Hlen_math.
+            (* Simplifies pow2_int (S L) into 2 * pow2_int L *)
+            simpl pow2_int. 
+            reflexivity.
+          }
+
+          (* 7. Substitute the exact mathematical formulas into the upper bound *)
+          rewrite Hsub_mod in Hmax.
+          rewrite Hpow_split in *.
+
+          (* 8. Let the solver crush the contradiction! 
+                (It knows X < P perfectly contradicts X = 2*P - 1) *)
+          assert (H_P_pos : (0 < pow2_int (length (removelast sub)))%Z).
+          { apply zero_lt_pow2_int. }
+
+          lia.
+        }
+
+        (* 3. The Grand Finale: 
+              lia combines (X >= 0) and (X <> 0) to know X >= 1, 
+              which perfectly solves 0 <= X - 1! *)
+        lia.
+      * (* Upper Bound: list2int t < P. 
+           (You can copy your Hmax / list2int_lt_pow2_int proof from branch 1!) *)
+        assert (Hlen: length (bits t) = N.to_nat(n)). 
+        { rewrite bits_size. rewrite Hsize. reflexivity. }
+        Check list2int_lt_pow2_int.
+        pose proof (list2int_lt_pow2_int Hlen) as H_lt.
+        rewrite <- Hlen in H_lt.
+        rewrite Hpow_eq in H_lt.
+        lia.
+Qed. 
+  
+Lemma sbv2int_pos_iff : forall n (x : bitvector),
+  size x = n ->
+  (0 <= sbv2int n x)%Z <-> last x false = false.
+Proof.
+  intros n x Hsize.
+  unfold sbv2int.
+  
+  destruct (last x false) eqn:Hsign.
+  
+  - (* Case 1: Sign bit is TRUE (Contradiction) *)
+    split; intro H.
+    + (* 1. Unfold bv2int and pow2_int_N to expose list2int and pow2_int *)
+      unfold bv2int, pow2_int_N in H.
+      Check list2int_lt_pow2_int.
+      
+      (* 1. Create a helper equality converting your 'size' proof into a 'length' proof *)
+      assert (H_len : length x = N.to_nat n).
+      {
+        (* How you solve this depends slightly on your library's definition of 'size'.
+           Usually, size is defined as N.of_nat (length x). 
+           Try one of these to close it: *)
+
+        (* Option B: *) unfold size in Hsize. lia. 
+      }
+
+      (* 2. Feed our specific variables AND the length proof into H_upper *)
+      pose proof (list2int_lt_pow2_int H_len) as H_bound.
+
+      (* 3. Now look at your context! You will have:
+         H : (0 <= list2int x - pow2_int (N.to_nat n))%Z
+         H_bound : (list2int x < pow2_int (N.to_nat n))%Z
+         
+         NOW lia has the concrete facts it needs to see the contradiction. *)
+      lia.
+      
+    + discriminate.
+
+  - (* Case 2: Sign bit is FALSE (Positive case) *)
+    split; intro H.
+    + reflexivity. 
+    + (* 1. Unfold bv2int to expose list2int *)
+      unfold bv2int.
+      
+      (* 2. Apply the lower bound lemma directly *)
+      apply list2int_geq_zero.
+
+Qed.
 
 
 (*-t = ~t + 1 *)
@@ -11312,17 +13510,36 @@ Proof.
     + rewrite H_res_sign, Ha_sign. reflexivity.
 Qed.
 
-Lemma bv_and_pos_sle_both: forall n (a b : bitvector),
+Lemma bv_and_pos_sle_1: forall n (a b : bitvector),
   size a = n -> size b = n ->
   last a false = false -> (* a is positive *)
   last b false = false -> (* b is positive *)
-  bv_sle (bv_and a b) a = true /\ bv_sle (bv_and a b) b = true.
+  bv_sle (bv_and a b) a = true.
 Proof.
   intros.
-  split.
-  - (* Proving a & b <= a *)
-    (* 1. Convert to unsigned comparison because inputs are positive *)
-    rewrite bv_sle_ule_same_sign with (n := n).
+  rewrite bv_sle_ule_same_sign with (n := n).
+  2: { apply bv_and_size. easy. easy. }
+  2: { easy. }
+  2: 
+    { 
+      rewrite pos_bvand_pos with (n := n).
+      - easy.
+      - easy.
+      - easy.
+      - easy.
+    }
+  apply bv_ule_and.
+  rewrite H, H0. easy.
+Qed.
+
+Lemma bv_and_pos_sle_2: forall n (a b : bitvector),
+  size a = n -> size b = n ->
+  last a false = false -> (* a is positive *)
+  last b false = false -> (* b is positive *)
+  bv_sle (bv_and a b) b = true.
+Proof.
+  intros.
+  rewrite bv_sle_ule_same_sign with (n := n).
     2: { apply bv_and_size. easy. easy. }
     2: { easy. }
     2: 
@@ -11333,25 +13550,11 @@ Proof.
         - easy.
         - easy.
       }
-    apply bv_ule_and.
-    rewrite H, H0. easy.
-  - (* Proving a & b <= b *)
-    rewrite bv_sle_ule_same_sign with (n := n).
-      2: { apply bv_and_size. easy. easy. }
-      2: { easy. }
-      2: 
-        { 
-          rewrite pos_bvand_pos with (n := n).
-          - easy.
-          - easy.
-          - easy.
-          - easy.
-        }
-    Search bv_and.
-    rewrite bv_and_comm with (n := n).
-    + apply bv_ule_and; rewrite H, H0; easy.
-    + easy.
-    + easy. 
+  Search bv_and.
+  rewrite bv_and_comm with (n := n).
+  + apply bv_ule_and; rewrite H, H0; easy.
+  + easy.
+  + easy. 
 Qed.
 
 (* End: bvand_slt *)
