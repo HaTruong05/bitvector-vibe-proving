@@ -122,8 +122,6 @@ Theorem bvashr_sle_eq : forall (n : N), forall (s t : bitvector),
     (exists (x : bitvector), (size x = n) /\ (bv_sle (bv_ashr_a x s) t = true)).
 Proof.
   intros.
-  Search bv_ashr .
-  Search bv_ashr_a.
 Admitted.
 
 (*------------------------------Neg------------------------------*)
@@ -177,296 +175,161 @@ Proof. intros n s t Hs Ht.
          now rewrite (@bv_and_comm n x s Hx Hs), (@bv_and_idem1 s x n Hs Hx).
 Qed.
 
+(* Ha proof 1 - start*)
 (* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
 Theorem bvand_slt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
 Proof.
-
-Search bv_not.
   intros n s t Hs Ht.
   split.
   - intro H_cond.
       exists (bv_not (bv_neg t)).
       split.
-        rewrite (@bv_not_size n).
-        split.
-        rewrite (@bv_neg_size n).
-        reflexivity.
-        assumption.
-        +
-        assumption. 
+        + rewrite (@bv_not_size n).
+          * easy.
+          * apply bv_neg_size. easy.
+        + assumption.
   - intro H_exists.
-  (*Pre-step: Normalize the syntax of "t minus 1" *)
     assert (H_syntax_fix : bv_not (bv_neg t) = bv_subt' t (one n)).
     {
-          (* 2. Apply algebra to move the subtraction *)
-          
           assert (H_sizes : size (one n) = n /\ size t = n /\ size (bv_not (bv_neg t)) = n).
           { 
             split. apply one_size.
             split. exact Ht.
             apply bv_not_size, bv_neg_size; auto.
           }
-          (* Only pass the proof H_sizes explicitly, let Coq infer the rest *)
           apply (proj1 (bvadd_U H_sizes)).
-          Check bv_neg_involutive.  
           rewrite <- bv_neg_involutive.
-          Check bv_neg_is_not_plus_one.
-          Search bv_not one.
           symmetry. 
           apply bv_neg_is_not_plus_one.
           apply bv_neg_size. easy.
     }
-    (* t <> signed_min *) 
     destruct H_exists as [x [Hx_size Hx_lt]].
     assert (H_not_min : t <> signed_min n).
     {
          intro H_is_min.
-         
-         
          rewrite H_is_min in Hx_lt.
-         
          pose proof (signed_min_sle (bv_and x s)) as H_imp.
-         Search bv_and.
          rewrite (bv_and_size Hx_size Hs) in H_imp.
          rewrite bv_sle_eq in H_imp.
          destruct H_imp as [H_min_lt_val | H_min_eq_val].
-         + 
-          pose proof (bv_slt_trans Hx_lt H_min_lt_val) as H_cycle.
-          rewrite bv_slt_nrefl in H_cycle. 
-          discriminate.
-         + 
-          rewrite <- H_min_eq_val in Hx_lt.
-          rewrite bv_slt_nrefl in Hx_lt.
-          discriminate.
+         + pose proof (bv_slt_trans Hx_lt H_min_lt_val) as H_cycle.
+           rewrite bv_slt_nrefl in H_cycle. 
+           discriminate.
+         + rewrite <- H_min_eq_val in Hx_lt.
+           rewrite bv_slt_nrefl in Hx_lt.
+           discriminate.
     }
     destruct (bv_slt s (zeros n)) eqn:H_sign.
-    + (* Case 1: s < 0 *)
-      (* Step 2: Prove that (t - 1) is strictly less than t *)
-      (* Reasoning: Since t != min, subtracting 1 stays smaller. *)
-      assert (H_t_minus_1_lt : bv_slt (bv_not (bv_neg t)) t = true).
+    + assert (H_t_minus_1_lt : bv_slt (bv_not (bv_neg t)) t = true).
       {
-      Search ones.
-        (* 1. Bridge: Convert signed bitvector comparison to Integer comparison *)
         rewrite bv_slt_iff_sbv2int with (n := n).
-        
-        (* Side goal 1: Prove size (t-1) = n *)
         2: { 
-        Search "bv_not_size".
           apply bv_not_size. 
           apply bv_neg_size.
           exact Ht. 
         }
-        
-        (* Side goal 2: Prove size t = n *)
         2: { exact Ht. }
         rewrite H_syntax_fix.
-
-        (* 2. Arithmetic: Replace value of (t-1) with (val t) - 1 *)
-        (* This requires proving t is not MIN_INT, which is H_not_min *)
-        
         rewrite sbv2int_sub_one with (n := n).
-        
-        (* Side goal 3: Prove size conditions for the subtraction lemma *)
         2: { exact Ht. }
-        
-        (* Side goal 4: Prove t <> min (The Guard) *)
         2: { exact H_not_min. }
-
-        (* 3. Solve: The goal is now (val t - 1 < val t)%Z *)
-        lia.
-        
+        lia. 
       }
-
-      (* Step 3: Prove that ((t-1) & s) <= (t-1) *)
-      (* This was your 'bvand_slt_helper1' *)
       assert (H_le : bv_sle (bv_and (bv_not (bv_neg t)) s) (bv_not (bv_neg t)) = true).
       {
         apply bv_and_neg_sle_itself with (n := n).
-        - (* 1. size (bv_not (bv_neg t)) = n *)
+        - 
           apply bv_not_size, bv_neg_size.
           exact Ht.
-          
-        - (* 2. size s = n *)
-          exact Hs.
-          
-        - (* 3. bv_slt s (zeros n) = true *)
-          exact H_sign.
+        - exact Hs.
+        - exact H_sign.
       }
-      
-      
       apply (bv_sle_slt_trans H_le H_t_minus_1_lt).
-    
-    (* ========================================================== *)
-    (* CASE 2: s is NON-NEGATIVE (s >= 0)                         *)
-    (* ========================================================== *)
-    +
-      rewrite (bv_slt_negb_sle Hs (zeros_size n)) in H_sign. 
+    + rewrite (bv_slt_negb_sle Hs (zeros_size n)) in H_sign. 
       apply negb_false_iff in H_sign.
-      
-      (* 2. Prove s is Positive (last bit is 0) *)
       rewrite <- Hs in H_sign.
       rewrite bv_zeros_sle in H_sign.
       apply negb_true_iff in H_sign.
-       assert (H_and_sz : size (bv_and x s) = n).
-        { apply bv_and_size; assumption. }
-        
-      (* 3. Prove (x & s) is Positive *)
+      assert (H_and_sz : size (bv_and x s) = n).
+      { apply bv_and_size; assumption. }
       assert (H_xs_pos : last (bv_and x s) false = false).
       {
-         Search "pos_bvand_pos".
-         Search bv_and.
          rewrite (bv_and_comm Hx_size Hs).
          apply (pos_bvand_pos Hs Hx_size H_sign).  
       }
       destruct (bv_slt t (zeros n)) eqn:H_t_sign.
-      * 
-      (* Case 2a: t < 0 (Contradiction) *)
-      (* 1. Prove t is Negative (last bit is 1) *)
-      rewrite <- Ht in H_t_sign.
-      rewrite bv_slt_zeros in H_t_sign. 
-      (* H_t_sign: last t false = true *)
-
-      assert (H_size_match : size t = size (bv_and x s)).
-      { 
-        rewrite H_and_sz.
-        assumption.
-      }
-      (* 4. Use bv_slt_tf to prove t < (x & s) *)
-      pose proof (bv_slt_tf H_size_match H_t_sign H_xs_pos) as H_contra.
-      
-      (* 5. Final Clash: (x&s) < t AND t < (x&s) implies (x&s) < (x&s) *)
-      pose proof (bv_slt_trans H_contra Hx_lt) as H_impossible.
-      rewrite bv_slt_nrefl in H_impossible.
-      discriminate.
-      *
-      rewrite (bv_slt_negb_sle Ht (zeros_size n)) in H_t_sign. 
-      apply negb_false_iff in H_t_sign.
-      Search bv_sle.
-      apply bv_sle_eq in H_t_sign.
-      destruct H_t_sign as [H_t_pos | H_t_eq_0].
-      **
-        Check bv_sle_slt_trans.
-        apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
-        (* Subgoal 1: Prove ((t-1) & s) <= (t-1) . Need to prove bv_not (bv_neg t)) is pos given t > 0*)
-        {
-          (* 1. First, establish the size of our target bitvector *)
-          assert (Hsz : size (bv_not (bv_neg t)) = n).
-          {
-            apply bv_not_size, bv_neg_size. easy.
-          }
-          assert (H_t_minus_1_pos : last (bv_not (bv_neg t)) false = false).
-          { 
-            (* 2. Feed the size proof into our lemma to unlock the exact <-> statement *)
-            pose proof (sbv2int_pos_iff Hsz) as H_iff.
-            
-            (* 3. Apply the left-to-right direction of the <-> (which proves 'last' from '0 <=') *)
-            apply H_iff.
-            
-            (* SUCCESS: Your goal is now exactly (0 <= sbv2int n (bv_not (bv_neg t)))%Z ! *)
-            
-            (* 4. Normalize the subtraction syntax *)
-            rewrite H_syntax_fix.
-            
-            (* 5. Bridge to Z: Convert bitvector subtraction to integer subtraction *)
-            rewrite sbv2int_sub_one. 
-            
-            (* --- SUBGOAL 1: (0 <= sbv2int n t - 1)%Z --- *)
-    
-            (* 1. First, we need a quick proof that the size of 'zeros n' is 'n' *)
-            assert (H_zeros_sz : size (zeros n) = n).
-            {
-              apply zeros_size.
-            }
-            
-            (* 2. Use '@' to force Coq to take all 5 arguments explicitly! 
-                  Order: n, x, y, size x = n, size y = n *)
-            pose proof (@bv_slt_iff_sbv2int n (zeros n) t H_zeros_sz Ht) as H_slt_bridge.
-            
-            (* 3. The lemma is now an exact <-> fact in your context. 
-                  We apply the forward direction (left to right) to H_t_pos *)
-            apply -> H_slt_bridge in H_t_pos. 
-            
-            (* 4. Convert 'sbv2int n (zeros n)' to '0%Z' manually *)
-            assert (H_zero_val : sbv2int n (zeros n) = 0%Z).
-            {
-              (* Unfold signed evaluation to expose the sign-bit check and bv2int *)
-              unfold sbv2int.
-              
-              (* The sign bit of 'zeros n' is always false. 
-                 Try 'simpl.' first. If that doesn't evaluate the 'last' function 
-                 because 'n' is symbolic, you will need your library's lemma for the 
-                 last bit of zeros (often called 'last_zeros' or similar). *)
-              
-              (* Assuming you can get the if-statement to collapse to the 'false' branch: *)
-              
-              (* Now use the lemma from your very first message! *)
-              rewrite bv2int_zeros. 
-              unfold zeros.
-              rewrite last_mk_list_false.
-              reflexivity.
-            }
-            
-            (* Now replace it in your bridge equation *)
-            rewrite H_zero_val in H_t_pos.
-            
-            (* 5. Fire the solver! *)
-            lia.
-            easy.
-            easy.
-          }
-          Check bv_and_pos_sle_1.
-          apply (bv_and_pos_sle_1 Hsz Hs H_t_minus_1_pos H_sign).
+      * rewrite <- Ht in H_t_sign.
+        rewrite bv_slt_zeros in H_t_sign. 
+        assert (H_size_match : size t = size (bv_and x s)).
+        { 
+          rewrite H_and_sz.
+          assumption.
         }
-    
-        (* Subgoal 2: Prove (t-1) < t *)
-        {
-          (* 1. Bridge: Convert signed bitvector comparison to Integer comparison *)
+        pose proof (bv_slt_tf H_size_match H_t_sign H_xs_pos) as H_contra.
+        pose proof (bv_slt_trans H_contra Hx_lt) as H_impossible.
+        rewrite bv_slt_nrefl in H_impossible.
+        discriminate.
+      * rewrite (bv_slt_negb_sle Ht (zeros_size n)) in H_t_sign. 
+        apply negb_false_iff in H_t_sign.
+        apply bv_sle_eq in H_t_sign.
+        destruct H_t_sign as [H_t_pos | H_t_eq_0].
+        **
+          apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
+          {
+            assert (Hsz : size (bv_not (bv_neg t)) = n).
+            {
+              apply bv_not_size, bv_neg_size. easy.
+            }
+            assert (H_t_minus_1_pos : last (bv_not (bv_neg t)) false = false).
+            { 
+              pose proof (sbv2int_pos_iff Hsz) as H_iff.
+              apply H_iff.
+              rewrite H_syntax_fix.
+              rewrite sbv2int_sub_one. 
+              assert (H_zeros_sz : size (zeros n) = n).
+              {
+                apply zeros_size.
+              }
+              pose proof (@bv_slt_iff_sbv2int n (zeros n) t H_zeros_sz Ht) as H_slt_bridge.
+              apply -> H_slt_bridge in H_t_pos. 
+              assert (H_zero_val : sbv2int n (zeros n) = 0%Z).
+              {
+                unfold sbv2int.
+                rewrite bv2int_zeros. 
+                unfold zeros.
+                rewrite last_mk_list_false.
+                reflexivity.
+              }
+              rewrite H_zero_val in H_t_pos.
+              lia.
+              easy.
+              easy.
+            }
+            apply (bv_and_pos_sle_1 Hsz Hs H_t_minus_1_pos H_sign).
+          }
           rewrite bv_slt_iff_sbv2int with (n := n).
-          
-          (* Side goal 1: Prove size (t-1) = n *)
           2: { 
-          Search "bv_not_size".
             apply bv_not_size. 
             apply bv_neg_size.
             exact Ht. 
           }
-          
-          (* Side goal 2: Prove size t = n *)
           2: { exact Ht. }
           rewrite H_syntax_fix.
-
-          (* 2. Arithmetic: Replace value of (t-1) with (val t) - 1 *)
-          (* This requires proving t is not MIN_INT, which is H_not_min *)
-          
           rewrite sbv2int_sub_one with (n := n).
-          
-          (* Side goal 3: Prove size conditions for the subtraction lemma *)
           2: { exact Ht. }
-          
-          (* Side goal 4: Prove t <> min (The Guard) *)
           2: { exact H_not_min. }
-
-          (* 3. Solve: The goal is now (val t - 1 < val t)%Z *)
           lia.
-        }             
-      **
-        (* 1. Replace t with 0 everywhere *)
-        rewrite <- H_t_eq_0 in *.
-        rewrite <- H_and_sz in Hx_lt.
-        
-        (* 2. Expose the contradiction in Hx_lt *)
-        (* Hx_lt says: (x & s) < 0 *)
-        (* This means the sign bit of (x & s) is 1 (true) *)
-        rewrite (bv_slt_zeros (bv_and x s)) in Hx_lt.
-
-        (* 4. Final Clash *)
-        (* Hx_lt says it's true, H_pos says it's false *)
-        rewrite H_xs_pos in Hx_lt.
-        discriminate.
+        **
+          rewrite <- H_t_eq_0 in *.
+          rewrite <- H_and_sz in Hx_lt.
+          rewrite (bv_slt_zeros (bv_and x s)) in Hx_lt.
+          rewrite H_xs_pos in Hx_lt.
+          discriminate.
 Qed.
+(* Ha proof 1 - end*)
 
 (*------------------------------------------------------------*)
 
@@ -484,6 +347,8 @@ Proof. intros n s t Hs Ht.
          now rewrite (@bv_or_idem2 x s n Hx Hs).
 Qed.
 
+(* Ha proof 2 - start *)
+(* t <s s | smax <=> (exists x, x | s >s t) *)
 Theorem bvor_sgt : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
     (exists (x : bitvector), (size x = n) /\ (bv_sgt (bv_or x s) t = true))
@@ -491,47 +356,23 @@ Theorem bvor_sgt : forall (n : N), forall (s t : bitvector),
 Proof.
   intros n s t Hn_s Hn_t.
   split.
-  
-  (* ========================================== *)
-  (* Left to Right (->)                         *)
-  (* ========================================== *)
   - intro H_exists.
     destruct H_exists as [x [Hx_size H_slt]].
-    
-    (* Convert bv_sgt (x | s) t to bv_slt t (x | s) *)
     apply bv_sgt_bv_slt in H_slt.
-    
-    (* Case analysis on the sign of s *)
     destruct (last s false) eqn:Hs_sign.
-    
-    + (* Case 1: s is Negative (last bit is true) *)
-      (* Goal: Prove t < s | signed_max *)
-      (* You need a lemma for bv_slt_sle_trans: t < (x|s) <= (s|signed_max) *)
-      
-      (* We assert the upper bound logic you described *)
-      assert (H_upper_bound: bv_sle (bv_or x s) (bv_or s (signed_max n)) = true).
+    + assert (H_upper_bound: bv_sle (bv_or x s) (bv_or s (signed_max n)) = true).
       {
-        (* 1. Unfold bv_sle to expose the underlying list operations *)
         unfold bv_sle.
-        
         rewrite (bv_or_size Hx_size Hn_s). 
         assert (Hsize_right : size (bv_or s (signed_max n)) = n).
         {
           apply bv_or_size.
           - exact Hn_s.
-          - apply signed_max_size. (* Or whatever your lemma for signed_max size is *)
+          - apply signed_max_size.
         } 
         rewrite Hsize_right.
         rewrite N.eqb_refl.
-
-        (* We need n to be S t' to expose the structure, just like before *)
-        (* Assuming you already have Hn_nat : N.to_nat n = S t' from this branch *)
-        
-        (* 2. Rewrite into big-endian to put the sign bits at the front *)
-        (* This might require unfolding sle_list depending on your library *)
         unfold sle_list. 
-        
-        (* Prove the left side isn't empty *)
         assert (Hnot_nil_left: bv_or x s <> nil).
         {
           intro Hnil.
@@ -539,167 +380,85 @@ Proof.
           { apply bv_or_size; assumption. }
           rewrite Hnil in Hsize.
           unfold size in Hsize; simpl in Hsize.
-          
-          (* Hsize is now '0%N = n'. Let's substitute 0 for n in Hn_s *)
           rewrite <- Hsize in Hn_s.
-          
-          (* Now Hn_s says 'size s = 0%N'. Let's look at the structure of s: *)
-          destruct s eqn:Hs_eq.
-          - (* If s is nil: last nil false is false, which contradicts Hs_sign! *)
-            simpl in Hs_sign. 
-            discriminate Hs_sign.
-          - (* If s is not nil: its size is at least 1, which contradicts size s = 0%N *)
-            unfold size in Hn_s. simpl in Hn_s. 
-            (* Coq knows N.of_nat (S ...) cannot equal 0%N *)
-            lia. (* Or 'discriminate Hn_s.' if lia isn't imported *)
-        }
-
-        (* Prove the right side isn't empty *)
-        assert (Hnot_nil_right: bv_or s (signed_max n) <> nil).
-        {
-          intro Hnil.
-          rewrite Hnil in Hsize_right.
-          unfold size in Hsize_right; simpl in Hsize_right.
-          
-          (* Exact same contradiction! Hsize_right is '0%N = n' *)
-          rewrite <- Hsize_right in Hn_s.
-          
           destruct s eqn:Hs_eq.
           - simpl in Hs_sign. 
             discriminate Hs_sign.
           - unfold size in Hn_s. simpl in Hn_s. 
             lia. 
         }
-        
-        (* Coq sees Hnot_nil_left applies to (bv_or x s), so it fills in the list automatically! *)
+        assert (Hnot_nil_right: bv_or s (signed_max n) <> nil).
+        {
+          intro Hnil.
+          rewrite Hnil in Hsize_right.
+          unfold size in Hsize_right; simpl in Hsize_right.
+          rewrite <- Hsize_right in Hn_s.
+          destruct s eqn:Hs_eq.
+          - simpl in Hs_sign. 
+            discriminate Hs_sign.
+          - unfold size in Hn_s. simpl in Hn_s. 
+            lia. 
+        }
         pose proof (app_removelast_last false Hnot_nil_left) as H_split_left.
-        
         pose proof (app_removelast_last false Hnot_nil_right) as H_split_right.
-        
-        (* Replace the lists in your goal with their split versions *)
         rewrite H_split_left.
         rewrite H_split_right.
-        
-        (* Push the reverse inside to put the sign bits at the front *)
         rewrite rev_unit.
         rewrite rev_unit.
-
         assert (Hsign_left: last (bv_or x s) false = true).
         {
-          (* 1. Unfold bv_or to expose map2 orb *)
           unfold bv_or.
           unfold bits.
-          
-          (* 2. Clear the 'if' statement *)
           assert (Hxs : (size x =? size s)%N = true).
           { rewrite Hx_size, Hn_s. apply N.eqb_refl. }
           rewrite Hxs.
-          
-          (* 3. Split both (bits x) and (bits s) into (removelast ++ last) *)
-          (* Note: You will need quick proofs that bits x and bits s are not nil.
-             I'll call those Hx_not_nil and Hs_not_nil here. *)
-          (* 1. Prove s is not nil using your sign bit! *)
           assert (Hs_not_nil: s <> nil).
           { 
             intro Hnil. subst s. 
             simpl in Hs_sign. discriminate. 
           }
-
-          (* 2. Prove x is not nil (since it has the same size as s) *)
           assert (Hx_not_nil: x <> nil).
           { 
             intro Hnil. subst x.
-            
-            (* 1. Hx_size is now: size nil = n. 
-                  Let's plug that directly into Hn_s so they match. *)
             rewrite <- Hx_size in Hn_s. 
-            
-            (* Now Hn_s is: size s = size nil. Let's look at the shape of s. *)
             destruct s as [| hd tl].
-            - (* Case 1: s is nil. 
-                 If s is nil, last nil false = true, which simplifies to false = true. *)
-              simpl in Hs_sign. 
+            - simpl in Hs_sign. 
               discriminate Hs_sign.
-              
-            - (* Case 2: s has at least one element (hd :: tl).
-                 This means size (hd :: tl) = size nil. 
-                 Coq knows a list with elements can't have the same size as an empty list! *)
-              simpl in Hn_s. 
+            - simpl in Hn_s. 
               discriminate Hn_s. 
-              (* Note: If 'discriminate' fails here because 'size' is opaque in your library, 
-                 just add 'unfold size in Hn_s.' right before it. *)
           }
-
-          (* 3. Split x and s into their front bits and sign bits *)
-          (* Using the app_removelast_last lemma you found earlier *)
           rewrite (app_removelast_last false Hx_not_nil) at 1.
           rewrite (app_removelast_last false Hs_not_nil) at 1.
-
-          (* 4. Push map2 orb through the lists! *)
           rewrite map2_or_app.
-          
-          (* We now have two subgoals to prove the lengths match for map2_or_app *)
           2: {
-        
-            (* 1. Bring in our trusted split equations *)
             pose proof (app_removelast_last false Hx_not_nil) as Hx_app.
             pose proof (app_removelast_last false Hs_not_nil) as Hs_app.
-
-            (* 2. Convert the list equalities into length equalities *)
             apply (f_equal (@length bool)) in Hx_app.
             apply (f_equal (@length bool)) in Hs_app.
-
-            (* 3. Evaluate the lengths of the appends *)
             rewrite length_app in Hx_app.
             rewrite length_app in Hs_app.
-            
-            (* The length of a single-element list [last ...] is just 1 *)
             simpl in Hx_app, Hs_app.
-
-            (* 4. Prove the base lengths of x and s are equal *)
             assert (Hlen: length x = length s).
             { 
-              (* We know size x = n and size s = n, so size x = size s. *)
               assert (Hsize_eq: size x = size s).
               { rewrite Hx_size, Hn_s. reflexivity. }
               apply size_len_eq.
               easy.
             }
-
-            (* 5. Now we know:
-               length s = length (removelast x) + 1
-               length s = length (removelast s) + 1
-               So the lengths of their removelast parts are identical! *)
             assert (H_removelast_len: length (removelast x) = length (removelast s)).
             { lia. }
             rewrite H_removelast_len. 
             reflexivity.
-            
           }
-          2: {
-            (* Subgoal 2: length [last x false] = length [last s false] *)
-            (* Both are length 1, so this is trivial *)
-            reflexivity.
-          }
-
-          (* 5. Your goal is now basically: 
-             last (map2 orb (removelast x) (removelast s) ++ [last x false || last s false]) false = true *)
-          simpl. 
-          
-          (* 6. Strip away the front of the list! *)
-          rewrite last_app.
-          
-          (* 7. Coq now sees: (last x false || last s false) = true *)
-          rewrite Hs_sign.
-          apply orb_true_r.
-
+          * simpl. 
+            rewrite last_app.
+            rewrite Hs_sign.
+            apply orb_true_r.
+          * reflexivity.
         }
-        
         assert (Hsign_right: last (bv_or s (signed_max n)) false = true).
         {
           unfold bv_or.
-          
-          (* 1. Clear the size comparison 'if' statement *)
           assert (Hssm : (size s =? size (signed_max n))%N = true).
           { 
             rewrite Hn_s.
@@ -707,371 +466,184 @@ Proof.
             apply N.eqb_refl.
           }
           rewrite Hssm.
-          
           assert (Hs_not_nil: s <> nil).
           { 
             intro Hnil. subst s. 
             simpl in Hs_sign. discriminate. 
           }
-          
           assert (Hsm_not_nil: signed_max n <> nil).
           {
             intro Hnil.
-            (* 1. Convert the boolean equality in Hssm into a standard logical equality *)
             apply N.eqb_eq in Hssm. 
-            
-            (* 2. Substitute signed_max n with nil in our size equation *)
             rewrite Hnil in Hssm. 
-            (* Hssm is now: size s = size nil *)
-
-            (* 3. Now look at the structure of s. It either has elements or it doesn't. *)
             destruct s as [| hd tl].
-            - (* Case 1: s is nil. But we know s <> nil! Contradiction. *)
-              apply Hs_not_nil. reflexivity.
-              
-            - (* Case 2: s has elements (hd :: tl). 
-                 This means size (hd :: tl) = size nil. 
-                 A list with elements cannot have the same size as an empty list! *)
-              (* Unfold size if it's opaque in your library, then evaluate *)
-              unfold size in Hssm. 
+            - apply Hs_not_nil. reflexivity.
+            - unfold size in Hssm. 
               simpl in Hssm. 
               discriminate Hssm.
           }
-          
-          (* 3. Split both lists into removelast ++ last *)
           rewrite (app_removelast_last false Hs_not_nil) at 1.
           rewrite (app_removelast_last false Hsm_not_nil) at 1.
-          
           unfold bits.
-          
-          (* 4. Distribute map2 orb across the append *)
           rewrite map2_or_app.
-          
-          (* Subgoal 1: Prove length/size of the removelast parts match *)
           2: {
-        
-            (* 1. Bring in our trusted split equations *)
             pose proof (app_removelast_last false Hsm_not_nil) as Hsm_app.
             pose proof (app_removelast_last false Hs_not_nil) as Hs_app.
-
-            (* 2. Convert the list equalities into length equalities *)
             apply (f_equal (@length bool)) in Hsm_app.
             apply (f_equal (@length bool)) in Hs_app.
-
-            (* 3. Evaluate the lengths of the appends *)
             rewrite length_app in Hsm_app.
             rewrite length_app in Hs_app.
-            
-            (* The length of a single-element list [last ...] is just 1 *)
             simpl in Hsm_app, Hs_app.
-
-            (* 4. Prove the base lengths of signed max and s are equal *)
             assert (Hlen: length (signed_max n)  = length s).
             {
               apply size_len_eq.
               rewrite Hn_s.
               apply signed_max_size. 
             }
-            
-            assert (H_removelast_len: length (removelast (signed_max n)) = length (removelast s)).
-            { lia. }
+            assert (H_removelast_len: length (removelast (signed_max n)) = length (removelast s)) by lia.
             rewrite H_removelast_len. 
             reflexivity.
-            
           }
-          
-          (* Subgoal 2: Prove lengths of single-element lists match (1 = 1) *)
           2: reflexivity.
-          
-          (* 5. Simplify the map2 on the single elements and grab the last one *)
           simpl.
           rewrite last_app.
-          
-          (* 6. Resolve the boolean logic!
-             Coq now sees: (last s false || last (signed_max n) false) = true *)
           rewrite Hs_sign. 
-          
-          (* Since 'true || anything' is true, orb_true_l instantly solves this! *)
           apply orb_true_l.
         }
-        
-        (* 3. Substitute 'true' into your goal *)
         rewrite Hsign_left.
         rewrite Hsign_right.
-
-        (* Your goal is now: 
-           sle_list_big_endian (true :: ...) (true :: ...) = true *)
-
-        (* 4. Let Coq evaluate the identical sign bits! *)
         simpl.
-        (* 1. Wipe out the useless || false *)
         rewrite orb_false_r.
-        
         assert (Hs_not_nil: s <> nil).
         { 
           intro Hnil. subst s. 
           simpl in Hs_sign. discriminate. 
         }
-        (* 1. Setup the assert for our final replacement *)
         assert (H_all_true : rev (removelast (bv_or s (signed_max n))) = 
                              mk_list_true (length (rev (removelast (bv_or x s))))).
         {
-          (* Step A: Align the lengths!
-          The length of the left side's removelast is the exact same as the 
-          length of the right side's removelast (since size x = size s = n). *)
           assert (Hlen : length (rev (removelast (bv_or x s))) = length (removelast s)).
           { 
-            
-            (* 1. Wipe out the 'rev' immediately using the standard library lemma *)
             rewrite length_rev.
-
-            (* Your goal is now: length (removelast (bv_or x s)) = length (removelast s) *)
-
-            (* 2. Let's calculate the length of the left side using your split! *)
             assert (Hlen_left : length (bv_or x s) = length (removelast (bv_or x s)) + 1).
             {
-              (* Replace the list with its split version *)
               rewrite H_split_left at 1.
-              
-              (* The length of A ++ B is length A + length B *)
               rewrite length_app.
-              
-              (* Evaluate the length of the single-element list at the end to 1 *)
               simpl. reflexivity.
             }
-
-            (* 3. Do the exact same split and calculation for 's' *)
             assert (H_split_s : s = removelast s ++ last s false :: nil).
             { 
               apply app_removelast_last. 
               exact Hs_not_nil. 
             }
-            
             assert (Hlen_s : length s = length (removelast s) + 1).
             {
               rewrite H_split_s at 1.
               rewrite length_app.
               simpl. reflexivity.
             }
-
-            (* 4. State that the full lists have the same length (since both are size n) *)
             assert (H_sizes_equal : length (bv_or x s) = length s).
             {
               apply size_len_eq.
               rewrite Hn_s.
               apply bv_or_size. easy. easy.
             }
-
-            (* 5. Substitute our split length calculations into H_sizes_equal *)
             rewrite Hlen_left in H_sizes_equal.
             rewrite Hlen_s in H_sizes_equal.
-            
-            (* H_sizes_equal now literally says: 
-               length (removelast (bv_or x s)) + 1 = length (removelast s) + 1 *)
-
-            (* 6. Let Coq's math automation strip the "+ 1" from both sides! *)
             lia. 
-         }
-    rewrite Hlen.
-    unfold bv_or.
-    rewrite Hn_s. rewrite signed_max_size. rewrite N.eqb_refl.
-    unfold signed_max, smax_big_endian.
-    (* 1. Destruct n to evaluate and clear the match *)
-    destruct (N.to_nat n) as [| t'] eqn:Hnat.
-    { 
-      (* 1. Destruct 's' to see if it's empty or has elements *)
-      destruct s as [| b s'].
-      {
-        (* Case 1: s is nil (empty) *)
-        (* If s is empty, Hs_sign becomes 'last nil false = true', which evaluates to 'false = true'. *)
-        simpl in Hs_sign.
-        discriminate.
-      }
-      {
-        (* Case 2: s is b :: s' (has at least one bit) *)
-        (* If s has elements, its size cannot be 0. We expose this contradiction using Hn_s and Hnat. *)
-        
-        (* Replace n with 0 in our size hypothesis *)
-        assert (Hn_zero : n = 0%N) by lia. (* or apply N2Nat.id/similar if lia fails *)
-        rewrite Hn_zero in Hn_s.
-        
-        (* Hn_s now says: size (b :: s') = 0%N *)
-        (* Since size of a non-empty list is > 0, this is false! *)
-        (* 'discriminate' or 'inversion' will usually clear this up once size is computed: *)
-        simpl in Hn_s.
-        discriminate || lia.
-      }
-    }
-
-    (* 2. Strip the 'bits' wrapper so Coq sees the lists *)
-    unfold bits. 
-
-    (* 3. Simplify the 'rev' on the right side of the map2 *)
-    simpl rev. 
-    
-    (* This turns rev (false :: mk_list_true t') into: rev (mk_list_true t') ++ [false] *)
-    
-    rewrite rev_mk_list_true. 
-    (* The right side is now cleanly: mk_list_true t' ++ [false] *)
-
-    (* 4. Split 's' to perfectly match the append we just exposed on the right *)
-    (* NOTE: Make sure you have 'Hs_not_nil : s <> nil' in context! *)
-    rewrite (app_removelast_last false Hs_not_nil) at 1.
-
-    (* 5. Push map2 through both appends! *)
-    rewrite map2_or_app.
-    
-    2: { 
-      (* 1. Evaluate the length of the right side (mk_list_true t') *)
-      assert (Hlen_true : length (mk_list_true t') = t').
-      {
-        apply length_mk_list_true. 
-      }
-      rewrite Hlen_true.
-
-      (* Your goal is now: length (removelast s) = t' *)
-
-      (* 2. Use your trusty split trick to relate removelast to the full list *)
-      assert (Hsplit_s : s = removelast s ++ last s false :: nil).
-      { 
-        apply app_removelast_last. exact Hs_not_nil. 
-      }
-      
-      assert (Hlen_s_split : length s = length (removelast s) + 1).
-      {
-        rewrite Hsplit_s at 1.
-        rewrite length_app.
-        simpl. lia. (* or reflexivity/omega depending on your setup *)
-      }
-
-      (* 3. Connect the length of 's' to t' using your size hypotheses *)
-      assert (Hlen_s_nat : length s = S t').
-      {
-        (* Use your newly found lemma! (If 'length s' fails, change it to 'length (bits s)') *)
-        rewrite <- Hnat.
-        rewrite <- Hn_s.
-        
-        (* This lemma links N.to_nat (size s) to length s *)
-        rewrite <- bits_size. 
-        
-        (* If 'bits' is just a transparent wrapper for the list, we can drop it *)
-        unfold bits. 
-        reflexivity.
-      }
-
-      (* 4. Let the arithmetic solver crush the rest! *)
-      (* You now have:
-         Hlen_s_split : length s = length (removelast s) + 1
-         Hlen_s_nat   : length s = S t' 
-      *)
-      lia.
-    }
-    2: { 
-      (* Subgoal 2: length [last s false] = length [false] *)
-      reflexivity. 
-    }
-
-    rewrite removelast_app.
-    (* ========================================== *)
-    (* TACKLING GOAL 1: The Main Equation         *)
-    (* ========================================== *)
-
-    (* 1. Simplify the map2 and removelast on the 1-element lists *)
-    (* This will evaluate the right side of the append to 'nil' *)
-    simpl map2.
-    simpl removelast.
-
-    (* 2. Clear out the '++ nil' *)
-    (* Your list is now (BIG_LIST ++ nil). We use the standard library 
-       lemma to remove the empty append. *)
-    rewrite app_nil_r.
-
-    (* You are now looking at exactly: 
-       rev (map2 orb (removelast s) (mk_list_true t')) = mk_list_true (length (removelast s)) *)
-
-    (* 3. Align t' with the length of removelast s so map2_or_1_true fits perfectly *)
-    assert (H_len_eq : t' = length (removelast s)).
-    {
-      (* 1. Connect the full length of 's' to S t' using your golden lemma *)
-      assert (Hlen_s_nat : length s = S t').
-      {
-        (* Work backwards from S t' -> N.to_nat n -> N.to_nat (size s) -> length (bits s) *)
-        rewrite <- Hnat.
-        rewrite <- Hn_s.
-        rewrite <- bits_size.
-        
-        (* If 'bits s' is exactly 's' under the hood, this closes the assert *)
-        reflexivity. 
-        (* Note: If reflexivity fails here, just add 'unfold bits.' before it! *)
-      }
-
-      (* 2. Break 's' apart to expose the length of removelast *)
-      assert (H_s_split : s = removelast s ++ last s false :: nil).
-      { 
-        apply app_removelast_last. 
-        exact Hs_not_nil. 
-      }
-
-      (* 3. Turn the list append into basic integer math *)
-      assert (Hlen_s : length s = length (removelast s) + 1).
-      {
-        rewrite H_s_split at 1.
-        rewrite length_app.
-        simpl. lia.
-      }
-
-      (* 4. Let Coq's math solver do the rest!
-         Context now has:
-         Hlen_s_nat: length s = S t'
-         Hlen_s:     length s = length (removelast s) + 1
-         Goal:       t' = length (removelast s) 
-      *)
-      lia.
-    }
-    
-    (* Replace t' with the exact length expression the lemma expects *)
-    rewrite H_len_eq.
-
-    (* 4. THE GOLDEN FINISH *)
-    rewrite map2_or_1_true.
-    rewrite rev_mk_list_true.
-    reflexivity.
-
-    (* ========================================== *)
-    (* TACKLING GOAL 2: The Non-Nil Safety Check  *)
-    (* ========================================== *)
-    
-    (* Coq asks: is [bit] <> nil? *)
-    (* simpl will evaluate map2, leaving a list structured as (bit :: nil). 
-       discriminate knows that a list with an element (cons) can never equal nil. *)
-    simpl. 
-    discriminate.
-
-    }
-
-
-        (* 2. Swap the messy right side for the clean mk_list_true *)
+          }
+          rewrite Hlen.
+          unfold bv_or.
+          rewrite Hn_s. rewrite signed_max_size. rewrite N.eqb_refl.
+          unfold signed_max, smax_big_endian.
+          destruct (N.to_nat n) as [| t'] eqn:Hnat.
+          { 
+            destruct s as [| b s'].
+            {
+              simpl in Hs_sign.
+              discriminate.
+            }
+            {
+              assert (Hn_zero : n = 0%N) by lia.
+              rewrite Hn_zero in Hn_s.
+              simpl in Hn_s.
+              discriminate || lia.
+            }
+          }
+          unfold bits. 
+          simpl rev. 
+          rewrite rev_mk_list_true. 
+          rewrite (app_removelast_last false Hs_not_nil) at 1.
+          rewrite map2_or_app.
+          2: { 
+            assert (Hlen_true : length (mk_list_true t') = t').
+            { apply length_mk_list_true. }
+            rewrite Hlen_true.
+            assert (Hsplit_s : s = removelast s ++ last s false :: nil).
+            { 
+              apply app_removelast_last. exact Hs_not_nil. 
+            }
+            
+            assert (Hlen_s_split : length s = length (removelast s) + 1).
+            {
+              rewrite Hsplit_s at 1.
+              rewrite length_app.
+              simpl. lia.
+            }
+            assert (Hlen_s_nat : length s = S t').
+            {
+              rewrite <- Hnat.
+              rewrite <- Hn_s.
+              rewrite <- bits_size. 
+              unfold bits. 
+              reflexivity.
+            }
+            lia.
+          }
+          2: { 
+            reflexivity. 
+          }
+          rewrite removelast_app.
+          simpl map2.
+          simpl removelast.
+          rewrite app_nil_r.
+          assert (H_len_eq : t' = length (removelast s)).
+          {
+            assert (Hlen_s_nat : length s = S t').
+            {
+              rewrite <- Hnat.
+              rewrite <- Hn_s.
+              rewrite <- bits_size.
+              reflexivity. 
+            }
+            assert (H_s_split : s = removelast s ++ last s false :: nil).
+            { 
+              apply app_removelast_last. 
+              exact Hs_not_nil. 
+            }
+            assert (Hlen_s : length s = length (removelast s) + 1).
+            {
+              rewrite H_s_split at 1.
+              rewrite length_app.
+              simpl. lia.
+            }
+            lia.
+          }
+          rewrite H_len_eq.
+          rewrite map2_or_1_true.
+          rewrite rev_mk_list_true.
+          reflexivity.
+          simpl. 
+          discriminate.
+        }
         rewrite H_all_true.
-
-        (* 3. Apply your golden lemma! *)
         apply ule_list_big_endian_1.
-    
-          (* 5. Evaluate the sign bits to 'true' *)
-          (* You will need a lemma or simpl to show that:
-             last (bv_or x s) false = true
-             last (bv_or s (signed_max n)) false = true *)
-             
-          (* 6. Once both sign bits are true, Coq will reduce the goal to:
-             ule_list_big_endian (rev (removelast (bv_or x s))) (rev (removelast (bv_or s ...))) *)
       }
       apply (bv_slt_sle_trans H_slt H_upper_bound).
-      
-    + (* Case 2: s is Positive (last bit is false) *)
-      assert (H_pos_or_smax: bv_or s (signed_max n) = (signed_max n)). {
+    + assert (H_pos_or_smax: bv_or s (signed_max n) = (signed_max n)). {
         destruct (N.to_nat n) as [| t'] eqn:Hn_nat.
         - unfold signed_max. rewrite Hn_nat. simpl. apply bv_or_empty_empty1.
-        - (* 2. Decompose `s` into its prefix and its sign bit *)
-          assert (Hs_not_nil: s <> nil). 
+        - assert (Hs_not_nil: s <> nil). 
           {
             intro Hs_nil.
             rewrite Hs_nil in Hn_s. 
@@ -1080,159 +652,68 @@ Proof.
           }
           unfold bv_or.
           rewrite Hn_s, signed_max_size. rewrite N.eqb_refl.
-          (* Use your lemma to rewrite `s` as `(removelast s) ++ [last s false]` *)
           rewrite (app_removelast_last false Hs_not_nil) at 1.
-          
-          (* Since s is positive, substitute `last s false` with `false` *)
           rewrite Hs_sign.
-          
-          (* 1. Unfold signed_max to expose its list structure *)
           unfold signed_max.
-          
-          (* Depending on your library, you might also need to unfold the inner helper: *)
           unfold smax_big_endian. 
-          
-          (* Rewrite your nat hypothesis to resolve the inner match statement *)
           rewrite Hn_nat.
-          
-          (* In Coq, rev (false :: mk_list_true t') evaluates to (rev mk_list_true) ++ [false] *)
           simpl rev. 
-          
-          (* Use your rev_mk_list_true lemma to clean up the prefix *)
           rewrite rev_mk_list_true.
           unfold bits.
-
           assert (Hlen : length s = S t').
           {
-            (* size s is N.of_nat (length s) *)
             unfold size in Hn_s.
-            (* Substitute n into Hn_nat so it becomes N.to_nat (N.of_nat (length s)) = S t' *)
             rewrite <- Hn_s in Hn_nat.
-            (* Nat2N.id simplifies N.to_nat (N.of_nat x) to just x *)
             rewrite Nat2N.id in Hn_nat. 
             exact Hn_nat.
           }
-          (* NOW your goal perfectly matches the lemma! *)
           rewrite map2_or_app.
-          
-          
-          (* Now you can solve the two halves just like we planned: *)
-          + (* Main Goal: map2 orb (removelast s) (mk_list_true t') ++ map2 orb [false] [false] = ... *)
-            (* Evaluate the right side (the sign bit) *)
-            simpl (map2 orb (false :: nil) (false :: nil)).
+          + simpl (map2 orb (false :: nil) (false :: nil)).
             replace t' with (length (removelast s)).
-              * 
-                rewrite map2_or_1_true.
-                reflexivity.
-              *
-                (* 2. Use your new lemma to rewrite removelast into firstn *)
-                rewrite removelast_firstn_len.
-                (* 3. Use the standard library lemma for the length of firstn *)
-                rewrite length_firstn.
-                (* 4. Substitute our length knowledge *)
-                rewrite Hlen.
-                (* 5. simpl will reduce `pred (S t')` to just `t'` *)
-                simpl.
-                (* The goal is now `min t' (S t') = t'`. 
-                   Since t' <= S t', the minimum is just t'. *)
-                apply Nat.min_l.
-                (* Prove t' <= S t' for the min_l lemma *)
-                lia. 
+            * rewrite map2_or_1_true.
+              reflexivity.
+            * rewrite removelast_firstn_len.
+              rewrite length_firstn.
+              rewrite Hlen.
+              simpl.
+              apply Nat.min_l.
+              lia. 
           + rewrite length_mk_list_true. 
-            (* 2. Use your new lemma to rewrite removelast into firstn *)
             rewrite removelast_firstn_len.
-            (* 3. Use the standard library lemma for the length of firstn *)
             rewrite length_firstn.
-            (* 4. Substitute our length knowledge *)
             rewrite Hlen.
-            (* 5. simpl will reduce `pred (S t')` to just `t'` *)
             simpl.
-            (* The goal is now `min t' (S t') = t'`. 
-               Since t' <= S t', the minimum is just t'. *)
             apply Nat.min_l.
-            (* Prove t' <= S t' for the min_l lemma *)
             lia. 
           + easy.
       }
       assert (H_upper_bound: bv_sle (bv_or x s) (bv_or s (signed_max n)) = true).
       {
-        (* 1. First, rewrite using the lemma we just proved *)
         rewrite H_pos_or_smax.
-        
-        (* 2. Unfold the comparison to expose the underlying lists *)
-        
         unfold bv_sle.
         rewrite (bv_or_size Hx_size Hn_s), signed_max_size. rewrite N.eqb_refl.
-        
-        (* 3. Re-destruct N.to_nat n to clear the match statements! *)
         destruct (N.to_nat n) as [| t'] eqn:Hn_nat.
-        - (* Case 1: n = 0 *)
-          (* If n = 0, the bitvectors are empty. 
-             The match will simplify to 'nil'. 
-             You can likely solve this with reflexivity or admit for now. *)
-          
-          unfold signed_max. rewrite Hn_nat. simpl. Search sle_list.
+        - unfold signed_max. rewrite Hn_nat. simpl.
           destruct x as [| bx xtail].
-          + (* Case: x is nil. Now destruct s. *)
-            destruct s as [| bs stail].
-            * (* Case: s is nil. 
-                 Now everything is nil! The goal is sle_list (bv_or nil nil) nil = true.
-                 This computes automatically. *)
-              reflexivity.
-              
-            * (* Contradiction Case: s has elements but its size is 0 *)
-              (* 1. Unfold the size of the empty list 'x' *)
-              unfold size in Hx_size.
+          + destruct s as [| bs stail].
+            * reflexivity.
+            * unfold size in Hx_size.
               simpl in Hx_size. 
-              (* Hx_size now says: 0%N = n *)
-
-              (* 2. Substitute n with 0%N in your Hn_s hypothesis *)
               rewrite <- Hx_size in Hn_s. 
-              (* Hn_s now says: size (bs :: stail) = 0%N *)
-
-              (* 3. Unfold the size of the non-empty list 's' *)
               unfold size in Hn_s.
-              simpl in Hn_s.
-              (* Hn_s now evaluates to something like: N.pos ... = 0%N *)
-
-              (* 4. A positive number can never equal 0. discriminate solves this! *)
               discriminate Hn_s.
-              
-          + (* 1. Unfold the size function for our non-empty list 'x' *)
-            unfold size in Hx_size.
-            
-            (* 2. Substitute that size definition into our n = 0 hypothesis *)
+          + unfold size in Hx_size.
             rewrite <- Hx_size in Hn_nat.
-            
-            (* 3. Simplify Hn_nat. 
-               N.to_nat (N.of_nat (length (bx :: xtail))) will reduce to S (length xtail) = 0 *)
             simpl in Hn_nat.
-            
             lia.
-          
-        - (* Case 2: n = S t' (Now we have t' back!) *)
-          (* Unfold signed_max wrappers since the match is resolved *)
-          unfold signed_max, smax_big_endian.
-          (* 1. Substitute N.to_nat n with S t' so the match can evaluate *)
+        - unfold signed_max, smax_big_endian.
           rewrite Hn_nat.
-          
-          (* Now your goal looks like: rev (false :: mk_list_true t') *)
-          
-          (* 2. NOW simpl will push the rev inside! *)
           simpl rev. 
           rewrite rev_mk_list_true.
-          
-          (* 5. Now we have our raw sle_list goal! *)
-          (* Let's call the list 'y' to make it easier to work with. *)
           remember (bv_or x s) as y.
-          
-          (* Since y has size S t', it's not empty. Split it using app_removelast_last. *)
           assert (Hy_not_nil: y <> nil). 
           {
-            (* Assume y is nil to derive a contradiction *)
             intro Hy_nil.
-            
-            (* 1. Prove size y = n using your lemma *)
             assert (Hy_size: size y = n).
             {
               rewrite Heqy.
@@ -1240,93 +721,38 @@ Proof.
               - exact Hx_size.
               - exact Hn_s.
             }
-            
-            (* 2. Substitute y = nil into our new size hypothesis *)
             rewrite Hy_nil in Hy_size.
-            
-            (* 3. size nil evaluates to 0%N, so Hy_size becomes 0%N = n *)
             unfold size in Hy_size. 
             simpl in Hy_size. 
-            
-            (* 4. Substitute 0%N for n in your Hn_nat hypothesis *)
             rewrite <- Hy_size in Hn_nat.
-            
-            (* 5. Hn_nat is now N.to_nat 0 = S t', which simplifies to 0 = S t' *)
             simpl in Hn_nat.
-            
-            (* A successor can never be 0! *)
             discriminate Hn_nat.
           }
-          
-          (* Notice 'at 1' so we only rewrite the first 'y', not both! *)
           rewrite (app_removelast_last false Hy_not_nil) at 1.
           unfold sle_list.
-          (* 1. Use the standard library lemma 'rev_unit' to evaluate the reverse.
-          rev (L ++ [b]) becomes b :: rev L. We do this for both sides! *)
           rewrite rev_unit.
           rewrite rev_unit.
-          
-          (* Your goal now perfectly exposes the sign bits at the front:
-             sle_list_big_endian (last y false :: rev (removelast y)) (false :: rev (mk_list_true t')) = true *)
-             
-          (* 2. Destruct the sign bit of y so Coq can evaluate both possibilities *)
           destruct (last y false) eqn:Hy_sign.
-          
-          + (* Case 1: y's sign bit is 'true' (y is negative) *)
-            (* Coq sees: sle_list_big_endian (true :: ...) (false :: ...)
-               Because true (negative) is always less than false (positive) in 
-               two's complement, this evaluates directly to true! *)
-            reflexivity. 
-            
-          + (* Case 2: y's sign bit is 'false' (y is positive) *)
-            (* Coq sees: sle_list_big_endian (false :: ...) (false :: ...)
-               It will strip the identical sign bits and leave you with an 
-               unsigned less-than-or-equal comparison. *)
-            simpl.
+          + reflexivity. 
+          + simpl.
             rewrite orb_false_r.
-            (* 1. Clean up the rev on mk_list_true, as you've done before! *)
             rewrite rev_mk_list_true.
-            
-            (* 2. We want to use ule_list_big_endian_1, which expects mk_list_true 
-               to have the exact length of the left-hand list. 
-               Let's replace t' with that exact length! *)
             replace t' with (length (rev (removelast y))).
-            
-            * (* Case 1: The main goal. It now perfectly matches your lemma! *)
-              apply ule_list_big_endian_1.
-              
-            * (* Case 2: Prove that our length replacement is mathematically true *)
-              rewrite length_rev.
-              
-              (* Step A: Get 'length y = S t'' *)
+            * apply ule_list_big_endian_1.
+            * rewrite length_rev.
               assert (Hy_size: size y = n). 
               { rewrite Heqy. apply bv_or_size; assumption. }
               unfold size in Hy_size.
               rewrite <- Hy_size in Hn_nat.
-              simpl in Hn_nat. (* Hn_nat becomes: length y = S t' *)
-              
-              (* Step B: Relate 'length y' to 'length (removelast y)' using our split *)
+              simpl in Hn_nat.
               pose proof (app_removelast_last false Hy_not_nil) as H_split.
-              
-              (* Apply the length function to both sides of the split equation *)
               apply (f_equal size) in H_split.
-              (* 1. Simplify Hn_nat to get: length y = S t' *)
               rewrite Nnat.Nat2N.id in Hn_nat.
-
-              (* 2. Use your lemma to replace 'removelast y' with 'firstn' *)
               rewrite removelast_firstn_len.
-
-              (* 3. Use the standard lemma 'firstn_length' *)
               rewrite length_firstn.
-
-              (* 4. Now the goal is: min (Init.Nat.pred (length y)) (length y) = t' *)
-              (* Since Hn_nat says length y = S t', pred (length y) is exactly t' *)
               rewrite Hn_nat.
-              simpl. (* pred (S t') becomes t' *)
-
-              (* 5. min t' (S t') is obviously t' *)
+              simpl.
               rewrite Nat.min_l by lia.
-              
               reflexivity.
       }
       apply (bv_slt_sle_trans H_slt H_upper_bound).
@@ -1340,6 +766,7 @@ Proof.
       * apply signed_max_size.
       * exact Hn_s.
 Qed.
+(* Ha proof 2 - end *)
 
 (*------------------------------------------------------------*)
 
