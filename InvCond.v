@@ -5,98 +5,11 @@ Import RAWBITVECTOR_LIST.
 
 Require Import List Bool NArith Psatz (*Int63*) ZArith Nnat.
 
-(* Remaining Proofs - CSC490 *)
 
-
-(* t <s (maxs >> s) << s <=> (exists x, t <s x << s) *)
-Theorem bvshl_sgt :
-  forall (n : N) (s t : bitvector),
-    size s = n ->
-    size t = n ->
-    iff
-      (bv_slt t (bv_shl (bv_shr (signed_max n) s) s) = true)
-      (exists x, size x = n /\ bv_slt t (bv_shl x s) = true).
-Proof.
-Admitted.
-
-(* (mins >> s) << s <=s t <=> (exists x, (x << s) <=s t) *)
-Theorem bvshl_sle : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_sle (bv_shl (bv_shr (signed_min n) s) s) t = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_sle (bv_shl x s) t = true)).
-Proof.
-Admitted.
-
-
-(* t <=s (maxs >> s) << s <=> (exists x, t <=s (x << s)) *)
-Theorem bvshl_sge : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_sle t (bv_shl (bv_shr (signed_max n) s) s) = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_sle t (bv_shl x s) = true)).
-Proof.
-Admitted.
-
-(* mins << s <=s t + mins <=> (exists x, (s << x) <=s t) *)
-Theorem bvshl_sle2 : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_sle (bv_shl (signed_min n) s) (bv_add t (signed_min n)) = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_sle (bv_shl s x) t = true)).
-Proof.
-Admitted.
-
-(* t <=s (~0 >> s) <=> (exists x, t <=s (x >> s)) *)
-Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_sle t (bv_shr (bv_not (zeros (size s))) s) = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_sle t (bv_shr x s) = true)).
-Proof.
-Admitted.
-
-(* (t <s s \/ t <s ~0) <=> (exists x, t <s (s >>_a x)) *)
-Theorem bvashr_sgt2 : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    ((bv_slt t s = true) \/ (bv_slt t (bv_not (zeros (size t))) = true))
-    (exists (x : bitvector), (size x = n) /\ (bv_slt t (bv_ashr s x) = true)).
-Proof.
-Admitted.
-
-(* (s <=s t \/ 0 <=s t \/ ~0 <=s t) <=> (exists x, (s >>_a x) <=s t) *)
-Theorem bvashr_sle2 : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    ((bv_sle s t = true) \/
-     (bv_sle (zeros (size t)) t = true) \/
-     (bv_sle (bv_not (zeros (size t))) t = true))
-    (exists (x : bitvector), (size x = n) /\ (bv_sle (bv_ashr s x) t = true)).
-Proof.
-Admitted.
-
-(* ~(-t) & (-s | s) <s t <=> (exists x, x * s <s t) *)
-Theorem bvmult_slt : forall (n : N) (s t : bitvector),
-  size s = n -> size t = n ->
-  iff
-    (exists x, size x = n /\ bv_slt (bv_mult x s) t = true)
-    (bv_slt (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) t = true).
-Proof.
-Admitted.
-    
-(* t <s t - ((s | t) | -s) <=> (exists x, x * s >s t) *)
-Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
-  size s = n -> size t = n ->
-  iff
-    (exists x, size x = n /\ bv_slt t (bv_mult x s) = true)
-    (bv_slt t (bv_subt t (bv_or (bv_or s t) (bv_neg s))) = true).
-Proof.
-Admitted.
-
-(* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
-Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
-Proof.
-Admitted.
 
 (*------------------------------Neg------------------------------*)
+
+
 (* -x = t <=> True *)
 
 Theorem bvneg_eq : forall (n : N), forall (t : bitvector),
@@ -111,10 +24,13 @@ Proof.
   + easy.
 Qed.
 
+
 (*------------------------------------------------------------*)
 
 
 (*------------------------------Not------------------------------*)
+
+
 (* ~x = t <=> True *)
 Theorem bvnot_eq : forall (n : N), forall (t : bitvector),
  (size t) = n -> iff
@@ -128,10 +44,13 @@ Proof.
   + easy.
 Qed.
 
+
 (*------------------------------------------------------------*)
 
 
 (*------------------------------And------------------------------*)
+
+
 (* t & s = t <=> (exists x, x & s = t) *)
 Theorem bvand_eq : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -325,6 +244,16 @@ Proof.
 Qed.
 
 
+(* (s & t = t) v (t <s (t - s) & s) <=> (exists x, x & s >=s t) *)
+Theorem bvand_sge : forall (n : N), forall (s t : bitvector),
+    (size s) = n -> (size t) = n -> iff
+      ((bv_and s t) = t \/ (bv_slt t (bv_and (bv_subt t s) s) = true))
+      (exists (x : bitvector), (size x = n) /\
+          ((bv_sge (bv_and x s) t) = true)).
+Proof.
+Admitted.
+
+
 (*------------------------------------------------------------*)
 
 
@@ -342,6 +271,15 @@ Proof. intros n s t Hs Ht.
        - destruct A as (x, (Hx, A)). rewrite <- A.
          now rewrite (@bv_or_idem2 x s n Hx Hs).
 Qed.
+
+
+(* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
+Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
+Proof.
+Admitted.
 
 
 (* t <s s | smax <=> (exists x, x | s >s t) *)
@@ -417,6 +355,8 @@ Qed.
 
 
 (*--------------------Logical left shift 1--------------------*)
+
+
 (* (t >> s) << s = t <=> (exists x, x << s = t) *)
 Theorem bvshl_eq : forall (n : N), forall (s t : bitvector),
    (size s) = n -> (size t) = n -> iff
@@ -511,6 +451,7 @@ Proof.
            apply contr.
 Qed. 
 
+
 (* (exists x, x << s != t) => t != 0 or s <u size(s) *)
 Theorem bvshl_neq_rtl: forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n ->
@@ -537,6 +478,7 @@ Proof.
       rewrite N2Nat.id. now rewrite N.eqb_refl.
 Qed.
 
+
 Theorem bvshl_neq: forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff
     (bv_eq t (zeros (size t)) = false \/ 
@@ -547,6 +489,7 @@ Proof.
   + now apply bvshl_neq_ltr.
   + now apply bvshl_neq_rtl.
 Qed.
+
 
 (* (t <u (~0 << s)) <=> (exists x, x << s >u t) *)
 Theorem bvshl_ugt : forall (n : N), forall (s t : bitvector),
@@ -573,6 +516,7 @@ Proof.
     apply H0.
 Qed.
 
+
 (* ~0 << s >=u t <=> x << s >= t *)
 Theorem bvshl_uge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -588,6 +532,7 @@ Proof.
     pose proof (@bv_ule_list_trans t (bv_shl_a x s) (bv_shl_a (bv_not (zeros (size s))) s) H H0).
     apply bv_ule_bv_uge in H1. apply H1.
 Qed.
+
 
 (* (mins >> s) << s <s t <=> (exists x, x << s <s t) *)
 Theorem bvshl_slt : forall (n : N), forall (s t : bitvector),
@@ -625,10 +570,22 @@ Proof.
     now apply (@bv_sle_slt_trans (bv_shl (bv_shr (signed_min n) s) s) (bv_shl x s) t).
 Qed.
 
+
+(* t >> (t >> s) <u min_s <=> (exists x, x << s <=s t) *)
+Theorem bvshl_sle : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_ult (bv_shr t (bv_shr t s)) (signed_min n) = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_shl x s) t) = true)).
+Proof.
+Admitted.
+
+
 (*------------------------------------------------------------*)
 
 
 (*--------------------Logical left shift 2--------------------*)
+
+
 (* (exists i, s << i = t) <=> (exists x, s << x = t) *)
 Theorem bvshl_eq2 : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff
@@ -649,18 +606,22 @@ Proof. split; intros.
          rewrite H, <- H1, Nat2N.id. now rewrite N2List_list2N.
 Qed.
 
-(* mins << s <s t + mins <=> (exists x, s << x <s t) *)
+
+(* min_s << s <u t + min_s <=> (exists x, s << x <s t) *)
 Theorem bvshl_slt2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-    (bv_slt (bv_shl (signed_min n) s) (bv_add t (signed_min n)) = true)
+    (bv_ult (bv_shl (signed_min n) s) (bv_add t (signed_min n)) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_shl s x) t) = true)).
 Proof.
 Admitted.
+
 
 (*------------------------------------------------------------*)
 
 
 (*--------------------Logical right shift 1--------------------*)
+
+
 (* (t << s) >> s = t <=> (exists x, x >> s = t) *)
 Theorem bvshr_eq : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -705,6 +666,7 @@ Proof. intros.
        rewrite bv_not_size with (n:= n). easy.
        easy. easy.
 Qed.
+
 
 (* (exists x, (x >> s) >u t) => (t <u (~s >> s)) *)
 Theorem bvshr_ugt_rtl : forall (n : N), forall (s t : bitvector), 
@@ -762,10 +724,13 @@ Proof.
     apply H.
 Qed.
 
+
 (*------------------------------------------------------------*)
 
 
 (*--------------------Logical right shift 2--------------------*)
+
+
 (* (exists x, s >> x = t) <=> (exists i, s >> i = t) *)
 Theorem bvshr_eq2 : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -799,10 +764,22 @@ Proof. split; intros.
          now rewrite Nat2N.id, N2List_list2N.
 Qed.
 
+
+(* t >> s <u mins <=> (exists x, s << x <=s t) *)
+Theorem bvshl_sle2 : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_ult (bv_shr t s) (signed_min n) = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_shl s x) t) = true)).
+Proof.
+Admitted.
+
+
 (*------------------------------------------------------------*)
 
 
 (*--------------------Arithmetic right shift 1--------------------*)
+
+
 (* (s <u size(s) => (t << s) >>a s = t) 
     and 
     (s >=u size(s) => (t = ~0 or t = 0)) 
@@ -941,6 +918,7 @@ Proof.
        now rewrite N.eqb_refl. 
 Qed.
 
+
 (* mins >>a s <s t <=> (exists x, x >>a s <s t) *)
 Theorem bvashr_slt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -1003,6 +981,8 @@ Qed.
 
 
 (*--------------------Arithmetic right shift 2--------------------*)
+
+
 (* (exists i, s >>a i = t) <=> (exists x, s >>a x = t) *)
 Theorem bvashr_eq2 : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff
@@ -1343,6 +1323,7 @@ Proof. intros. split.
              (@BV.BVList.RAWBITVECTOR_LIST.bitvector, 
               @BV.BVList.RAWBITVECTOR_LIST.size).
 Qed.
+
 
 Theorem bvashr_ult2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -1745,6 +1726,7 @@ Proof. intros.
         - now rewrite H, H0, N.eqb_refl. 
 Qed.
 
+
 Theorem bvashr_ugt2: forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     ((bv_slt s (bv_shr_a s (bv_not t)) = true) \/ (bv_ult t s = true))
@@ -1753,6 +1735,7 @@ Proof. split.
        + now apply bvashr_ugt2_ltr.
        + now apply bvashr_ugt2_rtl.
 Qed.
+
 
 (* (s <u min(s) \/ t >= s) <=> s >>a x <= t *)
 Theorem bvashr_ule2 : forall (n : N), forall (s t : bitvector),
@@ -1809,6 +1792,7 @@ Proof.
       apply (@bv_uge_list_trans t (bv_ashr_a s x) s H H1).
 Qed.
 
+
 (* s >=u ~s \/ s >= t <=> s >>a x >= t *)  
 Theorem bvashr_uge2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -1841,6 +1825,7 @@ Proof.
       * assert (b :: s <> nil) by easy.
         apply (@sign_neg_implies_uge_bvnot_refl (b :: s) H1 H0).
 Qed.
+
 
 (* s <s t \/ 0 <s t <=> (exists x, s >>a x <s t) *)
 Theorem bvashr_slt2 : forall (n : N), forall (s t : bitvector),
@@ -1908,10 +1893,32 @@ Proof.
       * apply A.
 Qed.
 
+
+(* t <s s & max_s /\ t <s s | max_s <=> (exists x, s >>a x >s t) *)
+Theorem bvashr_sgt2 : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_slt t (bv_and s (signed_max n)) = true /\
+     bv_slt t (bv_or s (signed_max n)) = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_ashr x s)) = true)).
+Proof.
+Admitted.
+
+
+(* t >=s 0 \/ t >=s s <=> (exists x, s >>a x <=s t) *)
+Theorem bvashr_sle2 : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_sge t (zeros n) = true \/ bv_sge t s = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_ashr s x) t) = true)).
+Proof.
+Admitted.
+
+
 (*------------------------------------------------------------*)
 
 
 (*--------------------------Addition--------------------------*)
+
+
 (* T <=> (exists x, x + s = t) *)
 Theorem bvadd : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -1936,9 +1943,14 @@ Proof. intros n s t (Hs, Ht).
   split; [exact (bv_subt'_size Ht Hs) | exact (bv_add_subst_opp Ht Hs)].
 Qed.
 
+
 (*------------------------------------------------------------*)
 
+
+
 (*-----------------------Multiplication-----------------------*)
+
+
 (* (-s | s) & t = t <=> (exists x, x * s = t) *)
 Theorem bvmult_eq : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -2004,6 +2016,7 @@ Proof.
       * now apply bv2int_exists_bv_mult_eq.
 Qed.
 
+
 (* s != 0 \/ t != 0 <=> (exists x, x * s != t) *)
 Theorem bvmult_neq : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -2046,6 +2059,7 @@ Proof.
         ++ apply Hs.
     - now right.
 Qed.
+
 
 (* t <u (-s | s) <=> (exists x, x * s >u t) *)
 Theorem bvmult_ugt : forall (n : N), forall (s t : bitvector),
@@ -2093,6 +2107,7 @@ Proof.
       * easy.
 Qed.
 
+
 (* (-s | s) >=u t <=> (exists x, x * s >=u t) *)
 Theorem bvmult_uge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -2138,5 +2153,6 @@ Proof.
       * easy.
     - apply A.
 Qed.
+
 
 (*------------------------------------------------------------*)
