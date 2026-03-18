@@ -52,14 +52,6 @@ Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
 Proof.
 Admitted.
 
-(* (mins >>_a s) <=s t <=> (exists x, (x >>_a s) <=s t) *)
-Theorem bvashr_sle : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_sle (bv_ashr (signed_min n) s) t = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_sle (bv_ashr x s) t = true)).
-Proof.
-Admitted.
-
 (* (t <s s \/ t <s ~0) <=> (exists x, t <s (s >>_a x)) *)
 Theorem bvashr_sgt2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
@@ -96,110 +88,12 @@ Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
 Proof.
 Admitted.
 
-(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
-Theorem bvand_slt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
-Proof.
-Admitted.
-
 (* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
 Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
 Proof.
-Admitted.
-
-(* Arjun -- Added for CSC490W26 *)
-Theorem bvand_sgt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-  (bv_slt t (bv_and s (signed_max n)) = true)
-  (exists (x : bitvector), (size x  = n) /\ ((bv_sgt (bv_and x s) t) = true)).
-Proof.
-  intros n s t Hs Ht. split.
-  + intros. exists (signed_max n). split.
-    - apply signed_max_size.
-    - rewrite (@bv_and_comm n (signed_max n) s).
-      apply bv_slt_bv_sgt in H. apply H. apply signed_max_size. apply Hs.
-  + intros (x, (Hx, H)).
-    apply bv_sgt_bv_slt in H. rewrite (@bv_and_comm n x s) in H.
-    apply (@bv_slt_sle_trans t (bv_and s x) (bv_and s (signed_max n))).
-    apply H. apply (@bv_and_sle_maxs n s x Hs Hx).
-    apply Hx. apply Hs.
-Qed.
-
-(*Theorem bvor_sge : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-  (bv_sge s (bv_and s t) = true)
-  (exists (x : bitvector), (size x  = n) /\ ((bv_ule (bv_or x s) t) = true)).
-Proof.
-  intros n s t Hs Ht. split.
-  + intros. *)
-(* End Arjun -- Added for CSC490W26 *)
-
-(* THIS STATEMENT IS WRONG *)
-(* t <s (~0 >> s) <=> (exists x, t <s (x >> s)) *)
-Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_slt t (bv_shr (bv_not (zeros (size s))) s) = true)
-    (exists (x : bitvector), (size x = n) /\ (bv_slt t (bv_shr x s) = true)).
-Proof.
-  intros n s t Hs Ht. 
-  assert (Hbvn0 : size (bv_not (zeros (size s))) = n).
-  { apply bv_not_size. rewrite Hs. apply zeros_size. }
- split.
-  + intros. exists (bv_not (zeros (size s))). split.
-    - apply Hbvn0.
-    - apply H.
-  + intros. destruct H as (x, (Hx, H)). rewrite bv_shr_eq in *.
-    unfold bv_slt in *. rewrite Ht in *. 
-    unfold slt_list in *. rewrite <- (@bv_shr_a_size n x s Hx Hs) in H.
-    rewrite <- (@bv_shr_a_size n (bv_not (zeros (size s))) s Hbvn0 Hs).
-    rewrite N.eqb_refl in *.
-    unfold bv_shr_a in *. rewrite Hs, Hx in *. rewrite Hbvn0.
-    rewrite N.eqb_refl in *. unfold shr_n_bits_a in *.
-    pose proof Hx as Hx2.
-    pose proof Hbvn0 as Hnots. pose proof Hs as Hs2.
-    unfold size in Hx2, Hnots, Hs2. apply N2Nat.inj_iff in Hx2. 
-    apply N2Nat.inj_iff in Hnots. apply N2Nat.inj_iff in Hs2.
-    rewrite Nat2N.id in Hx2, Hnots, Hs2.
-    case_eq (list2nat_be_a s <? length x); intros case.
-    - pose proof Hbvn0 as len. pose proof Hx as Hxlen.
-      unfold size in len, Hxlen. apply N2Nat.inj_iff in len. 
-      apply N2Nat.inj_iff in Hxlen. rewrite Nat2N.id in len, Hxlen.
-      rewrite len. rewrite <- Hxlen. rewrite case in *. 
-      rewrite rev_app_distr in *. rewrite rev_mk_list_false in *.
-      apply Nat.ltb_lt in case.
-      rewrite (@rev_skipn x (list2nat_be_a s) case) in H.
-      pose proof rev_skipn as rev_skipn. 
-      specialize (@rev_skipn (bv_not (zeros n)) (list2nat_be_a s)).
-      rewrite len in rev_skipn. rewrite <- Hx2 in rev_skipn.
-      specialize (@rev_skipn case). rewrite rev_skipn.
-      rewrite Hx2 in case. rewrite <- Hs2 in case.
-      unfold list2nat_be_a in case.
-      assert (sle_list_big_endian 
-              (mk_list_false (list2nat_be_a s) ++
-                firstn (length x - list2nat_be_a s) (rev x))
-              (mk_list_false (list2nat_be_a s) ++
-                firstn (length x - list2nat_be_a s) (rev (bv_not (zeros n)))) = true) as sle.
-      { admit. 
-        (* We need app_sle_list_big_endian *)
-      }
-      assert (slt_sle_list_big_endian_trans : forall x y z : list bool,
-              slt_list_big_endian x y = true -> 
-              sle_list_big_endian y z = true ->
-              slt_list_big_endian x z = true).
-      { admit. 
-        (* Similar to ult_ule_list_big_endian_trans *)}
-      specialize(@slt_sle_list_big_endian_trans (rev t)
-                 (mk_list_false (list2nat_be_a s) ++
-                 firstn (length x - list2nat_be_a s) (rev x))
-                 (mk_list_false (list2nat_be_a s) ++ 
-                 firstn (length x - list2nat_be_a s) (rev (bv_not (zeros n)))) H sle). apply slt_sle_list_big_endian_trans.
-   - rewrite case in *. rewrite Hnots. rewrite <- Hx2. rewrite case.
-    apply H. 
 Admitted.
 
 (*------------------------------Neg------------------------------*)
@@ -253,10 +147,190 @@ Proof. intros n s t Hs Ht.
 Qed.
 
 
+(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
+Theorem bvand_slt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_and x s) t) = true)).
+Proof.
+  intros n s t Hs Ht. split.
+  - intro H_cond. exists (bv_not (bv_neg t)). split.
+        + rewrite (@bv_not_size n).
+          * easy.
+          * apply bv_neg_size. easy.
+        + assumption.
+  - intro H_exists. destruct H_exists as [x [Hx_size Hx_lt]].
+    assert (H_x_and_s_size: size (bv_and x s) = n). 
+    { apply (bv_and_size Hx_size Hs). }
+    assert (H_not_min: t <> signed_min n). 
+    { apply (not_signed_min_if_gt H_x_and_s_size Ht Hx_lt). }
+    assert (H_size: size (bv_not (bv_neg t)) = n). 
+    { apply bv_not_size, bv_neg_size; easy. }
+    destruct (bv_slt s (zeros n)) eqn:H_sign.
+    + assert (H_t_minus_1_lt : bv_slt (bv_not (bv_neg t)) t = true).
+      { apply (bv_not_neg_slt Ht H_not_min). }
+      assert (H_le : bv_sle (bv_and (bv_not (bv_neg t)) s) (bv_not (bv_neg t)) = true).
+      { apply (bv_and_neg_sle_itself H_size Hs H_sign). }
+      apply (bv_sle_slt_trans H_le H_t_minus_1_lt).
+    + rewrite (bv_slt_negb_sle Hs (zeros_size n)) in H_sign. 
+      apply negb_false_iff in H_sign. rewrite <- Hs in H_sign.
+      rewrite bv_zeros_sle in H_sign. apply negb_true_iff in H_sign.
+      assert (H_xs_pos : last (bv_and x s) false = false). 
+      { apply (pos_bv_and Hx_size Hs H_sign). }
+      destruct (bv_slt t (zeros n)) eqn:H_t_sign.
+      * rewrite <- Ht in H_t_sign. rewrite bv_slt_zeros in H_t_sign. 
+        assert (H_size_match : size t = size (bv_and x s)).
+        { rewrite H_x_and_s_size; assumption. }
+        pose proof (bv_slt_tf H_size_match H_t_sign H_xs_pos) as H_contra.
+        pose proof (bv_slt_trans H_contra Hx_lt) as H_impossible.
+        rewrite bv_slt_nrefl in H_impossible. discriminate.
+      * rewrite (bv_slt_negb_sle Ht (zeros_size n)) in H_t_sign. 
+        apply negb_false_iff in H_t_sign. apply bv_sle_eq in H_t_sign.
+        destruct H_t_sign as [H_t_pos | H_t_eq_0].
+        ** apply bv_sle_slt_trans with (b2 := bv_not (bv_neg t)).
+           { assert (H_t_minus_1_pos : last (bv_not (bv_neg t)) false = false).
+             { apply (bv_not_neg_pos_if_gt_zero Ht H_not_min H_t_pos). }
+             apply (bv_and_pos_sle_1 H_size Hs H_t_minus_1_pos H_sign). }
+           rewrite (bv_slt_iff_sbv2int H_size).
+           *** rewrite (bv_not_neg_is_subt_one Ht).
+               rewrite (sbv2int_sub_one Ht).
+               **** lia.
+               **** assumption.
+           *** assumption.
+        ** rewrite <- H_t_eq_0 in *. rewrite <- H_x_and_s_size in Hx_lt.
+           rewrite (bv_slt_zeros (bv_and x s)) in Hx_lt.
+           rewrite H_xs_pos in Hx_lt. discriminate.
+Qed.
+
+
+Theorem bvand_sgt : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+  (bv_slt t (bv_and s (signed_max n)) = true)
+  (exists (x : bitvector), (size x  = n) /\ ((bv_sgt (bv_and x s) t) = true)).
+Proof.
+  intros n s t Hs Ht. split.
+  + intros. exists (signed_max n). split.
+    - apply signed_max_size.
+    - rewrite (@bv_and_comm n (signed_max n) s).
+      apply bv_slt_bv_sgt in H. apply H. apply signed_max_size. apply Hs.
+  + intros (x, (Hx, H)).
+    apply bv_sgt_bv_slt in H. rewrite (@bv_and_comm n x s) in H.
+    apply (@bv_slt_sle_trans t (bv_and s x) (bv_and s (signed_max n))).
+    apply H. apply (@bv_and_sle_maxs n s x Hs Hx).
+    apply Hx. apply Hs.
+Qed.
+
+
+(* s >=u t & mins <=> (exists x, x & s <=s t) *)
+Theorem bvand_sle : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n -> iff
+  (bv_uge s (bv_and t (signed_min n)) = true)
+  (exists x, size x = n /\ bv_sle (bv_and x s) t = true).
+Proof.
+  intros n s t Hs Ht.
+  split; intro H.
+  - exists (signed_min n). split.
+    { apply signed_min_size. }
+    rewrite (bv_and_comm (signed_min_size n) Hs).
+    destruct (last (bits t) false) eqn:Hsign_t.
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
+      { apply bv_and_signed_min_neg; assumption. }
+      rewrite Hmask in H. destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+      * subst n.
+        assert (Ht0: size t = 0%N) by (rewrite Ht; assumption).
+        assert (Hand_size: size (bv_and s (signed_min (size s))) = 0%N).
+        { transitivity (size s).
+          - apply bv_and_size; [reflexivity | apply signed_min_size].
+          - apply Hn0. }
+        apply bv_sle_size_zero; assumption.
+      * assert (Hn_gt_0: (0 < n)%N) by lia.
+        assert (Hs_neg: last (bits s) false = true).
+        { eapply bv_uge_signed_min_implies_msb; eassumption. }
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
+        { apply bv_and_signed_min_neg; assumption. }
+        rewrite Hmask_s. rewrite <- Ht. apply signed_min_sle; assumption.
+    + assert (Hmask: bv_and t (signed_min n) = zeros n).
+      { apply bv_and_signed_min_pos; assumption. }
+      rewrite Hmask in H.
+      destruct (last (bits s) false) eqn:Hsign_s.
+      * assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
+        { apply bv_and_signed_min_neg; assumption. }
+        rewrite Hmask_s.
+        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { subst. pose proof (bits_size s) as Hbs.
+          rewrite Hn0 in Hbs. simpl in Hbs.
+          apply length_zero_iff_nil in Hbs.
+          rewrite Hbs in Hsign_s. simpl in Hsign_s.
+          discriminate. }
+        rewrite <- Ht. apply signed_min_sle.
+      * assert (Hmask_s: bv_and s (signed_min n) = zeros n).
+        { apply bv_and_signed_min_pos; assumption. }
+        rewrite Hmask_s. apply zeros_sle_nonneg; assumption.
+  - destruct H as [x [Hx Hsle]].
+    destruct (last (bits t) false) eqn:Hsign_t.
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
+      { apply bv_and_signed_min_neg; assumption. }
+      rewrite Hmask.
+      destruct (last (bits s) false) eqn:Hs_case.
+      * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { subst. pose proof (bits_size s) as Hbs.
+          rewrite Hn0 in Hbs. simpl in Hbs.
+          apply length_zero_iff_nil in Hbs.
+          rewrite Hbs in Hs_case. simpl in Hs_case.
+          discriminate. }
+        { apply bv_msb_implies_uge_signed_min; try assumption. lia. }
+      * exfalso.
+        assert (Hn_pos: (0 < n)%N).
+        { destruct (N.eq_dec n 0) as [Hn0|Hnneq].
+          - rewrite Hn0 in Ht. 
+            assert (Hlen: length (bits t) = 0%nat).
+            { rewrite bits_size. rewrite Ht. simpl. reflexivity. }
+            destruct (bits t).
+            + simpl in Hsign_t. discriminate.
+            + simpl in Hlen. discriminate.
+          - apply N.neq_0_lt_0. assumption. }
+        assert (Hxs_pos: last (bits (bv_and x s)) false = false).
+        { rewrite (@bv_and_comm n x s Hx Hs). eapply pos_bvand_pos.
+           - apply Hs.
+           - apply Hx.
+           - try assumption. }
+        unfold bv_sle in Hsle.
+        assert (Hsz_xs: size (bv_and x s) = n).
+        { apply bv_and_size; assumption. }
+        rewrite Hsz_xs, Ht in Hsle. rewrite N.eqb_refl in Hsle.
+        unfold sle_list in Hsle.
+        remember (rev (bits (bv_and x s))) as l_xs.
+        remember (rev (bits t)) as l_t.
+        destruct l_xs as [|msb_xs rest_xs]; destruct l_t as [|msb_t rest_t].
+        { apply (f_equal (@length bool)) in Heql_t. simpl in Heql_t.
+          rewrite rev_length in Heql_t. rewrite bits_size in Heql_t.
+          rewrite Ht in Heql_t. lia. }
+        { apply (f_equal (@length bool)) in Heql_xs. simpl in Heql_xs.
+          rewrite rev_length in Heql_xs. rewrite bits_size in Heql_xs.
+          rewrite Hsz_xs in Heql_xs. lia. }
+        { apply (f_equal (@length bool)) in Heql_t. simpl in Heql_t.
+          rewrite rev_length in Heql_t. rewrite bits_size in Heql_t.
+          rewrite Ht in Heql_t. lia. }
+        { rewrite <- (hd_rev (bits (bv_and x s))) in Hxs_pos.
+          rewrite <- Heql_xs in Hxs_pos. simpl in Hxs_pos.
+          rewrite <- (hd_rev (bits t)) in Hsign_t.
+          rewrite <- Heql_t in Hsign_t. simpl in Hsign_t. subst msb_xs msb_t.
+          change (rev (bv_and x s)) with (rev (bits (bv_and x s))) in Hsle.
+          change (rev t) with (rev (bits t)) in Hsle.
+          rewrite <- Heql_xs in Hsle. rewrite <- Heql_t in Hsle.
+          simpl in Hsle. discriminate. }
+    + assert (Hmask: bv_and t (signed_min n) = zeros n).
+      { apply bv_and_signed_min_pos; assumption. }
+      rewrite Hmask. apply bv_uge_zeros. assumption.
+Qed.
+
+
 (*------------------------------------------------------------*)
 
 
 (*------------------------------Or------------------------------*)
+
+
 (* t & s = t <=> (exists x, x | s = t) *)
 Theorem bvor_eq : forall (n : N), forall (s t : bitvector), 
   (size s) = n -> (size t) = n -> iff 
@@ -267,6 +341,75 @@ Proof. intros n s t Hs Ht.
        - exists t. split; easy.
        - destruct A as (x, (Hx, A)). rewrite <- A.
          now rewrite (@bv_or_idem2 x s n Hx Hs).
+Qed.
+
+
+(* t <s s | smax <=> (exists x, x | s >s t) *)
+Theorem bvor_sgt : forall (n : N), forall (s t : bitvector), 
+  (size s) = n -> (size t) = n -> iff 
+    (exists (x : bitvector), (size x = n) /\ (bv_sgt (bv_or x s) t = true)) 
+    ((bv_slt t (bv_or s (signed_max n))) = true).
+Proof.
+  intros n s t Hn_s Hn_t.
+  split.
+  - intro H_exists.
+    destruct H_exists as [x [Hx_size H_slt]].
+    apply bv_sgt_bv_slt in H_slt.
+    destruct (last s false) eqn:Hs_sign.
+    + rewrite (bv_slt_sle_trans H_slt). 
+      * easy. 
+      * apply (bv_or_sle_or_smax Hx_size Hn_s ). 
+    + rewrite (bv_slt_sle_trans H_slt).
+      * easy.
+      * apply (bv_or_sle_or_smax Hx_size Hn_s). 
+  - intro H_slt.
+    exists (signed_max n).
+    split.
+    + apply signed_max_size.
+    + apply bv_slt_bv_sgt.
+      rewrite bv_or_comm with (n := n).
+      * exact H_slt.
+      * apply signed_max_size.
+      * exact Hn_s.
+Qed.
+
+
+(* t >=s (s | signed_min) <=> (exists x, x | s <=s t) *)
+Theorem bvor_sle : forall (n : N), forall (s t : bitvector),
+    (size s) = n -> (size t) = n -> iff
+      ((bv_sge t (bv_or s (signed_min n))) = true)
+      (exists (x : bitvector),
+          (size x = n) /\
+          ((bv_sle (bv_or x s) t) = true)).
+Proof.
+  intros n s t Hs Ht. assert (H_cases : (0 < n \/ n = 0)%N) by lia.
+  destruct H_cases as [Hn_pos | Hn_zero].
+  - split.
+    + intro Hge.
+      exists (signed_min n). split.
+      * apply signed_min_size.
+      * rewrite bv_sge_iff_sle in Hge.
+        rewrite (@bv_or_comm n (signed_min n) s).
+        -- exact Hge.
+        -- apply signed_min_size.
+        -- exact Hs.
+    + intro Hex. destruct Hex as [x [Hx_size Hle]].
+      rewrite bv_sge_iff_sle. eapply bv_sle_trans.
+      * apply bv_or_signed_min_lower_bound with (x := x).
+        -- lia.
+        -- exact Hs.
+        -- exact Hx_size.
+      * exact Hle.
+  - rewrite Hn_zero in *.
+    destruct s; [| unfold size in Hs; discriminate Hs].
+    destruct t; [| unfold size in Ht; discriminate Ht]. 
+    split.
+    + intro Hge. exists nil. split.
+      * reflexivity.
+      * compute. reflexivity.
+    + intros [x [Hx_size Hle]].
+      destruct x; [| unfold size in Hx_size; discriminate Hx_size].
+      compute. reflexivity.
 Qed.
 
 
@@ -820,6 +963,41 @@ Proof.
     }
     now apply (@bv_sle_slt_trans (bv_ashr (signed_min n) s) (bv_ashr x s) t).
 Qed.
+
+
+(* t >=s ~(max_s >> s) <=> exists x, x >>a s <=s t *)
+Theorem bvashr_sle:
+  forall (n : N) (t s : bitvector), size t = n -> size s = n -> iff
+      (bv_sge t (bv_not (bv_shr (signed_max n) s)) = true)
+      (exists (x : bitvector),
+          (size x = n) /\ (bv_sle (bv_ashr x s) t = true)).
+Proof.
+  intros n t s H_size_t H_size_s.
+  assert (H_cases : (0 < n \/ n = 0)%N) by lia.
+  destruct H_cases as [H_pos | H_zero].
+  - split.
+    + intro H_sge. exists (signed_min n). split.
+      * apply signed_min_size.
+      * rewrite <- (ashr_smin_eq_not_shr_smax H_pos H_size_s) in H_sge.
+        rewrite bv_sge_iff_sle in H_sge. exact H_sge.
+    + intros [x [H_size_x H_sle]]. rewrite bv_sge_iff_sle.
+      rewrite <- (ashr_smin_eq_not_shr_smax H_pos H_size_s).
+      pose proof (ashr_smin_is_minimal H_pos H_size_x H_size_s) as H_min_is_bottom.
+      eapply bv_sle_trans.
+      * exact H_min_is_bottom. 
+      * exact H_sle.
+  - rewrite H_zero in *.
+    destruct s; [| unfold size in H_size_s; discriminate H_size_s].
+    destruct t; [| unfold size in H_size_t; discriminate H_size_t].
+    split.
+    + intro H_sge. exists nil. split.
+      * reflexivity. 
+      * compute. reflexivity.
+    + intros [x [H_size_x H_sle]].
+      destruct x; [| unfold size in H_size_x; discriminate H_size_x].
+      compute. reflexivity.
+Qed.
+
 
 (*------------------------------------------------------------*)
 
@@ -1869,7 +2047,7 @@ Proof.
     - now right.
 Qed.
 
-(* t <u s | -s <=> (exists x, x * s >u t) *)
+(* t <u (-s | s) <=> (exists x, x * s >u t) *)
 Theorem bvmult_ugt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_ult t (bv_or (bv_neg s) s) = true)
@@ -1915,7 +2093,7 @@ Proof.
       * easy.
 Qed.
 
-(* s | -s >=u t <=> (exists x, x * s >=u t) *)
+(* (-s | s) >=u t <=> (exists x, x * s >=u t) *)
 Theorem bvmult_uge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_uge (bv_or (bv_neg s) s) t = true)

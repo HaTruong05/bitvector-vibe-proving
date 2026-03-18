@@ -1,0 +1,6 @@
+- Pack multiple short tactics onto the same line up to a strict 60-character limit, wrapping to a new line only when necessary. 
+- Don't split a single-line tactic between multiple lines.
+- Bullet points should be on their own lines.
+- There should be no empty lines between lines in a proof script (between Proof. and Qed.).
+- White space should be used for indentations of bullets and subproofs, etc. but don't use arbitrary whitespace otherwise.
+- The proof in InvCond should model a whiteboard proof. All the complexity (including subproofs) should be pushed to BVList unless the subproof is very specific to the current proof (when in doubt, put in BVList). Make sure you are putting a generalized version of the proof in BVList.
