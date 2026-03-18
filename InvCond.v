@@ -1982,6 +1982,8 @@ Proof.
     - apply A.
 Qed.
 
+(* Ha: Start *)
+
  (* ~(-t) & (-s | s) <s t <=> (exists x, x * s <s t) *)
 Theorem bvmult_slt : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
@@ -2005,7 +2007,7 @@ Theorem bvmult_sle : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sle (bv_mult x s) t = true)
-    (~ (s = mk_list_false (N.to_nat n) /\ bv_slt t s = true)).
+    (~ (s = zeros n /\ bv_slt t s = true)).
 Proof.
 Admitted.
 
@@ -2018,6 +2020,8 @@ Theorem bvmult_sge: forall (n : N) (s t : bitvector),
 Proof.
 Admitted.
 
+(* Below lemmas are commented out because we don't have defitniions for unsigned division and mod *)
+
 (*------------------------------------------------------------*)
 
 (*-----------------------Division 1---------------------------*)
@@ -2029,8 +2033,8 @@ Theorem udiv_uge : forall (n : N) (s t : bitvector),
     (exists (x : bitvector), size x = n /\ bv_uge (bv_udiv x s) t = true)
     (bv_eq 
        (bv_and (bv_udiv (bv_mult s t) t) s) 
-       s
-    ) = true.
+       s 
+     = true). 
 Proof.
 Admitted. *)
 
@@ -2038,110 +2042,109 @@ Admitted. *)
 
 (*-----------------------Division 2---------------------------*)
 
-(* (* n = 1 -> s & t = 0   (Otherwise True) <=> (exists x, s /s x != t) *)
-Theorem sdiv_reverse_neq : forall (n : N) (s t : bitvector),
+(* (* n = 1 -> s & t = 0 ; otherwise True <=> (exists x, s /u x != t) *)
+Theorem udiv_reverse_neq : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_eq (bv_sdiv s x) t = false)
-    (if (N.eq_dec n 1) then
-       bv_eq (bv_and s t) (zeros n)
+    (exists (x : bitvector), size x = n /\ bv_eq (bv_udiv s x) t = false)
+    (if N.eq_dec n 1 then
+       bv_eq (bv_and s t) (zeros n) = true
      else
-       true) = true.
+       True).
 Proof.
-Admitted.
+Admitted. *)
 
-(* n=1 -> s >s t ; n!=1 -> ( (s >=s 0 => s >s t) /\ (s <s 0 => (s >> 1) >s t) ) 
-<=> (exists x, s /s x != t) *)
-Theorem sdiv_reverse_sgt : forall (n : N) (s t : bitvector),
+(* (* n = 1 -> s >s t ; n != 1 -> ( (s >=s 0 => s >s t) /\ (s <s 0 => (s >> 1) >s t) ) 
+   <=> (exists x, s /u x >s t) *)
+Theorem udiv_reverse_sgt : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_sgt (bv_sdiv s x) t = true)
-    (if (N.eq_dec n 1) then
-       bv_sgt s t
+    (exists (x : bitvector), size x = n /\ bv_sgt (bv_udiv s x) t = true)
+    (if N.eq_dec n 1 then
+       bv_sgt s t = true
      else
-       (
-         (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
-         (bv_slt s (zeros n) = true -> bv_sgt (bv_shr s (one n)) t = true)
-       )
-    ) = true.
+       (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
+       (bv_slt s (zeros n) = true -> bv_sgt (bv_shr s (one n)) t = true)).
 Proof.
-Admitted.
+Admitted. *)
 
-(* (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) <=> (exists x, s /s x != t) *)
-Theorem sdiv_reverse_sge : forall (n : N) (s t : bitvector),
+(* (* (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) <=> (exists x, s /u x >=s t) *)
+Theorem udiv_reverse_sge : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_sge (bv_sdiv s x) t = true)
-    (
-      (bv_sge s (zeros n) = true -> bv_sge s t = true) /\
-      (bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t = true)
-    ) = true.
+    (exists (x : bitvector), size x = n /\ bv_sge (bv_udiv s x) t = true)
+    ((bv_sge s (zeros n) = true -> bv_sge s t = true) /\
+     (bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t = true)).
 Proof.
 Admitted. *)
 
 (*------------------------------------------------------------*)
 
 (*-----------------------Remainder 1--------------------------*)
-(* (* ~t <s (-s | -t) <=> (exists x, (x srem s) <s t) *)
-Theorem srem_slt : forall (n : N) (s t : bitvector),
+(* (* ~t <s (-s | -t) <=> (exists x, (x urem s) <s t) *)
+Theorem urem_slt : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_slt (bv_srem x s) t = true)
+    (exists (x : bitvector), size x = n /\ bv_slt (bv_urem x s) t = true)
     (bv_slt 
        (bv_not t) 
        (bv_or (bv_neg s) (bv_neg t))
-    ) = true.
+     = true).
+Proof.
+Admitted. *)
     
-(* ~0 <s -s & t <=> (exists x, x srem s <=s t) *)
-Theorem srem_sle : forall (n : N) (s t : bitvector),
+(* (* ~0 <s -s & t <=> (exists x, x urem s <=s t) *)
+Theorem urem_sle : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_sle (bv_srem x s) t = true)
+    (exists (x : bitvector), size x = n /\ bv_sle (bv_urem x s) t = true)
     (bv_slt 
        (bv_not (zeros n)) 
        (bv_and (bv_neg s) t)
-    ) = true.
+     = true).
 Proof.
-Admitted.
- *)
+Admitted. *)
+
  
  (*------------------------------------------------------------*)
  (*-----------------------Remainder 2--------------------------*)
  
-(* (* (t + t - s) & s >=u t <=> (exists x, s srem x = t) *)
-Theorem srem_reverse_eq : forall (n : N) (s t : bitvector),
+(* (* (t + t - s) & s >=u t <=> (exists x, s urem x = t) *)
+Theorem urem_reverse_eq : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
-    (exists (x : bitvector), size x = n /\ bv_eq (bv_srem s x) t = true)
+    (exists (x : bitvector), size x = n /\ bv_eq (bv_urem s x) t = true)
     (bv_uge 
-       (bv_and (bv_sub (bv_add t t) s) s) 
+       (bv_and (bv_subt (bv_add t t) s) s) 
        t
-    ) = true.
-Proof.
-Admitted.
-
-(* (s >=s 0 => s >s t) /\ (s <s 0 => ((s - 1) >> 1) >s t) <=> (exists x, s srem x >s t) *)
-Theorem srem_reverse_sgt : forall (n : N) (s t : bitvector),
-  size s = n -> size t = n ->
-  iff
-    (exists (x : bitvector), size x = n /\ bv_sgt (bv_srem s x) t = true)
-    (
-      (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
-      (bv_slt s (zeros n) = true -> bv_sgt (bv_shr (bv_sub s (one n)) (one n)) t = true)
-    ).
-Proof.
-Admitted.
-
-(* (s >=s 0 => s >=s t) /\ ((s <s 0 /\ t >=s 0) => s - t >u t) <=> (exists x, s srem x >=s t) *)
-Theorem srem_reverse_sge : forall (n : N) (s t : bitvector),
-  size s = n -> size t = n ->
-  iff
-    (exists (x : bitvector), size x = n /\ bv_sge (bv_srem s x) t = true)
-    (
-      (bv_sge s (zeros n) = true -> bv_sge s t = true) /\
-      ((bv_slt s (zeros n) = true /\ bv_sge t (zeros n) = true) -> 
-       bv_ugt (bv_sub s t) t = true)
-    ).
+     = true).
 Proof.
 Admitted.
  *)
+ 
+(* (* (s >=s 0 => s >s t) /\ (s <s 0 => ((s - 1) >> 1) >s t) <=> (exists x, s urem x >s t) *)
+Theorem urem_reverse_sgt : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sgt (bv_urem s x) t = true)
+    (
+      (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
+      (bv_slt s (zeros n) = true -> bv_sgt (bv_shr (bv_subt s (one n)) (one n)) t = true)
+    ).
+Proof.
+Admitted. *)
+
+(* (* (s >=s 0 => s >=s t) /\ ((s <s 0 /\ t >=s 0) => s - t >u t) <=> (exists x, s urem x >=s t) *)
+Theorem urem_reverse_sge : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sge (bv_urem s x) t = true)
+    (
+      (bv_sge s (zeros n) = true -> bv_sge s t = true) /\
+      ((bv_slt s (zeros n) = true /\ bv_sge t (zeros n) = true) -> 
+       bv_ugt (bv_subt s t) t = true)
+    ).
+Proof.
+Admitted. *)
+
+(* Ha: End *)
