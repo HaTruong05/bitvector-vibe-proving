@@ -152,95 +152,37 @@ Proof.
     { apply signed_min_size. }
     rewrite (bv_and_comm (signed_min_size n) Hs).
     destruct (last (bits t) false) eqn:Hsign_t.
-    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      { apply bv_and_signed_min_neg; assumption. }
-      rewrite Hmask in H. destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-      * subst n.
-        assert (Ht0: size t = 0%N) by (rewrite Ht; assumption).
-        assert (Hand_size: size (bv_and s (signed_min (size s))) = 0%N).
-        { transitivity (size s).
-          - apply bv_and_size; [reflexivity | apply signed_min_size].
-          - apply Hn0. }
-        apply bv_sle_size_zero; assumption.
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+      rewrite Hmask in H.
+      destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+      * subst n. apply bv_sle_size_zero.
+        -- rewrite <- Hn0. apply bv_and_size; [reflexivity | apply signed_min_size].
+        -- rewrite Ht. exact Hn0.
       * assert (Hn_gt_0: (0 < n)%N) by lia.
-        assert (Hs_neg: last (bits s) false = true).
-        { eapply bv_uge_signed_min_implies_msb; eassumption. }
-        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
-        { apply bv_and_signed_min_neg; assumption. }
-        rewrite Hmask_s. rewrite <- Ht. apply signed_min_sle; assumption.
-    + assert (Hmask: bv_and t (signed_min n) = zeros n).
-      { apply bv_and_signed_min_pos; assumption. }
+        assert (Hs_neg: last (bits s) false = true) by (eapply bv_uge_signed_min_implies_msb; eassumption).
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+        rewrite Hmask_s, <- Ht.
+        apply signed_min_sle; assumption.
+    + assert (Hmask: bv_and t (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
       rewrite Hmask in H.
       destruct (last (bits s) false) eqn:Hsign_s.
-      * assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
-        { apply bv_and_signed_min_neg; assumption. }
-        rewrite Hmask_s.
-        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-        { subst. pose proof (bits_size s) as Hbs.
-          rewrite Hn0 in Hbs. simpl in Hbs.
-          apply length_zero_iff_nil in Hbs.
-          rewrite Hbs in Hsign_s. simpl in Hsign_s.
-          discriminate. }
-        rewrite <- Ht. apply signed_min_sle.
-      * assert (Hmask_s: bv_and s (signed_min n) = zeros n).
-        { apply bv_and_signed_min_pos; assumption. }
+      * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { exfalso. exact (@size_zero_msb_absurd n s Hs Hn0 Hsign_s). }
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+        rewrite Hmask_s, <- Ht. apply signed_min_sle.
+      * assert (Hmask_s: bv_and s (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
         rewrite Hmask_s. apply zeros_sle_nonneg; assumption.
   - destruct H as [x [Hx Hsle]].
     destruct (last (bits t) false) eqn:Hsign_t.
-    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      { apply bv_and_signed_min_neg; assumption. }
-      rewrite Hmask.
-      destruct (last (bits s) false) eqn:Hs_case.
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+      rewrite Hmask. destruct (last (bits s) false) eqn:Hs_case.
       * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-        { subst. pose proof (bits_size s) as Hbs.
-          rewrite Hn0 in Hbs. simpl in Hbs.
-          apply length_zero_iff_nil in Hbs.
-          rewrite Hbs in Hs_case. simpl in Hs_case.
-          discriminate. }
-        { apply bv_msb_implies_uge_signed_min; try assumption. lia. }
-      * exfalso.
-        assert (Hn_pos: (0 < n)%N).
-        { destruct (N.eq_dec n 0) as [Hn0|Hnneq].
-          - rewrite Hn0 in Ht. 
-            assert (Hlen: length (bits t) = 0%nat).
-            { rewrite bits_size. rewrite Ht. simpl. reflexivity. }
-            destruct (bits t).
-            + simpl in Hsign_t. discriminate.
-            + simpl in Hlen. discriminate.
-          - apply N.neq_0_lt_0. assumption. }
-        assert (Hxs_pos: last (bits (bv_and x s)) false = false).
-        { rewrite (@bv_and_comm n x s Hx Hs). eapply pos_bvand_pos.
-           - apply Hs.
-           - apply Hx.
-           - try assumption. }
-        unfold bv_sle in Hsle.
-        assert (Hsz_xs: size (bv_and x s) = n).
-        { apply bv_and_size; assumption. }
-        rewrite Hsz_xs, Ht in Hsle. rewrite N.eqb_refl in Hsle.
-        unfold sle_list in Hsle.
-        remember (rev (bits (bv_and x s))) as l_xs.
-        remember (rev (bits t)) as l_t.
-        destruct l_xs as [|msb_xs rest_xs]; destruct l_t as [|msb_t rest_t].
-        { apply (f_equal (@length bool)) in Heql_t. simpl in Heql_t.
-          rewrite rev_length in Heql_t. rewrite bits_size in Heql_t.
-          rewrite Ht in Heql_t. lia. }
-        { apply (f_equal (@length bool)) in Heql_xs. simpl in Heql_xs.
-          rewrite rev_length in Heql_xs. rewrite bits_size in Heql_xs.
-          rewrite Hsz_xs in Heql_xs. lia. }
-        { apply (f_equal (@length bool)) in Heql_t. simpl in Heql_t.
-          rewrite rev_length in Heql_t. rewrite bits_size in Heql_t.
-          rewrite Ht in Heql_t. lia. }
-        { rewrite <- (hd_rev (bits (bv_and x s))) in Hxs_pos.
-          rewrite <- Heql_xs in Hxs_pos. simpl in Hxs_pos.
-          rewrite <- (hd_rev (bits t)) in Hsign_t.
-          rewrite <- Heql_t in Hsign_t. simpl in Hsign_t. subst msb_xs msb_t.
-          change (rev (bv_and x s)) with (rev (bits (bv_and x s))) in Hsle.
-          change (rev t) with (rev (bits t)) in Hsle.
-          rewrite <- Heql_xs in Hsle. rewrite <- Heql_t in Hsle.
-          simpl in Hsle. discriminate. }
-    + assert (Hmask: bv_and t (signed_min n) = zeros n).
-      { apply bv_and_signed_min_pos; assumption. }
-      rewrite Hmask. apply bv_uge_zeros. assumption.
+        { exfalso. exact (@size_zero_msb_absurd n s Hs Hn0 Hs_case). }
+        apply bv_msb_implies_uge_signed_min; try assumption; lia.
+      * exfalso. 
+        exact (@bvand_sle_backward_absurd n s t x Hs Ht Hx Hs_case Hsign_t Hsle).
+    + assert (Hmask: bv_and t (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
+      rewrite Hmask. apply bv_uge_zeros; assumption.
 Qed.
 
 
@@ -348,6 +290,41 @@ Proof.
     + intros [x [Hx_size Hle]].
       destruct x; [| unfold size in Hx_size; discriminate Hx_size].
       compute. reflexivity.
+Qed.
+
+
+(* s >=s s & t <=> (exists x, x | s >=s t) *)
+Theorem bvor_sge :
+  forall (n : N), forall (s t : bitvector), (size s) = n -> (size t) = n ->
+    iff
+      ((bv_sge s (bv_and s t)) = true)
+      (exists (x : bitvector), (size x = n) /\
+          ((bv_sge (bv_or x s) t) = true)).
+Proof.
+  intros n s t H_size_s H_size_t.
+  assert (H_cases : (0 < n \/ n = 0)%N) by lia.
+  destruct H_cases as [H_n_pos | H_n_zero].
+  { 
+    split.
+    - intro H_sge_and.
+      exists (signed_max n); split.
+      + apply signed_max_size.
+      + apply bvor_smax_sge_helper; assumption.
+    - intro H_exists; destruct H_exists as [x [H_size_x H_sge_or]].
+      eapply bvor_sge_exists_helper; eassumption.
+  }
+  { 
+    rewrite H_n_zero in *.
+    destruct s; [| unfold size in H_size_s; discriminate H_size_s].
+    destruct t; [| unfold size in H_size_t; discriminate H_size_t].
+    split.
+    - intro H_sge_and. exists nil. split.
+      + reflexivity.
+      + compute. reflexivity.
+    - intros [x [H_size_x H_sge_or]].
+      destruct x; [| unfold size in H_size_x; discriminate H_size_x].
+      compute. reflexivity.
+  }
 Qed.
 
 
