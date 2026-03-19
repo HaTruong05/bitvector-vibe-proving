@@ -1817,180 +1817,53 @@ Proof.
     rewrite (bv_and_comm (signed_min_size n) Hs).
     destruct (last (bits t) false) eqn:Hsign_t.
     
-    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      { apply bv_and_signed_min_neg; assumption. }
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
       rewrite Hmask in H.
       destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
       
       * subst n.
-        assert (Ht0: size t = 0%N) by (rewrite Ht; assumption).
-        
-        assert (Hand_size: size (bv_and s (signed_min (size s))) = 0%N).
-        {
-          transitivity (size s).
-          - apply bv_and_size; [reflexivity | apply signed_min_size].
-          - apply Hn0.
-        }
-        
-        apply bv_sle_size_zero; assumption.
+        apply bv_sle_size_zero.
+        -- rewrite <- Hn0. apply bv_and_size; [reflexivity | apply signed_min_size].
+        -- rewrite Ht. exact Hn0.
         
       * assert (Hn_gt_0: (0 < n)%N) by lia.
-
-        assert (Hs_neg: last (bits s) false = true).
-        { eapply bv_uge_signed_min_implies_msb; eassumption. }
-
-        assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
-        { apply bv_and_signed_min_neg; assumption. }
-        rewrite Hmask_s.
-
-        rewrite <- Ht.
+        assert (Hs_neg: last (bits s) false = true) by (eapply bv_uge_signed_min_implies_msb; eassumption).
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+        rewrite Hmask_s, <- Ht.
         apply signed_min_sle; assumption.
         
-    + assert (Hmask: bv_and t (signed_min n) = zeros n).
-      { apply bv_and_signed_min_pos; assumption. }
+    + assert (Hmask: bv_and t (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
       rewrite Hmask in H.
 
       destruct (last (bits s) false) eqn:Hsign_s.
-      * assert (Hmask_s: bv_and s (signed_min n) = signed_min n).
-        { apply bv_and_signed_min_neg; assumption. }
-        rewrite Hmask_s.
-
-        destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-        { 
-          subst. 
-          pose proof (bits_size s) as Hbs.
-          rewrite Hn0 in Hbs.
-          simpl in Hbs.
-          apply length_zero_iff_nil in Hbs.
-          rewrite Hbs in Hsign_s.
-          simpl in Hsign_s.
-          discriminate.
-        }
+      * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
+        { exfalso. exact (@size_zero_msb_absurd n s Hs Hn0 Hsign_s). }
         
-        rewrite <- Ht.
+        assert (Hmask_s: bv_and s (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
+        rewrite Hmask_s, <- Ht.
         apply signed_min_sle.
         
-      * assert (Hmask_s: bv_and s (signed_min n) = zeros n).
-        { apply bv_and_signed_min_pos; assumption. }
+      * assert (Hmask_s: bv_and s (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
         rewrite Hmask_s.
         apply zeros_sle_nonneg; assumption.
 
   - destruct H as [x [Hx Hsle]].
     
     destruct (last (bits t) false) eqn:Hsign_t.
-    + assert (Hmask: bv_and t (signed_min n) = signed_min n).
-      { apply bv_and_signed_min_neg; assumption. }
+    + assert (Hmask: bv_and t (signed_min n) = signed_min n) by (apply bv_and_signed_min_neg; assumption).
       rewrite Hmask.
 
       destruct (last (bits s) false) eqn:Hs_case.
       * destruct (N.eq_dec n 0) as [Hn0 | Hnpos].
-        { 
-          subst. 
-          pose proof (bits_size s) as Hbs.
-          rewrite Hn0 in Hbs.
-          simpl in Hbs.
-          apply length_zero_iff_nil in Hbs.
-          rewrite Hbs in Hs_case.
-          simpl in Hs_case.
-          discriminate.
-        }
-        { apply bv_msb_implies_uge_signed_min; try assumption. lia. }
+        { exfalso. exact (@size_zero_msb_absurd n s Hs Hn0 Hs_case). }
+        apply bv_msb_implies_uge_signed_min; try assumption; lia.
         
-      * exfalso.
-
-        assert (Hn_pos: (0 < n)%N).
-        {
-          destruct (N.eq_dec n 0) as [Hn0|Hnneq].
-          - rewrite Hn0 in Ht. 
-          
-            assert (Hlen: length (bits t) = 0%nat).
-            { 
-              rewrite bits_size. 
-              rewrite Ht. 
-              simpl. reflexivity. 
-            }
-
-            destruct (bits t).
-            + simpl in Hsign_t. 
-              discriminate.
-            + simpl in Hlen. 
-              discriminate.
-              
-          - apply N.neq_0_lt_0. 
-            assumption. 
-        }
-
-        assert (Hxs_pos: last (bits (bv_and x s)) false = false).
-        {
-           rewrite (@bv_and_comm n x s Hx Hs).
-           eapply pos_bvand_pos.
-
-           - apply Hs.      
-           - apply Hx.      
-           - try assumption.  
-        }
-
-        unfold bv_sle in Hsle.
-
-        assert (Hsz_xs: size (bv_and x s) = n).
-        { apply bv_and_size; assumption. }
-        rewrite Hsz_xs, Ht in Hsle.
-        rewrite N.eqb_refl in Hsle.
-
-        unfold sle_list in Hsle.
-
-        remember (rev (bits (bv_and x s))) as l_xs.
-        remember (rev (bits t)) as l_t.
-        destruct l_xs as [|msb_xs rest_xs]; destruct l_t as [|msb_t rest_t].
-        {
-          apply (f_equal (@length bool)) in Heql_t. 
-          simpl in Heql_t.
-          rewrite rev_length in Heql_t.
-          rewrite bits_size in Heql_t.
-          rewrite Ht in Heql_t.
-          lia.
-        }
-        { 
-          apply (f_equal (@length bool)) in Heql_xs.
-          simpl in Heql_xs.
-          rewrite rev_length in Heql_xs.
-          rewrite bits_size in Heql_xs.
-          rewrite Hsz_xs in Heql_xs.
-          lia. 
-        }
-        { 
-          apply (f_equal (@length bool)) in Heql_t.
-          simpl in Heql_t.
-          rewrite rev_length in Heql_t.
-          rewrite bits_size in Heql_t.
-          rewrite Ht in Heql_t.
-          lia. 
-        }
-        {
-           rewrite <- (hd_rev (bits (bv_and x s))) in Hxs_pos.
-           rewrite <- Heql_xs in Hxs_pos. simpl in Hxs_pos.
-           
-           rewrite <- (hd_rev (bits t)) in Hsign_t.
-           rewrite <- Heql_t in Hsign_t. simpl in Hsign_t.
-
-           subst msb_xs msb_t.
-
-           change (rev (bv_and x s)) with (rev (bits (bv_and x s))) in Hsle.
-           change (rev t) with (rev (bits t)) in Hsle.
-
-           rewrite <- Heql_xs in Hsle.
-           rewrite <- Heql_t in Hsle.
-
-           simpl in Hsle.
-           discriminate.
-        }
+      * exfalso. 
+        exact (@bvand_sle_backward_absurd n s t x Hs Ht Hx Hs_case Hsign_t Hsle).
         
-    + assert (Hmask: bv_and t (signed_min n) = zeros n).
-      { apply bv_and_signed_min_pos; assumption. }
+    + assert (Hmask: bv_and t (signed_min n) = zeros n) by (apply bv_and_signed_min_pos; assumption).
       rewrite Hmask.
-
-      apply bv_uge_zeros.
-      assumption.
+      apply bv_uge_zeros; assumption.
 Qed.
 
 (* NOT SURE ON THIS ONE, USED AI*)
@@ -2111,159 +1984,10 @@ Proof.
     - intro H_sge_and.
       exists (signed_max n); split.
       + apply signed_max_size.
-      + unfold bv_sge.
-        rewrite H_size_t.
-        assert (H_size_or : size (bv_or (signed_max n) s) = n).
-        { apply bv_or_size; [apply signed_max_size | exact H_size_s]. }
-        rewrite H_size_or, N.eqb_refl.
-        unfold sge_list.
-        unfold bv_sge in H_sge_and.
-        assert (H_size_and : size (bv_and s t) = n) by (apply bv_and_size; assumption).
-        rewrite H_size_s, H_size_and, N.eqb_refl in H_sge_and.
-        unfold sge_list in H_sge_and.
-        assert (H_nat_pos : (0 < N.to_nat n)%nat) by lia.
-        destruct (N.to_nat n) as [| t'] eqn:H_nat_n.
-        * inversion H_nat_pos.
-        * rewrite rev_bv_or; [| rewrite H_size_s; apply signed_max_size].
-          unfold signed_max; rewrite rev_involutive, H_nat_n; simpl smax_big_endian.
-          
-          destruct (rev s) as [| s_sign s_tail] eqn:H_rev_s.
-          { assert (H_len_s : length (rev s) = 0) by (rewrite H_rev_s; reflexivity).
-            rewrite rev_length in H_len_s; unfold size in H_size_s; rewrite H_len_s in H_size_s.
-            rewrite <- H_size_s in H_nat_n; simpl in H_nat_n; discriminate H_nat_n. }
-            
-          destruct (rev t) as [| t_sign t_tail] eqn:H_rev_t.
-          { assert (H_len_t : length (rev t) = 0) by (rewrite H_rev_t; reflexivity).
-            rewrite rev_length in H_len_t; unfold size in H_size_t; rewrite H_len_t in H_size_t.
-            rewrite <- H_size_t in H_nat_n; simpl in H_nat_n; discriminate H_nat_n. }
-            
-          unfold bv_or.
-          assert (H_size_check : size (false :: mk_list_true t') = size (s_sign :: s_tail)).
-          { unfold size; apply f_equal.
-            assert (H_LHS : length (false :: mk_list_true t') = S t').
-            { simpl; f_equal; clear; induction t'; [reflexivity | simpl; f_equal; exact IHt']. }
-            rewrite H_LHS.
-            assert (H_RHS : length (s_sign :: s_tail) = S t').
-            { assert (H_rev_len : length (s_sign :: s_tail) = length (rev s)) by (rewrite H_rev_s; reflexivity).
-              rewrite H_rev_len, rev_length; unfold size in H_size_s; lia. }
-            rewrite H_RHS; reflexivity. }
-            
-          rewrite H_size_check, N.eqb_refl; try unfold bits; simpl.
-          try unfold bv_sge in H_sge_and; unfold bv_and in H_sge_and.
-          rewrite H_size_s, H_size_t, N.eqb_refl in H_sge_and.
-          try unfold bits in H_sge_and.
-          assert (H_len_st : length s = length t) by (unfold size in *; lia).
-          rewrite rev_map2_and in H_sge_and by assumption.
-          rewrite H_rev_s, H_rev_t in H_sge_and; simpl in H_sge_and.
-          destruct s_sign eqn:Hs_sign; destruct t_sign eqn:Ht_sign.
-          
-          -- rewrite orb_false_r.
-             assert (H_len_t_tail : length t_tail = t').
-             { assert (H_rev_len : length (rev t) = length (true :: t_tail)) by (rewrite H_rev_t; reflexivity).
-               rewrite rev_length in H_rev_len; simpl in H_rev_len.
-               assert (H_tmp : N.to_nat (N.of_nat (length t)) = N.to_nat n) by (f_equal; exact H_size_t).
-               rewrite H_nat_n in H_tmp; lia. }
-             assert (H_len_s_tail : length s_tail = t').
-             { assert (H_rev_len : length (rev s) = length (true :: s_tail)) by (rewrite H_rev_s; reflexivity).
-               rewrite rev_length in H_rev_len; simpl in H_rev_len.
-               assert (H_tmp : N.to_nat (N.of_nat (length s)) = N.to_nat n) by (f_equal; exact H_size_s).
-               rewrite H_nat_n in H_tmp; lia. }
-             clear -H_len_s_tail H_len_t_tail.
-             generalize dependent t_tail; generalize dependent s_tail.
-             induction t' as [| t'' IHt]; intros [| b_s s_tail'] H_s [| b_t t_tail'] H_t; simpl in *; try reflexivity; try discriminate.
-             destruct b_t; simpl; [rewrite orb_false_r; apply IHt; lia | reflexivity].
-             
-          -- simpl in H_sge_and; discriminate H_sge_and.
-          
-          -- reflexivity.
-          
-          -- rewrite orb_false_r.
-             assert (H_len_t_tail : length t_tail = t').
-             { assert (H_rev_len : length (rev t) = length (false :: t_tail)) by (rewrite H_rev_t; reflexivity).
-               rewrite rev_length in H_rev_len; simpl in H_rev_len.
-               assert (H_tmp : N.to_nat (N.of_nat (length t)) = N.to_nat n) by (f_equal; exact H_size_t).
-               rewrite H_nat_n in H_tmp; lia. }
-             assert (H_len_s_tail : length s_tail = t').
-             { assert (H_rev_len : length (rev s) = length (false :: s_tail)) by (rewrite H_rev_s; reflexivity).
-               rewrite rev_length in H_rev_len; simpl in H_rev_len.
-               assert (H_tmp : N.to_nat (N.of_nat (length s)) = N.to_nat n) by (f_equal; exact H_size_s).
-               rewrite H_nat_n in H_tmp; lia. }
-             clear -H_len_s_tail H_len_t_tail.
-             generalize dependent t_tail; generalize dependent s_tail.
-             induction t' as [| t'' IHt]; intros [| b_s s_tail'] H_s [| b_t t_tail'] H_t; simpl in *; try reflexivity; try discriminate.
-             destruct b_t; simpl; [rewrite orb_false_r; apply IHt; lia | reflexivity].
+      + apply bvor_smax_sge_helper; assumption.
 
     - intro H_exists; destruct H_exists as [x [H_size_x H_sge_or]].
-      unfold bv_sge.
-      rewrite H_size_s.
-      assert (H_size_and : size (bv_and s t) = n) by (apply bv_and_size; assumption).
-      rewrite H_size_and, N.eqb_refl; unfold sge_list.
-      
-      unfold bv_sge in H_sge_or.
-      assert (H_size_or : size (bv_or x s) = n) by (apply bv_or_size; assumption).
-      rewrite H_size_or, H_size_t, N.eqb_refl in H_sge_or.
-      unfold sge_list in H_sge_or.
-      
-      assert (H_nat_pos : (0 < N.to_nat n)%nat) by lia.
-      destruct (N.to_nat n) as [| t'] eqn:H_nat_n.
-      * inversion H_nat_pos.
-      * unfold bv_and; unfold bv_or in H_sge_or; try unfold bits; try unfold bits in H_sge_or.
-        assert (H_eqb_st : (size s =? size t)%N = true) by (rewrite H_size_s, H_size_t; apply N.eqb_refl).
-        rewrite H_eqb_st.
-        assert (H_len_st : length s = length t) by (unfold size in *; lia).
-        rewrite rev_map2_and by assumption.
-        
-        assert (H_eqb_xs : (size x =? size s)%N = true) by (rewrite H_size_x, H_size_s; apply N.eqb_refl).
-        rewrite H_eqb_xs in H_sge_or.
-        assert (H_len_xs : length x = length s) by (unfold size in *; lia).
-        rewrite rev_map2_orb in H_sge_or by assumption.
-        
-        destruct (rev s) as [| s_sign s_tail] eqn:H_rev_s.
-        { assert (H_len_s : length (rev s) = 0) by (rewrite H_rev_s; reflexivity).
-          rewrite rev_length in H_len_s; unfold size in H_size_s; rewrite H_len_s in H_size_s.
-          rewrite <- H_size_s in H_nat_n; simpl in H_nat_n; discriminate H_nat_n. }
-          
-        destruct (rev t) as [| t_sign t_tail] eqn:H_rev_t.
-        { assert (H_len_t : length (rev t) = 0) by (rewrite H_rev_t; reflexivity).
-          rewrite rev_length in H_len_t; unfold size in H_size_t; rewrite H_len_t in H_size_t.
-          rewrite <- H_size_t in H_nat_n; simpl in H_nat_n; discriminate H_nat_n. }
-          
-        destruct (rev x) as [| x_sign x_tail] eqn:H_rev_x.
-        { assert (H_len_x : length (rev x) = 0) by (rewrite H_rev_x; reflexivity).
-          rewrite rev_length in H_len_x; unfold size in H_size_x; rewrite H_len_x in H_size_x.
-          rewrite <- H_size_x in H_nat_n; simpl in H_nat_n; discriminate H_nat_n. }
-          
-        simpl; simpl in H_sge_or.
-        destruct s_sign eqn:Hs_sign; destruct t_sign eqn:Ht_sign.
-        
-        -- simpl; rewrite orb_false_r.
-           assert (H_len_tails : length s_tail = length t_tail).
-           { assert (H_s_len : length (rev s) = length (true :: s_tail)) by (rewrite H_rev_s; reflexivity).
-             assert (H_t_len : length (rev t) = length (true :: t_tail)) by (rewrite H_rev_t; reflexivity).
-             rewrite rev_length in H_s_len, H_t_len; simpl in H_s_len, H_t_len; lia. }
-           clear -H_len_tails; generalize dependent t_tail.
-           induction s_tail as [| b_s s_tail' IH]; intros [| b_t t_tail'] H_len; simpl in *; try reflexivity; try discriminate.
-           destruct b_s; destruct b_t; simpl; try (rewrite orb_false_r; apply IH; lia); reflexivity.
-           
-        -- rewrite orb_true_r in H_sge_or; simpl in H_sge_or; discriminate H_sge_or.
-        
-        -- simpl; rewrite orb_false_r.
-           assert (H_len_tails : length s_tail = length t_tail).
-           { assert (H_s_len : length (rev s) = length (false :: s_tail)) by (rewrite H_rev_s; reflexivity).
-             assert (H_t_len : length (rev t) = length (true :: t_tail)) by (rewrite H_rev_t; reflexivity).
-             rewrite rev_length in H_s_len, H_t_len; simpl in H_s_len, H_t_len; lia. }
-           clear -H_len_tails; generalize dependent t_tail.
-           induction s_tail as [| b_s s_tail' IH]; intros [| b_t t_tail'] H_len; simpl in *; try reflexivity; try discriminate.
-           destruct b_s; destruct b_t; simpl; try (rewrite orb_false_r; apply IH; lia); reflexivity.
-           
-        -- simpl; rewrite orb_false_r.
-           assert (H_len_tails : length s_tail = length t_tail).
-           { assert (H_s_len : length (rev s) = length (false :: s_tail)) by (rewrite H_rev_s; reflexivity).
-             assert (H_t_len : length (rev t) = length (false :: t_tail)) by (rewrite H_rev_t; reflexivity).
-             rewrite rev_length in H_s_len, H_t_len; simpl in H_s_len, H_t_len; lia. }
-           clear -H_len_tails; generalize dependent t_tail.
-           induction s_tail as [| b_s s_tail' IH]; intros [| b_t t_tail'] H_len; simpl in *; try reflexivity; try discriminate.
-           destruct b_s; destruct b_t; simpl; try (rewrite orb_false_r; apply IH; lia); reflexivity.
+      eapply bvor_sge_exists_helper; eassumption.
   }
   
   { 
@@ -2283,7 +2007,6 @@ Proof.
       compute. reflexivity.
   }
 Qed.
-
 (* t >> (t >> s) <u signed_min <=> exists x, x << s <=s t *)
 
 (* t >> s <u signed_min <=> exists x, s << x <=s t *)
