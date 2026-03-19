@@ -306,9 +306,10 @@ Qed.
 Theorem bvshl_sgt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_slt t (bv_and (bv_shl (signed_max n) s) (signed_max n)) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_shl x s)) = true)).
+    (exists (x : bitvector), (size x = n) /\ ((bv_sgt (bv_shl x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
+  setoid_rewrite bv_sgt_slt_equiv.
   rewrite and_shl_shr_signed_max_eq by exact Hs.
   split.
   - intros H.
@@ -387,9 +388,10 @@ Admitted.
 Theorem bvshl_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_sle t (bv_and (bv_shl (signed_max n) s) (signed_max n)) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_sle t (bv_shl x s)) = true)).
+    (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shl x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
+  setoid_rewrite bv_sge_sle_equiv.
   rewrite and_shl_shr_signed_max_eq by exact Hs.
   split.
   - intros H.
@@ -607,9 +609,10 @@ Qed.
 Theorem bvshr_sgt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_slt t (bv_shr (bv_shl (signed_max n) s) s) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_shr x s)) = true)).
+    (exists (x : bitvector), (size x = n) /\ ((bv_sgt (bv_shr x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
+  setoid_rewrite bv_sgt_slt_equiv.
   split.
   - intros H.
     exists (bv_shl (signed_max n) s).
@@ -671,9 +674,10 @@ Qed.
 Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_eq s (zeros n) = false -> bv_sle t (bv_shr (bv_not (zeros n)) s) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_sle t (bv_shr x s)) = true)).
+    (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shr x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
+  setoid_rewrite bv_sge_sle_equiv.
   split.
   - intros H.
     destruct (bv_eq s (zeros n)) eqn:Hsz.

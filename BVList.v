@@ -11977,6 +11977,53 @@ Proof.
   unfold zeros. rewrite Ha_len. reflexivity.
 Qed.
 
+Lemma ugt_ult_swap : forall (x y : list bool),
+  ugt_list_big_endian x y = ult_list_big_endian y x.
+Proof.
+  intros x y.
+  destruct (ugt_list_big_endian x y) eqn:Hugt.
+  - symmetry. apply ugt_list_big_endian_ult_list_big_endian. exact Hugt.
+  - destruct (ult_list_big_endian y x) eqn:Hult.
+    + apply ult_list_big_endian_ugt_list_big_endian in Hult. rewrite Hult in Hugt. discriminate.
+    + reflexivity.
+Qed.
+
+Lemma bv_sgt_slt_equiv : forall (a b : bitvector), bv_sgt a b = bv_slt b a.
+Proof.
+  intros a b.
+  unfold bv_sgt, bv_slt, sgt_list, slt_list.
+  rewrite N.eqb_sym.
+  destruct (size b =? size a); [|reflexivity].
+  destruct (rev a) eqn:Hra; destruct (rev b) eqn:Hrb; simpl; try reflexivity.
+  replace (eqb b0 b1) with (eqb b1 b0) by (destruct b0; destruct b1; reflexivity).
+  rewrite ugt_ult_swap.
+  rewrite andb_comm with (b1 := negb b0) (b2 := b1).
+  reflexivity.
+Qed.
+
+Lemma uge_ule_swap : forall (x y : list bool),
+  uge_list_big_endian x y = ule_list_big_endian y x.
+Proof.
+  intros x y.
+  destruct (uge_list_big_endian x y) eqn:Huge.
+  - symmetry. apply uge_list_big_endian_ule_list_big_endian. exact Huge.
+  - destruct (ule_list_big_endian y x) eqn:Hule.
+    + apply ule_list_big_endian_uge_list_big_endian in Hule. rewrite Hule in Huge. discriminate.
+    + reflexivity.
+Qed.
+
+Lemma bv_sge_sle_equiv : forall (a b : bitvector), bv_sge a b = bv_sle b a.
+Proof.
+  intros a b.
+  unfold bv_sge, bv_sle, sge_list, sle_list.
+  rewrite N.eqb_sym.
+  destruct (size b =? size a); [|reflexivity].
+  destruct (rev a) eqn:Hra; destruct (rev b) eqn:Hrb; simpl; try reflexivity.
+  replace (eqb b0 b1) with (eqb b1 b0) by (destruct b0; destruct b1; reflexivity).
+  rewrite uge_ule_swap.
+  rewrite andb_comm with (b1 := negb b0) (b2 := b1).
+  reflexivity.
+Qed.
 (* End - Liam Secrist *)
 
 
