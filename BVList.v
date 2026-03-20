@@ -12026,6 +12026,103 @@ Proof.
 Qed.
 (* End - Liam Secrist *)
 
+(* Start - Liam Secrist - 3/20/26 *)
+
+Lemma signed_max_sle_any : forall (n : N) (t : bitvector),
+  size t = n -> (0 < N.to_nat n)%nat ->
+  bv_sle t (signed_max n) = true.
+Proof.
+  intros n t Ht Hpos.
+  apply signed_max_is_max.
+  - exact Ht.
+  - lia.
+Qed.
+
+Lemma zeros_bv2nat_a_pos : forall (n : N) (s : bitvector),
+  size s = n -> bv_eq s (zeros n) = false -> (0 < bv2nat_a s)%nat.
+Proof.
+  intros n s Hs Hsne.
+  assert (Hs_len : length s = N.to_nat n).
+  { unfold size in Hs.
+    apply f_equal with (f := N.to_nat) in Hs.
+    rewrite Nat2N.id in Hs. exact Hs. }
+  assert (Hs_neq_mlf : s <> mk_list_false (length s)).
+  { intro Hcontra.
+    assert (s = zeros n).
+    { rewrite Hcontra. unfold zeros. rewrite Hs_len. reflexivity. }
+    rewrite H in Hsne.
+    rewrite bv_eq_refl in Hsne. discriminate. }
+  apply gt0_nmk_list_false in Hs_neq_mlf.
+  apply Nat.ltb_lt in Hs_neq_mlf.
+  unfold bv2nat_a, list2nat_be_a. lia.
+Qed.
+
+Lemma shr_ones_is_max_sle : forall (n : N) (x s : bitvector),
+  size x = n -> size s = n ->
+  bv_eq s (zeros n) = false ->
+  bv_sle (bv_shr x s) (bv_shr (bv_not (zeros n)) s) = true.
+Proof.
+  intros n x s Hx Hs Hsne.
+  set (k := bv2nat_a s).
+  destruct (Nat.leb (N.to_nat n) k) eqn:Hshift.
+  - apply Nat.leb_le in Hshift.
+    rewrite shr_ge_size with (n := n) (a := x).
+    + rewrite shr_ge_size with (n := n) (a := bv_not (zeros n)).
+      * apply bv_sle_refl.
+      * apply bv_not_size. apply zeros_size.
+      * exact Hs.
+      * apply Nat.leb_le. exact Hshift.
+    + exact Hx.
+    + exact Hs.
+    + apply Nat.leb_le. exact Hshift.
+  - apply Nat.leb_gt in Hshift.
+    rewrite bv_shr_eq_shr_n_bits by (rewrite Hx; symmetry; exact Hs).
+    assert (Hones_size : size (bv_not (zeros n)) = n).
+    { apply bv_not_size. apply zeros_size. }
+    rewrite bv_shr_eq_shr_n_bits
+      by (rewrite Hones_size; symmetry; exact Hs).
+    fold k.
+    assert (Hx_len : length x = N.to_nat n).
+    { unfold size in Hx.
+      apply f_equal with (f := N.to_nat) in Hx.
+      rewrite Nat2N.id in Hx. exact Hx. }
+    assert (Hones_len : length (bv_not (zeros n)) = N.to_nat n).
+    { unfold size in Hones_size.
+      apply f_equal with (f := N.to_nat) in Hones_size.
+      rewrite Nat2N.id in Hones_size. exact Hones_size. }
+    assert (Hk_pos : (0 < k)%nat).
+    { unfold k. eapply zeros_bv2nat_a_pos; eassumption. }
+    assert (Hv_last : last (shr_n_bits x k) false = false).
+    { rewrite shr_n_bits_skipn_append by lia.
+      rewrite last_append.
+      - apply last_mk_list_false.
+      - destruct k; [lia | rewrite mk_list_false_succ; discriminate].
+    }
+    assert (HM_last : last (shr_n_bits (bv_not (zeros n)) k) false = false).
+    { rewrite shr_n_bits_skipn_append by lia.
+      rewrite last_append.
+      - apply last_mk_list_false.
+      - destruct k; [lia | rewrite mk_list_false_succ; discriminate].
+    }
+    rewrite bv_sle_ule_equiv_when_msb_zero by assumption.
+    rewrite shr_n_bits_skipn_append by lia.
+    rewrite shr_n_bits_skipn_append by lia.
+    assert (Hones_eq : bv_not (zeros n) = mk_list_true (N.to_nat n)).
+    { unfold zeros. rewrite bv_not_false_true. reflexivity. }
+    rewrite Hones_eq.
+    rewrite skipn_mk_list_true by lia.
+    apply bv_ule_B2P.
+    apply bv_uleP_post_append.
+    apply bv_ule_B2P.
+    assert (Hskip_len : length (skipn k x) = (N.to_nat n - k)%nat).
+    { rewrite length_skipn. lia. }
+    pose proof (bv_ule_1_length (skipn k x)) as Hule.
+    rewrite Hskip_len in Hule.
+    exact Hule.
+Qed.
+
+(* End - Liam Secrist - 3/20/26 *)
+
 
 
 
