@@ -387,7 +387,7 @@ Admitted.
 (* (maxs << s) & maxs >=s t <=> (exists x, x << s >=s t) *)
 Theorem bvshl_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-    (bv_sle t (bv_and (bv_shl (signed_max n) s) (signed_max n)) = true)
+    (bv_sge (bv_and (bv_shl (signed_max n) s) (signed_max n)) t = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shl x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
@@ -673,7 +673,7 @@ Qed.
 (* s != 0 => ~0 >> s >=s t <=> (exists x, x >> s >=s t) *)
 Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-    (bv_eq s (zeros n) = false -> bv_sle t (bv_shr (bv_not (zeros n)) s) = true)
+    (bv_eq s (zeros n) = false -> bv_sge (bv_shr (bv_not (zeros n)) s) t = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shr x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
