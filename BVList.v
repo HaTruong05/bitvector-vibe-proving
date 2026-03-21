@@ -12958,7 +12958,6 @@ Proof.
     rewrite H_split_right.
     rewrite rev_unit.
     rewrite rev_unit.
-    Search last mk_list_true.
     rewrite (neg_bv_or Hx_size Hn_s Hs_sign).
     assert (H_smax_size: size (signed_max n) = n). { apply signed_max_size. }
     rewrite (bv_or_comm Hn_s H_smax_size).
