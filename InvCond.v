@@ -628,7 +628,7 @@ Admitted.
 (* (max_s << s) & max_s >=s t <=> (exists x, x << s >=s t) *)
 Theorem bvshl_sge : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-    (bv_sle t (bv_and (bv_shl (signed_max n) s) (signed_max n)) = true)
+    (bv_sge (bv_and (bv_shl (signed_max n) s) (signed_max n)) t = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shl x s) t) = true)).
 Proof.
   intros n s t Hs Ht.
@@ -899,6 +899,54 @@ Proof.
     eapply bv_slt_sle_trans.
     + exact Hlt.
     + exact Hle.
+Qed.
+
+
+(* s != 0 => ~0 >> s >=s t <=> (exists x, x >> s >=s t) *)
+Theorem bvshr_sge : forall (n : N), forall (s t : bitvector),
+  (size s) = n -> (size t) = n -> iff
+    (bv_eq s (zeros n) = false -> bv_sge (bv_shr (bv_not (zeros n)) s) t = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_sge (bv_shr x s) t) = true)).
+Proof.
+  intros n s t Hs Ht.
+  setoid_rewrite bv_sge_sle_equiv.
+  split.
+  - intros H.
+    destruct (bv_eq s (zeros n)) eqn:Hsz.
+    + apply bv_eq_reflect in Hsz. subst s.
+      exists (signed_max n).
+      split.
+      * apply signed_max_size.
+      * assert (Hsm_size : size (signed_max n) = n) by apply signed_max_size.
+        rewrite bv_shr_eq_shr_n_bits
+          by (rewrite Hsm_size; symmetry; exact Hs).
+        unfold bv2nat_a.
+        assert (Hzeros_eq : zeros n = mk_list_false (N.to_nat n)).
+        { unfold zeros. reflexivity. }
+        rewrite Hzeros_eq.
+        unfold list2nat_be_a.
+        rewrite list2N_mk_list_false.
+        simpl.
+        destruct (N.to_nat n) eqn:Hnn.
+        --- assert (Ht_empty : t = nil).
+           { unfold size in Ht.
+             apply f_equal with (f := N.to_nat) in Ht.
+             rewrite Nat2N.id in Ht. rewrite Hnn in Ht.
+             destruct t; simpl in Ht; [reflexivity | lia]. }
+           assert (Hsm_nil : signed_max n = nil).
+           { unfold signed_max, smax_big_endian. rewrite Hnn. simpl. reflexivity. }
+           subst t. rewrite Hsm_nil. apply bv_sle_refl.
+        --- apply signed_max_is_max.
+           ++ exact Ht.
+           ++ lia.
+    + exists (bv_not (zeros n)).
+      split.
+      * apply bv_not_size. apply zeros_size.
+      * apply H. reflexivity.
+  - intros [x [Hx Hle]] Hsne.
+    eapply bv_sle_trans.
+    + exact Hle.
+    + apply shr_ones_is_max_sle; assumption.
 Qed.
 
 
