@@ -12842,9 +12842,9 @@ Lemma length_removelast_eq : forall (l1 l2 : bitvector),
 Proof.
   intros l1 l2 Hlen.
   destruct l1 as [| h1 t1], l2 as [| h2 t2].
-  - reflexivity. (* Both are nil: 0 = 0 *)
-  - discriminate Hlen. (* l1 is nil, l2 is not: impossible *)
-  - discriminate Hlen. (* l1 is not nil, l2 is: impossible *)
+  - reflexivity. 
+  - discriminate Hlen. 
+  - discriminate Hlen. 
   - assert (Hnil1 : h1 :: t1 <> nil) by discriminate.
     assert (Hnil2 : h2 :: t2 <> nil) by discriminate.
     
@@ -13035,7 +13035,6 @@ Proof.
         {
           rewrite <- Hnat.
           rewrite <- Hn_s.
-          (* Based on your earlier logic: *)
           rewrite <- bits_size. 
           unfold bits. 
           reflexivity.
