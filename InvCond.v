@@ -829,7 +829,7 @@ Proof.
               (firstn (length x - list2nat_be_a s) (rev (bv_not s)))
               (mk_list_false (list2nat_be_a s))). 
       unfold list2nat_be_a. rewrite rev_bvnot. rewrite Hx2. rewrite <- Hs2.
-      apply first_bits_ule. unfold size. rewrite rev_length.
+      apply first_bits_ule. unfold size. rewrite length_rev.
       rewrite Hx2, Hs2. easy. apply case. }
     apply (@ult_ule_list_big_endian_trans 
             (rev t) 
@@ -1666,7 +1666,7 @@ Proof. intros n s t Hs Ht Ha.
               unfold bv2nat_a, list2nat_be_a in Ha.
               apply Nat.ltb_lt in H3.
               apply Nat.ltb_lt in Ha. lia.
-            * unfold size. rewrite app_length.
+            * unfold size. rewrite length_app.
               rewrite length_skipn. rewrite length_mk_list_false.
               rewrite N.eqb_eq. Reconstr.rcrush (@Coq.Arith.PeanoNat.Nat.lt_le_incl,
                 @Coq.Arith.PeanoNat.Nat.ltb_lt, 
@@ -1871,7 +1871,7 @@ Proof. intros.
               Reconstr.rcrush (@BV.BVList.RAWBITVECTOR_LIST.length_skipn,
                 @Coq.Arith.PeanoNat.Nat.ltb_lt, 
                 @Coq.NArith.Nnat.Nat2N.id, 
-                @Coq.Lists.List.app_length, 
+                @Coq.Lists.List.length_app, 
                 @BV.BVList.RAWBITVECTOR_LIST.length_mk_list_true, 
                 @Coq.Arith.PeanoNat.Nat.sub_add, 
                 @Coq.Arith.PeanoNat.Nat.lt_le_incl) 
@@ -2005,7 +2005,7 @@ Proof.
            assert (smin_big_endian (S n0) = 
                    true :: (mk_list_false n0)) by easy.
            rewrite H1. rewrite <- hd_rev in H0.
-           rewrite <- rev_length in Hs.
+           rewrite <- length_rev in Hs.
            case (rev (b :: s)) in *.
            -- now contradict Hs.
            -- assert (hd false (b0 :: l) = false -> b0 = false) by easy.
