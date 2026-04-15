@@ -15,8 +15,11 @@
 *.native
 *.o
 *.v.d
+*.crashcoqide
 *.vio
 *.vo
+*.vok
+*.vos
 .coq-native/
 .csdp.cache
 .lia.cache
@@ -28,3 +31,6 @@ lia.cache
 nia.cache
 nlia.cache
 nra.cache
+.Makefile.d
+Makefile
+Makefile.conf
