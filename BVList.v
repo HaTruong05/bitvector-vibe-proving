@@ -14638,6 +14638,86 @@ Proof.
     exact Hule.
 Qed.
 
+(* Converse of ult_b_signed_min_implies_positive_sign:
+   MSB = false implies bv_ult b (signed_min n) *)
+Lemma nonneg_ult_signed_min : forall (n : N) (b : bitvector),
+  (0 < n)%N -> size b = n -> last b false = false ->
+  bv_ult b (signed_min n) = true.
+Proof.
+  intros n b Hn Hb Hlast.
+  destruct (bv_ult b (signed_min n)) eqn:Hult.
+  - reflexivity.
+  - exfalso.
+    apply not_bv_ult_implies_bv_uge in Hult.
+    + apply bv_uge_signed_min_implies_msb in Hult.
+      * unfold bits in Hult. rewrite Hult in Hlast. discriminate.
+      * exact Hb.
+      * exact Hn.
+    + rewrite Hb. symmetry. apply signed_min_size.
+Qed.
+
+(* Shift by zero is identity *)
+Lemma bv_shr_zeros_is_self : forall (n : N) (a : bitvector),
+  size a = n -> bv_shr a (zeros n) = a.
+Proof.
+  intros n a Ha.
+  rewrite bv_shr_eq_shr_n_bits by (rewrite Ha; symmetry; apply zeros_size).
+  assert (H : bv2nat_a (zeros n) = 0%nat).
+  { unfold bv2nat_a, list2nat_be_a, zeros.
+    rewrite list2N_mk_list_false. reflexivity. }
+  rewrite H. reflexivity.
+Qed.
+
+(* Logical right shift by a positive amount gives MSB = false *)
+Lemma last_bv_shr_pos : forall (n : N) (a s : bitvector),
+  size a = n -> size s = n -> (0 < bv2nat_a s)%nat ->
+  last (bv_shr a s) false = false.
+Proof.
+  intros n a s Ha Hs Hpos.
+  rewrite bv_shr_eq_shr_n_bits by (rewrite Ha; symmetry; exact Hs).
+  assert (Ha_len : length a = N.to_nat n).
+  { unfold size in Ha. apply f_equal with (f := N.to_nat) in Ha.
+    rewrite Nat2N.id in Ha. exact Ha. }
+  destruct (Nat.leb (N.to_nat n) (bv2nat_a s)) eqn:Hle.
+  - apply Nat.leb_le in Hle.
+    rewrite shr_n_bits_ge_length by lia.
+    apply last_mk_list_false.
+  - apply Nat.leb_gt in Hle.
+    rewrite shr_n_bits_skipn_append by lia.
+    rewrite last_append.
+    + apply last_mk_list_false.
+    + intro Hempty.
+      apply (f_equal (@length bool)) in Hempty.
+      rewrite length_mk_list_false in Hempty. simpl in Hempty. lia.
+Qed.
+
+(* If shifting t right by 0 < k < n gives zeros, then MSB of t is false *)
+Lemma bv_shr_pos_zeros_implies_last_false : forall (n : N) (t s : bitvector),
+  size t = n -> size s = n ->
+  (0 < bv2nat_a s)%nat -> (bv2nat_a s < N.to_nat n)%nat ->
+  bv_shr t s = zeros n ->
+  last t false = false.
+Proof.
+  intros n t s Ht Hs Hpos Hlt Hshr.
+  assert (Ht_len : length t = N.to_nat n).
+  { unfold size in Ht. apply f_equal with (f := N.to_nat) in Ht.
+    rewrite Nat2N.id in Ht. exact Ht. }
+  rewrite bv_shr_eq_shr_n_bits in Hshr by (rewrite Ht; symmetry; exact Hs).
+  rewrite shr_n_bits_skipn_append in Hshr by lia.
+  unfold zeros in Hshr.
+  assert (Hskipn : skipn (bv2nat_a s) t = mk_list_false (N.to_nat n - bv2nat_a s)).
+  { apply app_inv_tail with (l := mk_list_false (bv2nat_a s)).
+    rewrite Hshr. symmetry.
+    rewrite <- mk_list_false_plus. f_equal. lia. }
+  rewrite <- firstn_skipn with (n := bv2nat_a s) (l := t).
+  rewrite last_append.
+  - rewrite Hskipn. apply last_mk_list_false.
+  - rewrite Hskipn.
+    intro Hempty.
+    apply (f_equal (@length bool)) in Hempty.
+    rewrite length_mk_list_false in Hempty. simpl in Hempty. lia.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.

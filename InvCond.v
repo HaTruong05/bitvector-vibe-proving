@@ -618,11 +618,88 @@ Qed.
 
 (* t >> (t >> s) <u min_s <=> (exists x, x << s <=s t) *)
 Theorem bvshl_sle : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
+  (0 < n)%N -> (size s) = n -> (size t) = n -> iff
     (bv_ult (bv_shr t (bv_shr t s)) (signed_min n) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_shl x s) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hn Hs Ht.
+  split.
+
+  - (* Forward: LHS → RHS. Witness: bv_shr (signed_min n) s *)
+    intro HLHS.
+    exists (bv_shr (signed_min n) s).
+    split.
+    + apply bv_shr_size. apply signed_min_size. exact Hs.
+    + destruct (Nat.leb (N.to_nat n) (bv2nat_a s)) eqn:Hshift.
+      * (* s >= n: bv_shl (bv_shr (signed_min n) s) s = zeros n *)
+        apply Nat.leb_le in Hshift.
+        rewrite shl_ge_size with (n := n).
+        -- (* need bv_sle (zeros n) t = true *)
+           apply zeros_sle_nonneg. { exact Ht. }
+           apply ult_b_signed_min_implies_positive_sign with (n := n). { exact Ht. }
+           (* bv_shr t s = zeros n, so bv_shr t (bv_shr t s) = t *)
+           assert (Hts : bv_shr t s = zeros n).
+           { apply shr_ge_size. exact Ht. exact Hs. apply Nat.leb_le. exact Hshift. }
+           rewrite Hts in HLHS.
+           rewrite bv_shr_zeros_is_self in HLHS by exact Ht.
+           exact HLHS.
+        -- apply bv_shr_size. apply signed_min_size. exact Hs.
+        -- exact Hs.
+        -- unfold bits. apply Nat.leb_le. exact Hshift.
+      * (* s < n: bv_shl (bv_shr (signed_min n) s) s = signed_min n *)
+        rewrite shl_shr_signed_min.
+        -- rewrite <- Ht. apply signed_min_sle.
+        -- exact Hs.
+        -- exact Hshift.
+
+  - (* Backward: RHS → LHS *)
+    intros [x [Hx Hle]].
+    assert (Hshr_size : size (bv_shr t s) = n) by (apply bv_shr_size; [exact Ht | exact Hs]).
+    (* Case split: is the inner shift result positive? *)
+    destruct (bvgez (bv_shr t s)) as [Hk1_0 | Hk1_pos].
+    + (* bv2nat_a (bv_shr t s) = 0: inner result is zeros n *)
+      assert (Hinner_zeros : bv_shr t s = zeros n).
+      { unfold bv2nat_a, list2nat_be_a in Hk1_0.
+        apply list2N_0_implies_mlf in Hk1_0.
+        assert (Hlen : length (bv_shr t s) = N.to_nat n).
+        { unfold size in Hshr_size.
+          apply f_equal with (f := N.to_nat) in Hshr_size.
+          rewrite Nat2N.id in Hshr_size. exact Hshr_size. }
+        rewrite Hk1_0, Hlen. reflexivity. }
+      rewrite Hinner_zeros. rewrite bv_shr_zeros_is_self by exact Ht.
+      apply nonneg_ult_signed_min with (n := n). { exact Hn. } { exact Ht. }
+      (* Need: last t false = false *)
+      destruct (Nat.leb (N.to_nat n) (bv2nat_a s)) eqn:Hshift.
+      * (* s >= n: bv_shl x s = zeros n, so bv_sle (zeros n) t = true *)
+        apply Nat.leb_le in Hshift.
+        assert (Hxs : bv_shl x s = zeros n).
+        { apply shl_ge_size. exact Hx. exact Hs.
+          unfold bits. apply Nat.leb_le. exact Hshift. }
+        rewrite Hxs in Hle.
+        pose proof (bv_zeros_sle t) as Hzs.
+        rewrite Ht in Hzs. rewrite Hle in Hzs.
+        apply negb_true_iff. exact (eq_sym Hzs).
+      * (* s < n and bv_shr t s = zeros n *)
+        apply Nat.leb_gt in Hshift.
+        destruct (bvgez s) as [Hs0 | Hs_pos].
+        -- (* s = 0: bv_shr t s = t, so t = zeros n *)
+           assert (Ht_zeros : t = zeros n).
+           { rewrite bv_shr_eq_shr_n_bits in Hinner_zeros
+               by (rewrite Ht; symmetry; exact Hs).
+             rewrite Hs0 in Hinner_zeros. exact Hinner_zeros. }
+           rewrite Ht_zeros. unfold zeros. apply last_mk_list_false.
+        -- (* 0 < s < n: use bv_shr_pos_zeros_implies_last_false *)
+           apply bv_shr_pos_zeros_implies_last_false with (n := n) (s := s).
+           ++ exact Ht. ++ exact Hs. ++ exact Hs_pos. ++ exact Hshift.
+           ++ exact Hinner_zeros.
+    + (* bv2nat_a (bv_shr t s) > 0: outer shift has MSB = false *)
+      apply nonneg_ult_signed_min with (n := n). { exact Hn. }
+      { apply bv_shr_size. exact Ht. exact Hshr_size. }
+      apply last_bv_shr_pos with (n := n) (s := bv_shr t s).
+      * exact Ht.
+      * exact Hshr_size.
+      * exact Hk1_pos.
+Qed.
 
 
 (* (max_s << s) & max_s >=s t <=> (exists x, x << s >=s t) *)
