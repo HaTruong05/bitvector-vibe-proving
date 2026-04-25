@@ -658,14 +658,8 @@ Proof.
     (* Case split: is the inner shift result positive? *)
     destruct (bvgez (bv_shr t s)) as [Hk1_0 | Hk1_pos].
     + (* bv2nat_a (bv_shr t s) = 0: inner result is zeros n *)
-      assert (Hinner_zeros : bv_shr t s = zeros n).
-      { unfold bv2nat_a, list2nat_be_a in Hk1_0.
-        apply list2N_0_implies_mlf in Hk1_0.
-        assert (Hlen : length (bv_shr t s) = N.to_nat n).
-        { unfold size in Hshr_size.
-          apply f_equal with (f := N.to_nat) in Hshr_size.
-          rewrite Nat2N.id in Hshr_size. exact Hshr_size. }
-        rewrite Hk1_0, Hlen. reflexivity. }
+      assert (Hinner_zeros : bv_shr t s = zeros n)
+        by (apply bv2nat_a_zero_eq_zeros; [exact Hshr_size | exact Hk1_0]).
       rewrite Hinner_zeros. rewrite bv_shr_zeros_is_self by exact Ht.
       apply nonneg_ult_signed_min with (n := n). { exact Hn. } { exact Ht. }
       (* Need: last t false = false *)
@@ -682,11 +676,12 @@ Proof.
       * (* s < n and bv_shr t s = zeros n *)
         apply Nat.leb_gt in Hshift.
         destruct (bvgez s) as [Hs0 | Hs_pos].
-        -- (* s = 0: bv_shr t s = t, so t = zeros n *)
+        -- (* s = 0: bv_shr t (zeros n) = t, so t = zeros n *)
            assert (Ht_zeros : t = zeros n).
-           { rewrite bv_shr_eq_shr_n_bits in Hinner_zeros
-               by (rewrite Ht; symmetry; exact Hs).
-             rewrite Hs0 in Hinner_zeros. exact Hinner_zeros. }
+           { pose proof (bv2nat_a_zero_eq_zeros Hs Hs0) as Hs_eq.
+             rewrite Hs_eq in Hinner_zeros.
+             rewrite bv_shr_zeros_is_self in Hinner_zeros by exact Ht.
+             exact Hinner_zeros. }
            rewrite Ht_zeros. unfold zeros. apply last_mk_list_false.
         -- (* 0 < s < n: use bv_shr_pos_zeros_implies_last_false *)
            apply bv_shr_pos_zeros_implies_last_false with (n := n) (s := s).
@@ -809,60 +804,20 @@ Theorem bvshl_slt2 : forall (n : N), forall (s t : bitvector),
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_shl s x) t) = true)).
 Proof.
   intros n s t Hs Ht.
-  assert (Hs_len : length s = N.to_nat n).
-  { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs. rewrite Nat2N.id in Hs. exact Hs. }
-  assert (Ht_len : length t = N.to_nat n).
-  { unfold size in Ht. apply f_equal with (f := N.to_nat) in Ht. rewrite Nat2N.id in Ht. exact Ht. }
-  (* bv2nat_a s = 0 → s = zeros n *)
-  assert (Hmk_zeros : bv2nat_a s = 0 -> s = zeros n).
-  { intro H0. unfold bv2nat_a, list2nat_be_a in H0.
-    apply list2N_0_implies_mlf in H0. unfold zeros. rewrite <- Hs_len. exact H0. }
-  (* bv_shl (signed_min n) (zeros n) = signed_min n *)
   assert (Hbshift_zero : bv_shl (signed_min n) (zeros n) = signed_min n).
   { rewrite bv_shl_eq.
     pose proof (bvshl_b_zeros (signed_min n)) as H.
     rewrite signed_min_size in H. exact H. }
-  (* s nonzero → n > 0 *)
-  assert (Hpos_n : (0 < bv2nat_a s)%nat -> (0 < n)%N).
-  { intro Hsp. destruct n as [| p].
-    - exfalso.
-      assert (Hs_nil : s = nil).
-      { apply length_zero_iff_nil. simpl in Hs_len. exact Hs_len. }
-      subst s. unfold bv2nat_a, list2nat_be_a in Hsp. simpl in Hsp. lia.
-    - lia. }
-  (* signed_min m = zeros(m-1) ++ [true] *)
-  assert (Hsmin_struct : forall (m : N), (0 < m)%N ->
-      signed_min m = mk_list_false (N.to_nat m - 1) ++ (true :: nil)).
-  { intros m Hm. unfold signed_min.
-    assert (Hm_pos : (0 < N.to_nat m)%nat).
-    { destruct m as [| p]. { exact (False_ind _ (N.lt_irrefl 0 Hm)). } simpl. exact (Pos2Nat.is_pos p). }
-    destruct (N.to_nat m) as [| k] eqn:Hk. { lia. }
-    simpl smin_big_endian. simpl rev. rewrite rev_mk_list_false.
-    f_equal. f_equal. lia. }
-  (* bv_add (signed_min m) (signed_min m) = zeros m *)
-  assert (Hsmin_add_self : forall (m : N), (0 < m)%N ->
-      bv_add (signed_min m) (signed_min m) = zeros m).
-  { intros m Hm.
-    rewrite (bv_add_signed_min_flip_msb (signed_min_size m) Hm).
-    rewrite (last_signed_min Hm). simpl negb.
-    rewrite (Hsmin_struct m Hm). rewrite removelast_last.
-    unfold zeros.
-    assert (Hm_pos : (0 < N.to_nat m)%nat).
-    { destruct m as [| p]. { exact (False_ind _ (N.lt_irrefl 0 Hm)). } simpl. exact (Pos2Nat.is_pos p). }
-    destruct (N.to_nat m) as [| k] eqn:Hk. { lia. }
-    simpl. rewrite Nat.sub_0_r. symmetry. apply mk_list_false_app. }
   split.
   - (* Forward: LHS → RHS *)
     intro HLHS.
     destruct (bvgez s) as [Hs0 | Hs_pos].
     + (* s = zeros n *)
-      assert (Hs_zeros : s = zeros n) by (apply Hmk_zeros; exact Hs0).
+      assert (Hs_zeros : s = zeros n) by (apply bv2nat_a_zero_eq_zeros; [exact Hs | exact Hs0]).
       rewrite Hs_zeros, Hbshift_zero in HLHS.
-      (* HLHS : bv_ult (signed_min n) (bv_add t (signed_min n)) = true *)
       destruct (N.eq_dec n 0%N) as [Hn0 | Hn_ne].
       * assert (Ht_nil : t = nil).
-        { apply length_zero_iff_nil.
-          assert (HHn : N.to_nat n = 0) by (rewrite Hn0; reflexivity). lia. }
+        { apply length_zero_iff_nil. rewrite (size_to_length Ht), Hn0. reflexivity. }
         subst t. rewrite Hn0 in HLHS. cbn in HLHS. discriminate.
       * assert (Hn : (0 < n)%N) by (destruct n; [exact (False_ind _ (Hn_ne eq_refl)) | lia]).
         assert (Hzst : bv_slt (zeros n) t = true).
@@ -873,14 +828,13 @@ Proof.
         { pose proof (bvshl_zeros (zeros n)) as H. rewrite zeros_size in H. exact H. }
         rewrite Hzz. exact Hzst.
     + (* s nonzero *)
-      assert (Hn : (0 < n)%N) by (apply Hpos_n; exact Hs_pos).
+      assert (Hn : (0 < n)%N) by exact (n_pos_of_bv2nat_a_pos Hs Hs_pos).
       assert (Hshl_zeros : bv_shl (signed_min n) s = zeros n).
       { apply bv_shl_signed_min_nonzero; assumption. }
       rewrite Hshl_zeros in HLHS.
-      (* HLHS : bv_ult (zeros n) (bv_add t (signed_min n)) = true *)
       assert (Hne : t <> signed_min n).
       { intro Heq. subst t.
-        rewrite (Hsmin_add_self n Hn) in HLHS.
+        rewrite (bv_add_smin_smin_eq_zeros Hn) in HLHS.
         pose proof (not_bv_ult_x_zero (zeros n)) as Hc.
         rewrite zeros_size in Hc. rewrite Hc in HLHS. discriminate. }
       destruct (nonzero_bv_shl_achieves_smin Hn Hs Hs_pos) as [x [Hx Hxeq]].
@@ -891,28 +845,24 @@ Proof.
     intros [x [Hx Hle]].
     destruct (bvgez s) as [Hs0 | Hs_pos].
     + (* s = zeros n *)
-      assert (Hs_zeros : s = zeros n) by (apply Hmk_zeros; exact Hs0).
+      assert (Hs_zeros : s = zeros n) by (apply bv2nat_a_zero_eq_zeros; [exact Hs | exact Hs0]).
       rewrite Hs_zeros in Hle.
       assert (Hshift_x : bv_shl (zeros n) x = zeros n).
       { pose proof (bvshl_zeros x) as H. rewrite Hx in H. exact H. }
       rewrite Hshift_x in Hle.
-      (* Hle : bv_slt (zeros n) t = true *)
       rewrite Hs_zeros, Hbshift_zero.
-      (* Goal: bv_ult (signed_min n) (bv_add t (signed_min n)) = true *)
       destruct (N.eq_dec n 0%N) as [Hn0 | Hn_ne].
       * assert (Ht_nil : t = nil).
-        { apply length_zero_iff_nil.
-          assert (HHn : N.to_nat n = 0) by (rewrite Hn0; reflexivity). lia. }
+        { apply length_zero_iff_nil. rewrite (size_to_length Ht), Hn0. reflexivity. }
         subst t. rewrite Hn0 in Hle. cbn in Hle. discriminate.
       * assert (Hn : (0 < n)%N) by (destruct n; [exact (False_ind _ (Hn_ne eq_refl)) | lia]).
         rewrite bv_ult_smin_add_smin_eq_slt_zeros by assumption.
         exact Hle.
     + (* s nonzero *)
-      assert (Hn : (0 < n)%N) by (apply Hpos_n; exact Hs_pos).
+      assert (Hn : (0 < n)%N) by exact (n_pos_of_bv2nat_a_pos Hs Hs_pos).
       assert (Hshl_zeros : bv_shl (signed_min n) s = zeros n).
       { apply bv_shl_signed_min_nonzero; assumption. }
       rewrite Hshl_zeros.
-      (* Goal: bv_ult (zeros n) (bv_add t (signed_min n)) = true *)
       assert (Hslt : bv_slt (signed_min n) t = true).
       { eapply bv_sle_slt_trans.
         - rewrite <- (bv_shl_size Hs Hx). apply signed_min_sle.
@@ -920,29 +870,7 @@ Proof.
       assert (Hne : t <> signed_min n).
       { intro Heq. rewrite Heq in Hslt. rewrite bv_slt_nrefl in Hslt. discriminate. }
       assert (Hadd_ne : bv_add t (signed_min n) <> zeros n).
-      { intro H.
-        rewrite (bv_add_signed_min_flip_msb Ht Hn) in H.
-        assert (Hlast_t : last t false = true).
-        { pose proof (last_app (removelast t) (negb (last t false)) false) as Heq.
-          rewrite H in Heq. unfold zeros in Heq. rewrite last_mk_list_false in Heq.
-          destruct (last t false); [reflexivity | simpl negb in Heq; discriminate]. }
-        rewrite Hlast_t in H. simpl negb in H.
-        assert (Hmkf : zeros n = mk_list_false (N.to_nat n - 1) ++ (false :: nil)).
-        { unfold zeros.
-          assert (Hn_pos : (0 < N.to_nat n)%nat).
-          { destruct n as [| p]. { exact (False_ind _ (N.lt_irrefl 0 Hn)). } simpl. exact (Pos2Nat.is_pos p). }
-          destruct (N.to_nat n) as [| k] eqn:Hk. { lia. }
-          simpl. rewrite Nat.sub_0_r. apply mk_list_false_app. }
-        rewrite Hmkf in H.
-        assert (Hrl : removelast t = mk_list_false (N.to_nat n - 1)).
-        { exact (app_inv_tail (false :: nil) (removelast t) (mk_list_false (N.to_nat n - 1)) H). }
-        assert (Hn_pos : (0 < N.to_nat n)%nat).
-        { destruct n as [| p]. { exact (False_ind _ (N.lt_irrefl 0 Hn)). } simpl. exact (Pos2Nat.is_pos p). }
-        assert (Ht_ne : t <> nil).
-        { intro Heq. subst t. simpl in Ht_len. lia. }
-        pose proof (app_removelast_last false Ht_ne) as Ht_split.
-        rewrite Hlast_t, Hrl in Ht_split.
-        apply Hne. rewrite Ht_split. symmetry. apply Hsmin_struct. exact Hn. }
+      { apply bv_add_t_smin_ne_zeros; assumption. }
       assert (Hule : bv_ule (zeros n) (bv_add t (signed_min n)) = true).
       { apply bv_uge_bv_ule. apply bv_uge_zeros.
         apply bv_add_size; [exact Ht | apply signed_min_size]. }
@@ -963,13 +891,7 @@ Proof.
     intro HLHS.
     destruct (bvgez s) as [Hs0 | Hs_pos].
     + (* bv2nat_a s = 0, so s = zeros n *)
-      assert (Hs_zeros : s = zeros n).
-      { unfold bv2nat_a, list2nat_be_a in Hs0.
-        apply list2N_0_implies_mlf in Hs0.
-        assert (Hs_len : length s = N.to_nat n).
-        { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs.
-          rewrite Nat2N.id in Hs. exact Hs. }
-        unfold zeros. rewrite <- Hs_len. exact Hs0. }
+      assert (Hs_zeros : s = zeros n) by (apply bv2nat_a_zero_eq_zeros; [exact Hs | exact Hs0]).
       (* bv_shr t (zeros n) = t, so hypothesis gives last t false = false *)
       assert (Hlast_t : last t false = false).
       { rewrite Hs_zeros in HLHS.
@@ -997,13 +919,7 @@ Proof.
     intros [x [Hx Hle]].
     destruct (bvgez s) as [Hs0 | Hs_pos].
     + (* bv2nat_a s = 0, so s = zeros n *)
-      assert (Hs_zeros : s = zeros n).
-      { unfold bv2nat_a, list2nat_be_a in Hs0.
-        apply list2N_0_implies_mlf in Hs0.
-        assert (Hs_len : length s = N.to_nat n).
-        { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs.
-          rewrite Nat2N.id in Hs. exact Hs. }
-        unfold zeros. rewrite <- Hs_len. exact Hs0. }
+      assert (Hs_zeros : s = zeros n) by (apply bv2nat_a_zero_eq_zeros; [exact Hs | exact Hs0]).
       (* bv_shl (zeros n) x = zeros n, so zeros n <=s t *)
       rewrite Hs_zeros in Hle.
       assert (Hsxl : bv_shl (zeros n) x = zeros n).
