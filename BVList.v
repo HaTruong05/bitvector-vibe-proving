@@ -15129,6 +15129,61 @@ Proof.
   apply Hne. rewrite Ht_split. symmetry. apply signed_min_struct. exact Hn.
 Qed.
 
+(* last s = false → bv_and s (signed_max n) = s *)
+Lemma bv_and_nonneg_smax_eq : forall (n : N) (s : bitvector),
+  size s = n -> last s false = false ->
+  bv_and s (signed_max n) = s.
+Proof.
+  intros n s Hn_s Hs_sign.
+  destruct (N.to_nat n) as [| t'] eqn:Hn_nat.
+  - assert (s = nil). { apply length_zero_iff_nil. unfold size in Hn_s. lia. }
+    subst. unfold signed_max, smax_big_endian. rewrite Hn_nat. simpl. reflexivity.
+  - assert (Hs_not_nil: s <> nil).
+    { intro Hs_nil. rewrite Hs_nil in Hn_s. rewrite <- Hn_s in Hn_nat. discriminate. }
+    unfold bv_and.
+    rewrite Hn_s, signed_max_size. rewrite N.eqb_refl.
+    unfold signed_max, smax_big_endian. rewrite Hn_nat. simpl rev. rewrite rev_mk_list_true.
+    unfold bits.
+    assert (Hlen : length s = S t').
+    { unfold size in Hn_s. rewrite <- Hn_s in Hn_nat. rewrite Nat2N.id in Hn_nat. exact Hn_nat. }
+    rewrite (app_removelast_last false Hs_not_nil) at 1. rewrite Hs_sign.
+    assert (Hrl : length (removelast s) = t').
+    { rewrite removelast_firstn_len. rewrite length_firstn. rewrite Hlen. simpl. apply Nat.min_l. lia. }
+    rewrite map2_and_app.
+    + simpl (map2 andb (false :: nil) (false :: nil)).
+      rewrite <- Hrl. rewrite map2_and_1_neutral.
+      symmetry. rewrite <- Hs_sign. exact (app_removelast_last false Hs_not_nil).
+    + rewrite length_mk_list_true. exact Hrl.
+    + easy.
+Qed.
+
+(* last s = true → bv_or s (signed_max n) = ones n *)
+Lemma bv_or_neg_smax_ones : forall (n : N) (s : bitvector),
+  size s = n -> last s false = true ->
+  bv_or s (signed_max n) = ones n.
+Proof.
+  intros n s Hn_s Hs_sign.
+  assert (Hs_not_nil: s <> nil).
+  { intro H. subst. simpl in Hs_sign. discriminate. }
+  destruct (N.to_nat n) as [| t'] eqn:Hn_nat.
+  - exfalso. apply Hs_not_nil. apply length_zero_iff_nil. unfold size in Hn_s. lia.
+  - unfold bv_or.
+    rewrite Hn_s, signed_max_size. rewrite N.eqb_refl.
+    unfold signed_max, smax_big_endian. rewrite Hn_nat. simpl rev. rewrite rev_mk_list_true.
+    unfold bits.
+    assert (Hlen : length s = S t').
+    { unfold size in Hn_s. rewrite <- Hn_s in Hn_nat. rewrite Nat2N.id in Hn_nat. exact Hn_nat. }
+    rewrite (app_removelast_last false Hs_not_nil) at 1. rewrite Hs_sign.
+    assert (Hrl : length (removelast s) = t').
+    { rewrite removelast_firstn_len. rewrite length_firstn. rewrite Hlen. simpl. apply Nat.min_l. lia. }
+    rewrite map2_or_app.
+    + simpl (map2 orb (true :: nil) (false :: nil)).
+      rewrite <- Hrl. rewrite map2_or_1_true. rewrite Hrl.
+      unfold ones. rewrite Hn_nat. symmetry. apply mk_list_true_app.
+    + rewrite length_mk_list_true. exact Hrl.
+    + easy.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.

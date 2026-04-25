@@ -2323,9 +2323,91 @@ Theorem bvashr_sgt2 : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
     (bv_slt t (bv_and s (signed_max n)) = true /\
      bv_slt t (bv_or s (signed_max n)) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_ashr x s)) = true)).
+    (exists (x : bitvector), (size x = n) /\ ((bv_slt t (bv_ashr s x)) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split.
+  + (* Forward: LHS -> RHS *)
+    intros (H1, H2).
+    case_eq (last s false); intro Hsign.
+    * (* s negative: bv_or s smax = ones n; witness shifts s to ones n *)
+      rewrite (bv_or_neg_smax_ones Hs Hsign) in H2.
+      exists (nat2bv (length s) (size s)). split.
+      { rewrite nat2bv_size. exact Hs. }
+      rewrite bv_ashr_eq. rewrite (ashr_size_sign1 Hsign).
+      unfold ones, zeros. rewrite bv_not_false_true. rewrite Hs. exact H2.
+    * (* s non-negative: bv_and s smax = s; witness zeros n shifts s to itself *)
+      rewrite (bv_and_nonneg_smax_eq Hs Hsign) in H1.
+      exists (zeros n). split.
+      { apply zeros_size. }
+      rewrite <- Hs. rewrite bv_ashr_eq. rewrite bvashr_zero. exact H1.
+  + (* Backward: RHS -> LHS *)
+    intros (x, (Hx, A)).
+    (* When n = 0, t and bv_ashr s x are nil so bv_slt is false, contradicting A *)
+    assert (Hn : (0 < N.to_nat n)%nat).
+    { destruct n.
+      - exfalso.
+        assert (Ht_nil : t = nil).
+        { apply length_zero_iff_nil. unfold size in Ht. simpl in Ht. lia. }
+        assert (Hashr_nil : bv_ashr s x = nil).
+        { apply length_zero_iff_nil.
+          assert (H := bv_ashr_size Hs Hx). unfold size in H. simpl in H. lia. }
+        rewrite Ht_nil, Hashr_nil in A. rewrite bv_slt_nrefl in A. discriminate.
+      - simpl. apply Pos2Nat.is_pos. }
+    case_eq (last s false); intro Hsign.
+    * (* s negative *)
+      pose proof (sign_bv_ashr Hs Hx) as Hsign_ashr.
+      rewrite Hsign in Hsign_ashr.
+      (* last (bv_and s smax) = false because last smax = false *)
+      pose proof (last_signed_max_false Hn) as Hsmax_sign.
+      assert (Hand_sign : last (bv_and s (signed_max n)) false = false).
+      { rewrite (bv_and_comm Hs (signed_max_size n)).
+        exact (pos_bvand_pos (signed_max_size n) Hs Hsmax_sign). }
+      (* last t = true: if t were non-negative, bv_ashr s x <s t contradicts A *)
+      assert (Ht_neg : last t false = true).
+      { case_eq (last t false); intro Ht_case.
+        - reflexivity.
+        - exfalso.
+          assert (H_size : size (bv_ashr s x) = size t).
+          { rewrite (bv_ashr_size Hs Hx), Ht. reflexivity. }
+          pose proof (bv_slt_tf H_size Hsign_ashr Ht_case) as Hlt.
+          pose proof (bv_slt_trans A Hlt) as Hcontra.
+          rewrite bv_slt_nrefl in Hcontra. discriminate. }
+      split.
+      { (* t <s bv_and s smax: t negative, bv_and s smax non-negative *)
+        apply bv_slt_tf.
+        - rewrite Ht, (bv_and_size Hs (signed_max_size n)). reflexivity.
+        - exact Ht_neg.
+        - exact Hand_sign. }
+      { (* t <s bv_or s smax = ones n; chain t <s bv_ashr s x <=s ones n *)
+        rewrite (bv_or_neg_smax_ones Hs Hsign).
+        assert (Hones_sign : last (ones n) false = true).
+        { unfold ones. apply last_mk_list_true. lia. }
+        assert (sign_eq : last (bv_ashr s x) false = last (ones n) false).
+        { rewrite Hsign_ashr. exact (eq_sym Hones_sign). }
+        pose proof (ones_bv_uge_size (bv_ashr s x)) as Hones_uge.
+        rewrite (bv_ashr_size Hs Hx) in Hones_uge.
+        apply bv_uge_bv_ule in Hones_uge.
+        assert (H_sle : bv_sle (bv_ashr s x) (ones n) = true).
+        { rewrite (bv_sle_ule_same_sign (bv_ashr_size Hs Hx) (ones_size n) sign_eq).
+          exact Hones_uge. }
+        exact (bv_slt_sle_trans A H_sle). }
+    * (* s non-negative *)
+      pose proof (sign_bv_ashr Hs Hx) as Hsign_ashr_eq.
+      (* bv_ashr s x <=s s since s is non-negative *)
+      assert (H_ashr_sle_s : bv_sle (bv_ashr s x) s = true).
+      { assert (H_size_eq : size x = size s). { rewrite Hx, Hs. reflexivity. }
+        pose proof (positive_bv_implies_uge_bv_ashr (b := s) (x := x) H_size_eq Hsign) as Huge.
+        rewrite <- bv_ashr_eq in Huge.
+        apply bv_uge_bv_ule in Huge.
+        rewrite (bv_sle_ule_same_sign (bv_ashr_size Hs Hx) Hs Hsign_ashr_eq).
+        exact Huge. }
+      pose proof (bv_slt_sle_trans A H_ashr_sle_s) as Ht_lt_s.
+      split.
+      { rewrite (bv_and_nonneg_smax_eq Hs Hsign). exact Ht_lt_s. }
+      { rewrite (bv_or_pos_smax Hs Hsign).
+        exact (bv_slt_sle_trans Ht_lt_s (signed_max_sle_any Hs Hn)). }
+Qed.
 
 
 (* t >=s 0 \/ t >=s s <=> (exists x, s >>a x <=s t) *)
