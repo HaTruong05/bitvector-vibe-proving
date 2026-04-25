@@ -2334,7 +2334,45 @@ Theorem bvashr_sle2 : forall (n : N), forall (s t : bitvector),
     (bv_sge t (zeros n) = true \/ bv_sge t s = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_ashr s x) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  rewrite (bv_sge_iff_sle t (zeros n)).
+  rewrite (bv_sge_iff_sle t s).
+  split.
+  + intros [H | H].
+    - (* bv_sle (zeros n) t: t >=s 0 *)
+      case_eq (last s false); intro Hsign.
+      * (* s negative: witness zeros n, ashr s 0 = s <=s t *)
+        exists (zeros n). split.
+        { apply zeros_size. }
+        rewrite <- Hs. rewrite bv_ashr_eq. rewrite bvashr_zero.
+        apply bv_sle_eq. left.
+        assert (Hslt : bv_slt s (zeros n) = true).
+        { rewrite <- Hs. rewrite bv_slt_zeros. exact Hsign. }
+        exact (bv_slt_sle_trans Hslt H).
+      * (* s non-negative: shift all the way to 0 *)
+        exists (nat2bv (length s) (size s)). split.
+        { rewrite nat2bv_size. exact Hs. }
+        pose proof (ashr_size_sign0 Hsign) as Hshift.
+        rewrite bv_ashr_eq. rewrite Hshift. rewrite Hs. exact H.
+    - (* bv_sle s t: t >=s s, witness zeros n *)
+      exists (zeros n). split.
+      { apply zeros_size. }
+      rewrite <- Hs. rewrite bv_ashr_eq. rewrite bvashr_zero.
+      exact H.
+  + intros (x, (Hx, A)).
+    case_eq (last s false); intro Hsign.
+    - (* s negative: ashr s x >=s s, so s <=s t *)
+      right.
+      exact (bv_sle_trans (bv_ashr_neg Hs Hx Hsign) A).
+    - (* s non-negative: ashr s x >=s 0, so 0 <=s t *)
+      left.
+      pose proof (sign_bv_ashr Hs Hx) as Hsign_ashr.
+      rewrite Hsign in Hsign_ashr.
+      pose proof (bv_zeros_sle (bv_ashr s x)) as Hzero_sle.
+      rewrite (bv_ashr_size Hs Hx) in Hzero_sle.
+      rewrite Hsign_ashr in Hzero_sle. simpl in Hzero_sle.
+      exact (bv_sle_trans Hzero_sle A).
+Qed.
 
 
 (*------------------------------------------------------------*)
