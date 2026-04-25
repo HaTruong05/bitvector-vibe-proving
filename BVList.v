@@ -15184,6 +15184,413 @@ Proof.
     + easy.
 Qed.
 
+(* ===== Helper lemmas for bvand_sge ===== *)
+
+(* borrow-subtract single bit equals add with negated b and negated carry *)
+Lemma subst_borrow_carry_inv : forall b1 b2 b,
+  let (r, c) := subst_borrow b1 b2 b in
+  add_carry b1 (negb b2) (negb b) = (r, negb c).
+Proof. destruct b1; destruct b2; destruct b; reflexivity. Qed.
+
+(* subst_list_borrow equals add_list_ingr with negated mask and negated carry-in *)
+Lemma subst_list_borrow_eq_add_ingr : forall a b c,
+  length a = length b ->
+  subst_list_borrow a b c = add_list_ingr a (map negb b) (negb c).
+Proof.
+  induction a as [| a1 as1 IH]; intros b c Hlen.
+  - destruct b; simpl; reflexivity.
+  - destruct b as [| b1 bs]; [discriminate Hlen |].
+    simpl in Hlen. injection Hlen as Hlen.
+    simpl subst_list_borrow. simpl add_list_ingr.
+    pose proof (subst_borrow_carry_inv a1 b1 c) as Hinv.
+    destruct (subst_borrow a1 b1 c) as [r c'] eqn:Hbc.
+    rewrite Hinv. f_equal.
+    exact (IH bs c' Hlen).
+Qed.
+
+(* list2int a + list2int (~a) = 2^n - 1 *)
+Lemma list2int_map_negb_sum : forall b,
+  (list2int b + list2int (map negb b) = pow2_int (length b) - 1)%Z.
+Proof.
+  induction b as [| h t IH].
+  - reflexivity.
+  - rewrite !list2int_cons. simpl (map negb (h :: t)).
+    rewrite list2int_cons. simpl length. rewrite pow2_int_succ.
+    destruct h; simpl bool2int; lia.
+Qed.
+
+(* Integer formula for borrow subtraction: (a - b + 2^n) mod 2^n *)
+Lemma list2int_subst_list_formula : forall a b,
+  length a = length b ->
+  (list2int (subst_list a b) =
+   (list2int a - list2int b + pow2_int (length a)) mod pow2_int (length a))%Z.
+Proof.
+  intros a b Hlen.
+  unfold subst_list.
+  rewrite (@subst_list_borrow_eq_add_ingr a b false Hlen).
+  simpl negb.
+  rewrite list2int_add_list_ingr; [| now rewrite length_map].
+  simpl bool2int.
+  pose proof (list2int_map_negb_sum b) as Hsum.
+  replace (list2int (map negb b)) with (pow2_int (length b) - 1 - list2int b)%Z by lia.
+  rewrite <- Hlen. f_equal. lia.
+Qed.
+
+(* Bitwise inclusion-exclusion: list2int(a&b) + list2int(a|b) = list2int a + list2int b *)
+Lemma list2int_map2_and_or_sum : forall a b,
+  length a = length b ->
+  (list2int (map2 andb a b) + list2int (map2 orb a b) = list2int a + list2int b)%Z.
+Proof.
+  induction a as [| a1 as1 IH]; intros b Hlen.
+  - destruct b; [simpl; lia | discriminate Hlen].
+  - destruct b as [| b1 bs]; [discriminate Hlen |].
+    simpl in Hlen. injection Hlen as Hlen.
+    simpl (map2 andb (a1 :: as1) (b1 :: bs)).
+    simpl (map2 orb (a1 :: as1) (b1 :: bs)).
+    rewrite !list2int_cons.
+    pose proof (IH bs Hlen) as IH'.
+    destruct a1; destruct b1; simpl bool2int; lia.
+Qed.
+
+(* ule_list implies list2int ≤ *)
+Lemma ule_list_list2int : forall x y,
+  length x = length y ->
+  ule_list x y = true ->
+  (list2int x <= list2int y)%Z.
+Proof.
+  intros x y Hlen H.
+  unfold ule_list in H.
+  apply ule_list_big_endian_implies_ult_list_big_endian_or_eq in H.
+  destruct H as [H | H].
+  - apply Z.lt_le_incl.
+    assert (Hlenr : length (rev x) = length (rev y)) by (now rewrite !length_rev).
+    apply ult_list_big_endian_list2int in H; [| exact Hlenr].
+    now rewrite !rev_involutive in H.
+  - apply rev_inj in H. subst. lia.
+Qed.
+
+(* bv_ult a b = false implies list2int b ≤ list2int a *)
+Lemma bv_ult_false_list2int_ge : forall a b,
+  size a = size b ->
+  bv_ult a b = false ->
+  (list2int b <= list2int a)%Z.
+Proof.
+  intros a b Hsize Hult.
+  pose proof (not_bv_ult_implies_bv_uge Hsize Hult) as Huge.
+  apply bv_uge_eq in Huge.
+  destruct Huge as [Hugt | Heq].
+  - apply Z.lt_le_incl.
+    apply bv_ugt_bv_ult in Hugt.
+    apply ult_list_list2int.
+    + apply size_len_eq. now rewrite Hsize.
+    + unfold bv_ult in Hugt. rewrite Hsize, N.eqb_refl in Hugt. exact Hugt.
+  - subst. lia.
+Qed.
+
+(* last v = true implies list2int v >= 2^(length v - 1) *)
+Lemma last_true_list2int_lb : forall v,
+  v <> [] ->
+  last v false = true ->
+  (pow2_int (length v - 1) <= list2int v)%Z.
+Proof.
+  intros v Hne Hlast.
+  pose proof (app_removelast_last false Hne) as Hdecomp.
+  pose proof (f_equal (@length bool) Hdecomp) as Hlen_eq.
+  rewrite length_app in Hlen_eq. simpl in Hlen_eq.
+  rewrite Hlast in Hdecomp.
+  rewrite Hdecomp.
+  rewrite list2int_app. simpl list2int. simpl bool2int. rewrite Z.mul_1_r.
+  rewrite length_app. simpl length. rewrite Nat.add_sub.
+  pose proof (@list2int_geq_zero (removelast v)) as Hge. lia.
+Qed.
+
+(* If a non-neg (last=false) and b neg (last=true): list2int(a&b) <= list2int b - 2^(n-1) *)
+Lemma last_false_and_true_submask_bound : forall a b,
+  length a = length b ->
+  last a false = false ->
+  last b false = true ->
+  (list2int (map2 andb a b) <= list2int b - pow2_int (length b - 1))%Z.
+Proof.
+  intros a b Hlen Ha_last Hb_last.
+  assert (Hb_ne : b <> []).
+  { intro H. subst. simpl in Hb_last. discriminate. }
+  assert (Ha_ne : a <> []).
+  { intro H. subst. destruct b; [exact (Hb_ne eq_refl) | discriminate Hlen]. }
+  pose proof (app_removelast_last false Ha_ne) as Ha_decomp. rewrite Ha_last in Ha_decomp.
+  pose proof (app_removelast_last false Hb_ne) as Hb_decomp. rewrite Hb_last in Hb_decomp.
+  set (ia := removelast a). set (ib := removelast b).
+  assert (Hia_len : length ia = pred (length a)).
+  { unfold ia. apply (f_equal (@length bool)) in Ha_decomp.
+    rewrite length_app in Ha_decomp. simpl in Ha_decomp. lia. }
+  assert (Hib_len : length ib = pred (length b)).
+  { unfold ib. apply (f_equal (@length bool)) in Hb_decomp.
+    rewrite length_app in Hb_decomp. simpl in Hb_decomp. lia. }
+  assert (Hlen_iab : length ia = length ib) by lia.
+  assert (Hle_and_ib : (list2int (map2 andb ia ib) <= list2int ib)%Z).
+  { apply ule_list_list2int.
+    - pose proof (map2_and_length Hlen_iab) as Hmap2_len. lia.
+    - rewrite map2_and_comm. apply ule_list_map2_and. lia. }
+  assert (Hb_int : (list2int b = list2int ib + pow2_int (length ib))%Z).
+  { rewrite Hb_decomp, list2int_app, list2int_bool.
+    change (bool2int true) with 1%Z. rewrite Z.mul_1_r. apply Z.add_comm. }
+  assert (Handb_int : (list2int (map2 andb a b) = list2int (map2 andb ia ib))%Z).
+  { rewrite Ha_decomp, Hb_decomp.
+    rewrite map2_and_app; [| exact Hlen_iab | easy].
+    simpl (map2 andb [false] [true]).
+    rewrite list2int_app, list2int_bool.
+    change (bool2int false) with 0%Z. rewrite Z.mul_0_r. rewrite Z.add_0_l. reflexivity. }
+  assert (Hpow : pow2_int (length b - 1) = pow2_int (length ib)).
+  { f_equal. lia. }
+  lia.
+Qed.
+
+(* Key lemma for bvand_sge backward direction *)
+Lemma bvand_sge_key : forall (n : N) (s t x : bitvector),
+  size s = n -> size t = n -> size x = n ->
+  bv_slt t (bv_and x s) = true ->
+  bv_and s t = t \/ bv_slt t (bv_and (bv_subt t s) s) = true.
+Proof.
+  intros n s t x Hs Ht Hx Hslt.
+  pose proof (@bv_and_size n x s Hx Hs) as Hxs_sz.
+  pose proof (@bv_subt_size n t s Ht Hs) as HD_sz.
+  pose proof (@bv_and_size n (bv_subt t s) s HD_sz Hs) as HDs_sz.
+  pose proof (@size_to_length n s Hs) as Hlen_s.
+  pose proof (@size_to_length n t Ht) as Hlen_t.
+  pose proof (@size_to_length n x Hx) as Hlen_x.
+  pose proof (@size_to_length n (bv_and x s) Hxs_sz) as Hlen_xs.
+  pose proof (@size_to_length n (bv_subt t s) HD_sz) as Hlen_D.
+  pose proof (@size_to_length n (bv_and (bv_subt t s) s) HDs_sz) as Hlen_Ds.
+  rewrite (@bv_slt_iff_sbv2int n t (bv_and x s) Ht Hxs_sz) in Hslt.
+  right.
+  rewrite (@bv_slt_iff_sbv2int n t (bv_and (bv_subt t s) s) Ht HDs_sz).
+  (* Work with unfolded sbv2int *)
+  unfold sbv2int in *.
+  set (T := bv2int t). set (M := bv2int (bv_and x s)).
+  set (S := bv2int s). set (D := bv2int (bv_subt t s)).
+  set (Ds := bv2int (bv_and (bv_subt t s) s)).
+  set (P := pow2_int_N n).
+  (* Key: bv2int = list2int *)
+  unfold bv2int in *. fold T M S D Ds P.
+  (* Unfold bv operations to list operations *)
+  assert (HT_eq : T = list2int t) by (unfold T; reflexivity).
+  assert (HM_eq : M = list2int (bv_and x s)) by (unfold M; reflexivity).
+  assert (HS_eq : S = list2int s) by (unfold S; reflexivity).
+  assert (HD_eq : D = list2int (bv_subt t s)) by (unfold D; reflexivity).
+  assert (HDs_eq : Ds = list2int (bv_and (bv_subt t s) s)) by (unfold Ds; reflexivity).
+  (* P = pow2_int (N.to_nat n) = pow2_int (length t) *)
+  assert (HP_eq : P = pow2_int (length t)) by (unfold P, pow2_int_N; now rewrite Hlen_t).
+  (* bv_and x s: unfold to map2 andb *)
+  assert (HM_and : list2int (bv_and x s) = list2int (map2 andb x s)).
+  { unfold bv_and. rewrite Hx, Hs, N.eqb_refl. unfold bits. reflexivity. }
+  assert (HDs_and : list2int (bv_and (bv_subt t s) s) = list2int (map2 andb (subst_list t s) s)).
+  { unfold bv_and. rewrite HD_sz, Hs, N.eqb_refl. unfold bits.
+    unfold bv_subt. rewrite Ht, Hs, N.eqb_refl. reflexivity. }
+  (* subst_list t s integer formula *)
+  assert (HLen_ts : length t = length s) by (rewrite Hlen_t, Hlen_s; reflexivity).
+  pose proof (@list2int_subst_list_formula t s HLen_ts) as HDform.
+  (* Key: list2int s <= list2int (mk_list_true...) = 2^n - 1 *)
+  pose proof (@list2int_lt_pow2_int s (length s) eq_refl) as HS_ub.
+  pose proof (@list2int_lt_pow2_int t (length t) eq_refl) as HT_ub.
+  pose proof (@list2int_geq_zero s) as HS_lb.
+  pose proof (@list2int_geq_zero t) as HT_lb.
+  (* bv_and x s <=u s *)
+  assert (Hlen_xs_eq : length x = length s) by (rewrite Hlen_x, Hlen_s; reflexivity).
+  assert (HMleS : (list2int (map2 andb x s) <= list2int s)%Z).
+  { apply ule_list_list2int.
+    - pose proof (@map2_and_length x s Hlen_xs_eq) as Hml. lia.
+    - rewrite map2_and_comm. apply (@ule_list_map2_and s x). lia. }
+  (* bv_and Ds s <=u s *)
+  assert (HDsleS : (list2int (map2 andb (subst_list t s) s) <= list2int s)%Z).
+  { assert (HDs_len : length (subst_list t s) = length s).
+    { pose proof (@subst_list_length t s HLen_ts). lia. }
+    apply ule_list_list2int.
+    - pose proof (@map2_and_length (subst_list t s) s HDs_len) as Hml. lia.
+    - rewrite map2_and_comm. apply (@ule_list_map2_and s (subst_list t s)). lia. }
+  (* Case split on bv_ult t s *)
+  destruct (bv_ult t s) eqn:Hult_ts.
+  - (* t <u s: list2int t < list2int s *)
+    assert (HT_lt_S : (list2int t < list2int s)%Z).
+    { apply ult_list_list2int; [rewrite Hlen_t, Hlen_s; reflexivity |].
+      unfold bv_ult in Hult_ts. rewrite Ht, Hs, N.eqb_refl in Hult_ts. exact Hult_ts. }
+    (* D formula: (T - S + P) mod P, no wrap since T < S *)
+    assert (HD_val : (list2int (subst_list t s) = list2int t - list2int s + pow2_int (length t))%Z).
+    { rewrite HDform. apply Z.mod_small.
+      split; [rewrite HLen_ts; lia |]. lia. }
+    (* Inclusion-exclusion for map2 andb (subst_list t s) s *)
+    assert (HIE : length (subst_list t s) = length s).
+    { pose proof (@subst_list_length t s HLen_ts). lia. }
+    pose proof (@list2int_map2_and_or_sum (subst_list t s) s HIE) as Hincl.
+    pose proof (@list2int_lt_pow2_int (map2 orb (subst_list t s) s)
+                  (length (map2 orb (subst_list t s) s)) eq_refl) as Hor_ub.
+    rewrite <- (@map2_or_length (subst_list t s) s HIE) in Hor_ub.
+    rewrite HIE, Hlen_s, <- Hlen_t in Hor_ub. rewrite <- HP_eq in Hor_ub.
+    (* list2int (Ds) >= list2int t + 1 *)
+    assert (HDs_lb : (list2int (map2 andb (subst_list t s) s) >= list2int t + 1)%Z).
+    { rewrite HD_val in Hincl. lia. }
+    (* Now case split on signs of t and bv_and (bv_subt t s) s *)
+    destruct (last t false) eqn:Ht_sign;
+    destruct (last (bv_and (bv_subt t s) s) false) eqn:HDs_sign.
+    + (* t neg, Ds neg: sbv2int = list2int - P *)
+      lia.
+    + (* t neg, Ds non-neg: 0 > t_signed, Ds_signed >= 0 *)
+      pose proof (@list2int_geq_zero (bv_and (bv_subt t s) s)) as HDs_ge.
+      rewrite HP_eq.
+      assert (Ht_neg : (pow2_int (length t - 1) <= list2int t)%Z).
+      { apply last_true_list2int_lb.
+        - intro H. subst t. simpl in Ht_sign. discriminate.
+        - exact Ht_sign. }
+      lia.
+    + (* t non-neg, Ds neg: contradiction *)
+      exfalso.
+      (* t non-neg: sbv2int t = T *)
+      (* Ds neg means last(bv_and D s) = true, so last D = true and last s = true *)
+      assert (HDs_last_raw : last (map2 andb (subst_list t s) s) false = true).
+      { unfold bv_and in HDs_sign. rewrite HD_sz, Hs, N.eqb_refl in HDs_sign.
+        unfold bv_subt in HDs_sign. rewrite Ht, Hs, N.eqb_refl in HDs_sign.
+        unfold bits in HDs_sign. exact HDs_sign. }
+      assert (HIElast : length (subst_list t s) = length s) by exact HIE.
+      assert (HDs_ne : map2 andb (subst_list t s) s <> []).
+      { intro H. rewrite H in HDs_last_raw. simpl in HDs_last_raw. discriminate. }
+      assert (HD_last_true : last (subst_list t s) false = true).
+      { rewrite <- hd_rev in HDs_last_raw.
+        rewrite rev_map2_and in HDs_last_raw; [| exact HIE].
+        unfold bits in *.
+        destruct (rev (subst_list t s)) as [| hd1 tl1] eqn:Hrx.
+        - apply (f_equal (@length bool)) in Hrx. rewrite length_rev in Hrx.
+          exfalso. apply HDs_ne.
+          assert (HD_nil : subst_list t s = []) by (apply length_zero_iff_nil; exact Hrx).
+          rewrite HD_nil. reflexivity.
+        - destruct (rev s) as [| hd2 tl2] eqn:Hry.
+          + apply (f_equal (@length bool)) in Hry. rewrite length_rev in Hry.
+            exfalso. apply HDs_ne.
+            assert (HD_nil : subst_list t s = []) by (apply length_zero_iff_nil; rewrite HIE; exact Hry).
+            rewrite HD_nil. reflexivity.
+          + simpl in HDs_last_raw.
+            rewrite andb_true_iff in HDs_last_raw. destruct HDs_last_raw as [H1 _].
+            rewrite <- hd_rev. rewrite Hrx. simpl. exact H1. }
+      assert (Hs_last_true : last s false = true).
+      { rewrite <- hd_rev in HDs_last_raw.
+        rewrite rev_map2_and in HDs_last_raw; [| exact HIE].
+        unfold bits in *.
+        destruct (rev s) as [| hd2 tl2] eqn:Hry.
+        - apply (f_equal (@length bool)) in Hry. rewrite length_rev in Hry.
+          exfalso. apply HDs_ne.
+          assert (HD_nil : subst_list t s = []) by (apply length_zero_iff_nil; rewrite HIE; exact Hry).
+          rewrite HD_nil. reflexivity.
+        - destruct (rev (subst_list t s)) as [| hd1 tl1] eqn:Hrx.
+          + apply (f_equal (@length bool)) in Hrx. rewrite length_rev in Hrx.
+            exfalso. apply HDs_ne.
+            assert (HD_nil : subst_list t s = []) by (apply length_zero_iff_nil; exact Hrx).
+            rewrite HD_nil. reflexivity.
+          + simpl in HDs_last_raw.
+            rewrite andb_true_iff in HDs_last_raw. destruct HDs_last_raw as [_ H2].
+            rewrite <- hd_rev. rewrite Hry. simpl. exact H2. }
+      (* last D = true means list2int D >= 2^(n-1) *)
+      assert (HD_ne : subst_list t s <> []).
+      { intro H. apply HDs_ne. rewrite H. reflexivity. }
+      assert (HD_last_lb : (pow2_int (length s - 1) <= list2int (subst_list t s))%Z).
+      { pose proof (last_true_list2int_lb HD_ne HD_last_true) as Hlb.
+        rewrite HIE in Hlb. exact Hlb. }
+      assert (Hpow_double : (pow2_int (length s) = 2 * pow2_int (length s - 1))%Z).
+      { assert (Hs_ne' : s <> [])
+          by (intro H; rewrite H in Hs_last_true; simpl in Hs_last_true; discriminate).
+        destruct s as [| h tl]; [exact (False_ind _ (Hs_ne' eq_refl)) |].
+        simpl length.
+        rewrite Nat.sub_succ_r, Nat.sub_0_r, Nat.pred_succ.
+        apply pow2_int_succ. }
+      assert (Hpow_ts : (pow2_int (length t) = pow2_int (length s))%Z).
+      { f_equal. exact HLen_ts. }
+      rewrite HD_val in HD_last_lb.
+      (* T - S + 2^n >= 2^(n-1) => T >= S - 2^(n-1) *)
+      assert (HT_ge : (list2int t >= list2int s - pow2_int (length s - 1))%Z) by lia.
+      (* s negative, x non-negative: list2int(bv_and x s) <= S - 2^(n-1) *)
+      assert (Hx_last_false : last x false = false).
+      { (* bv_and x s non-negative (from hypothesis sbv2int > T >= 0) *)
+        (* If last x = true, then last(bv_and x s) = last x && last s = true && true = true *)
+        (* So bv_and x s would be negative, contradicting hypothesis *)
+        destruct (last x false) eqn:Hx_sign; [| reflexivity].
+        exfalso.
+        assert (Hxs_neg : last (bv_and x s) false = true).
+        { exact (@neg_bvand_neg x s n Hx Hs Hx_sign Hs_last_true). }
+        rewrite Hxs_neg in Hslt.
+        pose proof (@list2int_lt_pow2_int (bv_and x s) (N.to_nat n) Hlen_xs) as Hub.
+        unfold pow2_int_N in Hslt. lia. }
+      assert (HMleS' : (list2int (map2 andb x s) <= list2int s - pow2_int (length s - 1))%Z).
+      { apply last_false_and_true_submask_bound.
+        - lia.
+        - exact Hx_last_false.
+        - exact Hs_last_true. }
+      assert (Hxs_pos : last (bv_and x s) false = false).
+      { exact (@pos_bvand_pos x s n Hx Hs Hx_last_false). }
+      rewrite Hxs_pos in Hslt.
+      lia.
+    + (* t non-neg, Ds non-neg: list2int t < list2int Ds *)
+      lia.
+  - (* t >=u s *)
+    (* Show t must be negative *)
+    assert (HT_ge_S : (list2int s <= list2int t)%Z).
+    { apply bv_ult_false_list2int_ge; [rewrite Ht, Hs; reflexivity | exact Hult_ts]. }
+    assert (Ht_neg : last t false = true).
+    { destruct (last t false) eqn:Ht_sign; [reflexivity | exfalso].
+      destruct (last (bv_and x s) false) eqn:Hxs_sign.
+      - pose proof (@list2int_lt_pow2_int (bv_and x s) (N.to_nat n) Hlen_xs) as Hub.
+        unfold pow2_int_N in Hslt. lia.
+      - lia. }
+    (* Show bv_and (bv_subt t s) s is non-negative *)
+    assert (HDs_nonneg : last (bv_and (bv_subt t s) s) false = false).
+    { destruct (last s false) eqn:Hs_sign.
+      - (* s negative: need D non-negative *)
+        (* T >= S >= 2^(n-1), T < 2^n, so D = T - S in [0, 2^(n-1)-1], D non-neg *)
+        assert (HS_neg_lb : (pow2_int (length s - 1) <= list2int s)%Z).
+        { apply last_true_list2int_lb.
+          - intro H. rewrite H in Hs_sign. simpl in Hs_sign. discriminate.
+          - exact Hs_sign. }
+        (* D = subst_list t s, D_val = T - S (since T >= S) *)
+        assert (HD_formula : (list2int (subst_list t s) = list2int t - list2int s)%Z).
+        { rewrite HDform.
+          replace (list2int t - list2int s + pow2_int (length t))%Z
+            with (list2int t - list2int s + 1 * pow2_int (length t))%Z by ring.
+          rewrite Z.mod_add; [| pose proof (zero_lt_pow2_int (length t)); lia].
+          apply Z.mod_small. split; lia. }
+        (* D_val = T - S < 2^(n-1) since T < 2^n and S >= 2^(n-1) *)
+        assert (HD_lt_half : (list2int (subst_list t s) < pow2_int (length t - 1))%Z).
+        { rewrite HD_formula.
+          assert (HT_neg_lb : (pow2_int (length t - 1) <= list2int t)%Z).
+          { apply last_true_list2int_lb.
+            - intro H. rewrite H in Ht_neg. simpl in Ht_neg. discriminate.
+            - exact Ht_neg. }
+          assert (Hpow2_double : (pow2_int (length t) = 2 * pow2_int (length t - 1))%Z).
+          { assert (Ht_ne : t <> []) by (intro H; rewrite H in Ht_neg; simpl in Ht_neg; discriminate).
+            destruct t as [| h tl]; [exact (False_ind _ (Ht_ne eq_refl)) |].
+            simpl length. rewrite Nat.sub_succ_r, Nat.sub_0_r, Nat.pred_succ. apply pow2_int_succ. }
+          replace (length s - 1)%nat with (length t - 1)%nat in HS_neg_lb by lia.
+          lia. }
+        (* D non-negative: list2int D < 2^(n-1) implies last D = false *)
+        assert (HD_ne : subst_list t s <> []).
+        { intro H. apply (f_equal (@length bool)) in H. simpl in H.
+          pose proof (@subst_list_length t s HLen_ts) as Hsl.
+          assert (Hls : length s = 0%nat) by lia.
+          assert (Hs_nil : s = []) by (apply length_zero_iff_nil; exact Hls).
+          rewrite Hs_nil in Hs_sign. simpl in Hs_sign. discriminate. }
+        assert (HD_last_false : last (subst_list t s) false = false).
+        { destruct (last (subst_list t s) false) eqn:H; [| reflexivity].
+          exfalso.
+          pose proof (last_true_list2int_lb HD_ne H) as Hlb.
+          replace (length (subst_list t s) - 1)%nat with (length t - 1)%nat in Hlb
+            by (pose proof (@subst_list_length t s HLen_ts); lia).
+          lia. }
+        assert (Hbt_last : last (bv_subt t s) false = false).
+        { unfold bv_subt. rewrite Ht, Hs, N.eqb_refl. exact HD_last_false. }
+        exact (@pos_bvand_pos (bv_subt t s) s n HD_sz Hs Hbt_last).
+      - (* s non-negative: bv_and D s non-negative *)
+        exact (@pos_bv_and n (bv_subt t s) s HD_sz Hs Hs_sign). }
+    (* t neg and bv_and D s non-neg: goal is (if last t false then T-P else T) < (if last Ds-sign then Ds-P else Ds) *)
+    rewrite Ht_neg, HDs_nonneg.
+    rewrite HT_eq, HDs_eq, HP_eq.
+    pose proof (@list2int_geq_zero (bv_and (bv_subt t s) s)) as HDs_ge.
+    lia.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.

@@ -193,7 +193,30 @@ Theorem bvand_sge : forall (n : N), forall (s t : bitvector),
       (exists (x : bitvector), (size x = n) /\
           ((bv_sge (bv_and x s) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split.
+  - intros [Hst | Hslt].
+    + (* bv_and s t = t: witness x = t *)
+      exists t. split; [exact Ht |].
+      rewrite bv_sge_sle_equiv.
+      rewrite (bv_and_comm Ht Hs).
+      rewrite Hst.
+      apply bv_sle_refl.
+    + (* bv_slt t (bv_and (bv_subt t s) s): witness x = bv_subt t s *)
+      exists (bv_subt t s). split; [apply bv_subt_size; [exact Ht | exact Hs] |].
+      rewrite bv_sge_sle_equiv.
+      apply bv_sle_eq. left. exact Hslt.
+  - intros [x [Hx Hxs]].
+    rewrite bv_sge_sle_equiv in Hxs.
+    apply bv_sle_eq in Hxs.
+    destruct Hxs as [Hslt | Heq].
+    + (* bv_slt t (bv_and x s): use bvand_sge_key *)
+      apply (@bvand_sge_key n s t x Hs Ht Hx Hslt).
+    + (* t = bv_and x s: bv_and s t = t *)
+      left. rewrite Heq.
+      rewrite (bv_and_comm Hs (bv_and_size Hx Hs)).
+      exact (@bv_and_idem2 x s n Hx Hs).
+Qed.
 
 
 (*------------------------------------------------------------*)
