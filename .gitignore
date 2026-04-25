@@ -34,3 +34,6 @@ nra.cache
 .Makefile.d
 Makefile
 Makefile.conf
+.claude
+convo.*
+temp_search.v
