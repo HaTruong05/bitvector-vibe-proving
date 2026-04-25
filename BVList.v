@@ -14718,6 +14718,135 @@ Proof.
     rewrite length_mk_list_false in Hempty. simpl in Hempty. lia.
 Qed.
 
+(* For any nonempty nonzero list s, there exists k < length s such that
+   left-shifting s by k positions gives signed_min of the same length *)
+Lemma shl_achieves_smin_nonzero_list : forall (s : list bool),
+  s <> [] ->
+  list2N s <> 0%N ->
+  exists k, (k < length s)%nat /\
+    shl_n_bits_a s k = mk_list_false (length s - 1) ++ [true].
+Proof.
+  induction s as [| b s' IH].
+  - intros H. contradiction.
+  - intros _ Hpos.
+    destruct b.
+    + (* LSB = true: shift by length s' = n-1 *)
+      exists (length s').
+      split.
+      * simpl. lia.
+      * set (n' := length s').
+        assert (Hlen : length (true :: s') = S n') by reflexivity.
+        assert (Hlt_n : (n' <? S n')%nat = true) by (apply Nat.ltb_lt; lia).
+        unfold shl_n_bits_a.
+        rewrite Hlen. rewrite Hlt_n.
+        assert (Hsub1 : (S n' - n' = 1)%nat).
+        { rewrite Nat.sub_succ_l by exact (Nat.le_refl n').
+          rewrite Nat.sub_diag. reflexivity. }
+        assert (Hsub2 : (S n' - 1 = n')%nat).
+        { rewrite Nat.sub_succ_r. rewrite Nat.sub_0_r. apply Nat.pred_succ. }
+        rewrite Hsub1. rewrite Hsub2. simpl firstn. reflexivity.
+    + (* LSB = false: use induction hypothesis *)
+      assert (Hpos' : list2N s' <> 0%N).
+      { intro Heq. apply Hpos. simpl. rewrite Heq. reflexivity. }
+      assert (Hne' : s' <> []).
+      { intro Heq. apply Hpos'. rewrite Heq. reflexivity. }
+      destruct (IH Hne' Hpos') as [k' [Hk' IHres]].
+      exists k'.
+      split.
+      * simpl. lia.
+      * unfold shl_n_bits_a in *.
+        assert (Hlt' : (k' <? length s')%nat = true)
+          by (apply Nat.ltb_lt; exact Hk').
+        assert (Hlt : (k' <? S (length s'))%nat = true)
+          by (apply Nat.ltb_lt; lia).
+        rewrite Hlt' in IHres.
+        simpl length.
+        rewrite Hlt.
+        replace (S (length s') - k')%nat with (S (length s' - k'))%nat by lia.
+        simpl firstn.
+        assert (Hfirstn : firstn (length s' - k')%nat s' =
+                          mk_list_false (length s' - 1 - k')%nat ++ [true]).
+        { assert (Htmp : mk_list_false k' ++ firstn (length s' - k')%nat s' =
+                         mk_list_false k' ++ (mk_list_false (length s' - 1 - k')%nat ++ [true])).
+          { rewrite IHres.
+            rewrite app_assoc.
+            rewrite <- mk_list_false_plus.
+            f_equal. f_equal. lia. }
+          exact (app_inv_head _ _ _ Htmp). }
+        rewrite Hfirstn.
+        replace (S (length s') - 1)%nat with (length s') by lia.
+        change (false :: (mk_list_false (length s' - 1 - k')%nat ++ [true])) with
+          ([false] ++ mk_list_false (length s' - 1 - k')%nat ++ [true]).
+        rewrite app_assoc.
+        change (mk_list_false k' ++ [false]) with (mk_list_false k' ++ mk_list_false 1).
+        rewrite <- mk_list_false_plus.
+        rewrite app_assoc.
+        rewrite <- mk_list_false_plus.
+        f_equal. f_equal. lia.
+Qed.
+
+(* Any nonzero bitvector s can be left-shifted to produce signed_min n *)
+Lemma nonzero_bv_shl_achieves_smin : forall (n : N) (s : bitvector),
+  (0 < n)%N ->
+  size s = n ->
+  (0 < bv2nat_a s)%nat ->
+  exists (x : bitvector), size x = n /\ bv_shl s x = signed_min n.
+Proof.
+  intros n s Hn Hs Hpos.
+  assert (Hs_len : length s = N.to_nat n).
+  { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs.
+    rewrite Nat2N.id in Hs. exact Hs. }
+  assert (Hne : s <> []).
+  { intro Heq. rewrite Heq in Hs_len. simpl in Hs_len.
+    assert (Hnn : n = 0%N).
+    { apply N2Nat.inj. simpl. lia. }
+    rewrite Hnn in Hn. exact (N.lt_irrefl 0%N Hn). }
+  assert (Hlist2N : list2N s <> 0%N).
+  { intro Heq.
+    assert (Hnat0 : N.to_nat (list2N s) = 0%nat) by (rewrite Heq; reflexivity).
+    apply list2N_0_implies_mlf in Hnat0.
+    unfold bv2nat_a, list2nat_be_a in Hpos.
+    rewrite Hnat0 in Hpos.
+    rewrite Hs_len in Hpos.
+    rewrite list2N_mk_list_false in Hpos.
+    simpl in Hpos. lia. }
+  destruct (@shl_achieves_smin_nonzero_list s Hne Hlist2N) as [k [Hk IHres]].
+  exists (nat2bv k n).
+  split.
+  - apply nat2bv_size.
+  - (* Show bv_shl s (nat2bv k n) = signed_min n *)
+    unfold bv_shl, shl_aux.
+    rewrite Hs. rewrite nat2bv_size. rewrite N.eqb_refl.
+    unfold list2nat_be_a, bv2nat_a, bits.
+    (* Show list2N (nat2bv k n) = N.of_nat k *)
+    assert (Hbv2nat : list2N (nat2bv k n) = N.of_nat k).
+    { unfold nat2bv.
+      apply list2N_N2List_s.
+      apply Nat.leb_le.
+      pose proof (size_gt k) as Hsg.
+      apply Nat.leb_le in Hsg.
+      lia. }
+    rewrite Hbv2nat.
+    rewrite Nat2N.id.
+    (* Now: shl_n_bits s k = signed_min n *)
+    rewrite shl_n_bits_eq_shl_n_bits_a by lia.
+    rewrite IHres.
+    (* signed_min n = mk_list_false (length s - 1) ++ [true] *)
+    unfold signed_min.
+    assert (Hn_nat : (0 < N.to_nat n)%nat).
+    { destruct n as [| p].
+      - exfalso. exact (N.lt_irrefl 0%N Hn).
+      - simpl. exact (Pos2Nat.is_pos p). }
+    destruct (N.to_nat n) as [| m] eqn:Hm.
+    + lia.
+    + simpl smin_big_endian.
+      simpl rev.
+      rewrite rev_mk_list_false.
+      rewrite Hs_len.
+      replace (S m - 1)%nat with m%nat by lia.
+      reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.

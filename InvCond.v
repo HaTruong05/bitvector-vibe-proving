@@ -810,6 +810,80 @@ Theorem bvshl_slt2 : forall (n : N), forall (s t : bitvector),
 Proof.
 Admitted.
 
+(* t >> s <u mins <=> (exists x, s << x <=s t) *)
+Theorem bvshl_sle2 : forall (n : N), forall (s t : bitvector),
+  (0 < n)%N -> (size s) = n -> (size t) = n -> iff
+    (bv_ult (bv_shr t s) (signed_min n) = true)
+    (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_shl s x) t) = true)).
+Proof.
+  intros n s t Hn Hs Ht.
+  split.
+  - (* Forward: t >> s <u min_s -> exists x. s << x <=s t *)
+    intro HLHS.
+    destruct (bvgez s) as [Hs0 | Hs_pos].
+    + (* bv2nat_a s = 0, so s = zeros n *)
+      assert (Hs_zeros : s = zeros n).
+      { unfold bv2nat_a, list2nat_be_a in Hs0.
+        apply list2N_0_implies_mlf in Hs0.
+        assert (Hs_len : length s = N.to_nat n).
+        { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs.
+          rewrite Nat2N.id in Hs. exact Hs. }
+        unfold zeros. rewrite <- Hs_len. exact Hs0. }
+      (* bv_shr t (zeros n) = t, so hypothesis gives last t false = false *)
+      assert (Hlast_t : last t false = false).
+      { rewrite Hs_zeros in HLHS.
+        rewrite bv_shr_zeros_is_self in HLHS by exact Ht.
+        apply ult_b_signed_min_implies_positive_sign with (n := n).
+        exact Ht. exact HLHS. }
+      (* Witness: zeros n. bv_shl (zeros n) (zeros n) = zeros n <=s t *)
+      exists (zeros n).
+      split.
+      * apply zeros_size.
+      * rewrite Hs_zeros.
+        assert (Hzz : bv_shl (zeros n) (zeros n) = zeros n).
+        { specialize (bvshl_zeros (zeros n)) as Hb.
+          rewrite zeros_size in Hb. exact Hb. }
+        rewrite Hzz.
+        rewrite <- Ht. rewrite bv_zeros_sle. rewrite Hlast_t. reflexivity.
+    + (* bv2nat_a s > 0: use nonzero_bv_shl_achieves_smin *)
+      destruct (@nonzero_bv_shl_achieves_smin n s Hn Hs Hs_pos) as [x [Hx Hxeq]].
+      exists x.
+      split.
+      * exact Hx.
+      * rewrite Hxeq.
+        rewrite <- Ht. apply signed_min_sle.
+  - (* Backward: exists x. s << x <=s t -> t >> s <u min_s *)
+    intros [x [Hx Hle]].
+    destruct (bvgez s) as [Hs0 | Hs_pos].
+    + (* bv2nat_a s = 0, so s = zeros n *)
+      assert (Hs_zeros : s = zeros n).
+      { unfold bv2nat_a, list2nat_be_a in Hs0.
+        apply list2N_0_implies_mlf in Hs0.
+        assert (Hs_len : length s = N.to_nat n).
+        { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs.
+          rewrite Nat2N.id in Hs. exact Hs. }
+        unfold zeros. rewrite <- Hs_len. exact Hs0. }
+      (* bv_shl (zeros n) x = zeros n, so zeros n <=s t *)
+      rewrite Hs_zeros in Hle.
+      assert (Hsxl : bv_shl (zeros n) x = zeros n).
+      { rewrite <- Hx. exact (bvshl_zeros x). }
+      rewrite Hsxl in Hle.
+      assert (Hlast_t : last t false = false).
+      { rewrite <- Ht in Hle. rewrite bv_zeros_sle in Hle.
+        destruct (last t false); simpl in Hle; [discriminate | reflexivity]. }
+      rewrite Hs_zeros.
+      rewrite bv_shr_zeros_is_self by exact Ht.
+      apply nonneg_ult_signed_min with (n := n); [exact Hn | exact Ht | exact Hlast_t].
+    + (* bv2nat_a s > 0: bv_shr t s always has MSB = false *)
+      assert (Hshr_size : size (bv_shr t s) = n)
+        by (apply bv_shr_size; [exact Ht | exact Hs]).
+      apply nonneg_ult_signed_min with (n := n).
+      * exact Hn.
+      * exact Hshr_size.
+      * apply last_bv_shr_pos with (n := n) (s := s).
+        -- exact Ht. -- exact Hs. -- exact Hs_pos.
+Qed.
+
 
 (*------------------------------------------------------------*)
 
@@ -1065,15 +1139,6 @@ Proof. split; intros.
          rewrite H, <- H1.
          now rewrite Nat2N.id, N2List_list2N.
 Qed.
-
-
-(* t >> s <u mins <=> (exists x, s << x <=s t) *)
-Theorem bvshl_sle2 : forall (n : N), forall (s t : bitvector),
-  (size s) = n -> (size t) = n -> iff
-    (bv_ult (bv_shr t s) (signed_min n) = true)
-    (exists (x : bitvector), (size x = n) /\ ((bv_sle (bv_shl s x) t) = true)).
-Proof.
-Admitted.
 
 
 (*------------------------------------------------------------*)
