@@ -35,11 +35,29 @@ Proof workflow:
 1. **Structure first.** Sketch the argument with `assert`/`pose proof` before writing tactics.
 2. **Helper lemmas in BVList.v.** If an inline subproof exceeds ~20 lines, extract it there.
 3. **One `Admitted` at a time.** Fill one hole, compile, stop on error.
-4. **Clean context.** `clear` irrelevant hypotheses before calling `nia`/`lia`.
+4. **Reflect after each theorem.** Update CLAUDE.md with any non-obvious _patterns_ or _error fixes_.
 
 ## Implicit Arguments
 
 **`BVList.v` line 33: `Set Implicit Arguments`.** All `forall (x : bitvector)` and `forall (n : N)` args are implicit — pass only proofs, bitvectors are inferred. Error symptom: `"s" has type "bitvector" while expected "bv_sle ?a ?b = true"`. Fix: drop the bitvector args, or prefix with `@` to make them explicit again.
+
+**Watch out for list arguments made implicit.** `list2int_geq_zero`, `list2int_lt_pow2_int`, and `bv_and_idem2` all have their list/bitvector argument implicit. When the argument can't be inferred from the goal, Coq reports "Unable to find an instance for n" or a type mismatch. Use `@` to pass explicitly:
+
+```coq
+pose proof (@list2int_geq_zero l) as H.
+pose proof (@list2int_lt_pow2_int l (length l) eq_refl) as H.
+exact (@bv_and_idem2 x s n Hx Hs).
+```
+
+## N_scope Infects Tactic Terms
+
+**`Local Open Scope N_scope` (BVList.v line 27)** means bare `-`, `+`, `*` inside tactic arguments (`replace`, `assert`, `ring`) are parsed as `N` operations — even when the values are `Z` or `nat`. Error symptom: `"list2int t" has type "Z" while it is expected to have type "N"`. Fix: always annotate with `%Z` or `%nat`:
+
+```coq
+replace (a - b + c)%Z with (a - b + 1 * c)%Z by ring.
+assert (Hls : length s = 0%nat) by lia.
+replace (length t - 1)%nat with (length s - 1)%nat in H by lia.
+```
 
 ## Integer Bridges (critical for signed arithmetic)
 
@@ -67,18 +85,6 @@ grep -n "Lemma\|Theorem" BVList.v | grep -i "keyword"
 **Step 2 — Read only the relevant line range:**
 Use the line number from grep to read ~30 lines around the lemma.
 
-**Step 3 — For type-guided search, use a temp file:**
-
-```coq
-(* temp_search.v *)
-From BV Require Import BVList.
-Search bv_shl bv_slt.
-SearchPattern (bv_slt _ _ = true).
-SearchRewrite (sbv2int (bv_shl _ _)).
-```
-
-Compile with `coqc temp_search.v`, then delete the file.
-
 **Keyword index** — seed your searches with these names:
 
 Operations: `bv_and`, `bv_or`, `bv_xor`, `bv_not`, `bv_neg`, `bv_add`, `bv_subt'`,
@@ -99,9 +105,6 @@ make InvCond.vo                  # must succeed
 grep "Admitted" InvCond.v        # must return nothing
 ```
 
-## Remaining Admitted Theorems (2)
+## Current Open Problem
 
-In file order:
-
-1. **`bvand_sge`** (line 196): `(s & t = t) ∨ (t <s (t - s) & s) ↔ ∃x. x & s ≥s t`
-2. **`bvor_slt`** (line 224): `~(s - t) | s <s t ↔ ∃x. x | s <s t`
+**`bvor_slt`** (InvCond.v line 247): `~(s - t) | s <s t ↔ ∃x. x | s <s t`
