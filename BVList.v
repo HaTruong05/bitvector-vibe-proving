@@ -14847,6 +14847,203 @@ Proof.
       reflexivity.
 Qed.
 
+(* shl_n_bits preserves all-false lists *)
+Lemma shl_n_bits_all_false : forall (l k : nat),
+  shl_n_bits (mk_list_false l) k = mk_list_false l.
+Proof.
+  intros l k. induction k.
+  - reflexivity.
+  - simpl.
+    assert (H : shl_one_bit (mk_list_false l) = mk_list_false l).
+    { pose proof (shl_one_bit_all_false (mk_list_false l)).
+      rewrite length_mk_list_false in H. exact H. }
+    rewrite H. exact IHk.
+Qed.
+
+(* bv_shl of signed_min by any nonzero shift gives zeros *)
+Lemma bv_shl_signed_min_nonzero : forall (n : N) (s : bitvector),
+  size s = n -> (0 < bv2nat_a s)%nat ->
+  bv_shl (signed_min n) s = zeros n.
+Proof.
+  intros n s Hs Hpos.
+  assert (Hs_len : length s = N.to_nat n).
+  { unfold size in Hs. apply f_equal with (f := N.to_nat) in Hs. rewrite Nat2N.id in Hs. exact Hs. }
+  assert (Hn_pos : (0 < N.to_nat n)%nat).
+  { destruct (N.to_nat n) as [| m].
+    - exfalso. assert (s = []) by (apply length_zero_iff_nil; lia). subst.
+      unfold bv2nat_a, list2nat_be_a in Hpos. simpl in Hpos. lia.
+    - lia. }
+  assert (H_smin_shl1 : shl_one_bit (signed_min n) = mk_list_false (N.to_nat n)).
+  { unfold signed_min.
+    destruct (N.to_nat n) as [| m] eqn:Hm. { lia. }
+    simpl smin_big_endian. simpl rev. rewrite rev_mk_list_false.
+    rewrite shl_one_b. simpl. reflexivity. }
+  assert (Hsm : size (signed_min n) = n) by apply signed_min_size.
+  rewrite bv_shl_eq_shl_n_bits by (rewrite Hsm; symmetry; exact Hs).
+  destruct (bv2nat_a s) as [| k] eqn:Hk. { lia. }
+  simpl shl_n_bits.
+  rewrite H_smin_shl1.
+  rewrite shl_n_bits_all_false.
+  unfold zeros. reflexivity.
+Qed.
+
+(* signed_min is strictly less than everything except itself *)
+Lemma bv_slt_signed_min_iff : forall (n : N) (t : bitvector),
+  size t = n ->
+  bv_slt (signed_min n) t = true <-> t <> signed_min n.
+Proof.
+  intros n t Ht.
+  split.
+  - intro H. intro Heq. subst t. pose proof (bv_slt_nrefl (signed_min n)) as Hnrefl. rewrite Hnrefl in H. discriminate.
+  - intro Hne.
+    pose proof (signed_min_sle t) as Hsle. rewrite Ht in Hsle.
+    apply bv_sle_eq in Hsle.
+    destruct Hsle as [H | H].
+    + exact H.
+    + exfalso. apply Hne. exact (eq_sym H).
+Qed.
+
+(* add_list_ingr of (t ++ [b]) with (zeros ++ [1]) flips the last bit *)
+Lemma add_list_ingr_smin_flip_msb : forall (t : list bool) (b : bool),
+  add_list_ingr (t ++ [b]) (mk_list_false (length t) ++ [true]) false = t ++ [negb b].
+Proof.
+  induction t as [| h t IH]; intro b.
+  - destruct b; reflexivity.
+  - simpl length. simpl mk_list_false. rewrite <- app_comm_cons.
+    simpl add_list_ingr.
+    destruct h; simpl; rewrite IH; reflexivity.
+Qed.
+
+(* bv_add t (signed_min n) flips the MSB of t *)
+Lemma bv_add_signed_min_flip_msb : forall (n : N) (t : bitvector),
+  size t = n -> (0 < n)%N ->
+  bv_add t (signed_min n) = removelast t ++ [negb (last t false)].
+Proof.
+  intros n t Ht Hn.
+  assert (Hsm : size (signed_min n) = n) by apply signed_min_size.
+  assert (Ht_len : length t = N.to_nat n).
+  { unfold size in Ht. apply f_equal with (f := N.to_nat) in Ht. rewrite Nat2N.id in Ht. exact Ht. }
+  assert (Hn_pos : (0 < N.to_nat n)%nat).
+  { destruct n as [| p]. { exfalso. exact (N.lt_irrefl 0 Hn). } simpl. exact (Pos2Nat.is_pos p). }
+  assert (Ht_ne : t <> []).
+  { intro Heq. subst t. cbn in Ht_len. lia. }
+  assert (H_smin : signed_min n = mk_list_false (N.to_nat n - 1) ++ [true]).
+  { unfold signed_min.
+    destruct (N.to_nat n) as [| m] eqn:Hm. { lia. }
+    simpl smin_big_endian. simpl rev. rewrite rev_mk_list_false.
+    f_equal. f_equal. lia. }
+  assert (Hrlen : length (removelast t) = (N.to_nat n - 1)%nat).
+  { rewrite (app_removelast_last false Ht_ne) in Ht_len.
+    rewrite length_app in Ht_len. simpl in Ht_len. lia. }
+  unfold bv_add.
+  rewrite Ht. rewrite Hsm. rewrite N.eqb_refl.
+  unfold add_list.
+  rewrite H_smin.
+  rewrite <- Hrlen.
+  rewrite (app_removelast_last false Ht_ne) at 1.
+  exact (add_list_ingr_smin_flip_msb (removelast t) (last t false)).
+Qed.
+
+(* Cancelling the same appended bit in bv_ult *)
+Lemma ult_list_be_cancel_head : forall (a b : list bool) (x : bool),
+  ult_list_big_endian (x :: a) (x :: b) = ult_list_big_endian a b.
+Proof.
+  intros a b x.
+  destruct a as [| ha ta]; destruct b as [| hb tb];
+    simpl; try rewrite Bool.eqb_reflx; simpl;
+    destruct x; simpl; try rewrite Bool.orb_false_r; reflexivity.
+Qed.
+
+Lemma bv_ult_cancel_app : forall (a b : list bool) (x : bool),
+  length a = length b ->
+  bv_ult (a ++ [x]) (b ++ [x]) = bv_ult a b.
+Proof.
+  intros a b x Hlen.
+  unfold bv_ult, ult_list.
+  assert (Hsize : (size (a ++ [x]) =? size (b ++ [x])) = true).
+  { unfold size. rewrite !length_app. simpl. rewrite Hlen. apply N.eqb_refl. }
+  assert (Hsizab : (size a =? size b) = true).
+  { unfold size. rewrite Hlen. apply N.eqb_refl. }
+  rewrite Hsize. rewrite Hsizab.
+  rewrite !rev_app_distr. simpl rev.
+  exact (ult_list_be_cancel_head (rev a) (rev b) x).
+Qed.
+
+(* ult_list_be with true::_ vs false::_ is always false *)
+Lemma ult_list_be_true_false_head : forall (a b : list bool),
+  ult_list_big_endian (true :: a) (false :: b) = false.
+Proof.
+  intros a b. destruct a; destruct b; reflexivity.
+Qed.
+
+(* bv_ult (signed_min n) (bv_add t (signed_min n)) = bv_slt (zeros n) t *)
+Lemma bv_ult_smin_add_smin_eq_slt_zeros : forall (n : N) (t : bitvector),
+  size t = n -> (0 < n)%N ->
+  bv_ult (signed_min n) (bv_add t (signed_min n)) = bv_slt (zeros n) t.
+Proof.
+  intros n t Ht Hn.
+  rewrite bv_add_signed_min_flip_msb by assumption.
+  assert (H_smin : signed_min n = mk_list_false (N.to_nat n - 1) ++ [true]).
+  { unfold signed_min.
+    assert (Hn_pos : (0 < N.to_nat n)%nat).
+    { destruct n as [| p]. { exfalso. exact (N.lt_irrefl 0 Hn). } simpl. exact (Pos2Nat.is_pos p). }
+    destruct (N.to_nat n) as [| m] eqn:Hm. { lia. }
+    simpl smin_big_endian. simpl rev. rewrite rev_mk_list_false.
+    f_equal. f_equal. lia. }
+  assert (H_zeros : zeros n = mk_list_false (N.to_nat n - 1) ++ [false]).
+  { unfold zeros.
+    assert (Hn_pos : (0 < N.to_nat n)%nat).
+    { destruct n as [| p]. { exfalso. exact (N.lt_irrefl 0 Hn). } simpl. exact (Pos2Nat.is_pos p). }
+    rewrite <- (Nat.succ_pred_pos (N.to_nat n) Hn_pos) at 1.
+    assert (Hpred : (N.to_nat n - 1)%nat = Nat.pred (N.to_nat n)) by lia.
+    rewrite Hpred. apply mk_list_false_app. }
+  assert (Ht_len : length t = N.to_nat n).
+  { unfold size in Ht. apply f_equal with (f := N.to_nat) in Ht. rewrite Nat2N.id in Ht. exact Ht. }
+  assert (Hrlen : length (removelast t) = (N.to_nat n - 1)%nat).
+  { destruct t as [| h tl].
+    - unfold size in Ht. simpl in Ht. rewrite <- Ht in Hn. exfalso. exact (N.lt_irrefl 0 Hn).
+    - assert (Hne : h :: tl <> []) by discriminate.
+      rewrite (app_removelast_last false Hne) in Ht_len.
+      rewrite length_app in Ht_len. cbn [length] in Ht_len. lia. }
+  rewrite H_smin. rewrite H_zeros.
+  assert (Ht_ne : t <> []).
+  { intro Heq. subst t. cbn in Ht_len.
+    assert (Hn_pos : (0 < N.to_nat n)%nat).
+    { destruct n as [| p]. { exfalso. exact (N.lt_irrefl 0 Hn). } simpl. exact (Pos2Nat.is_pos p). }
+    lia. }
+  destruct (last t false) eqn:Hlast.
+  - (* last t = true: LHS = false, RHS = false *)
+    simpl negb.
+    assert (HLHS : bv_ult (mk_list_false (N.to_nat n - 1) ++ [true]) (removelast t ++ [false]) = false).
+    { unfold bv_ult, ult_list.
+      assert (Hsz : (size (mk_list_false (N.to_nat n - 1) ++ [true]) =? size (removelast t ++ [false])) = true).
+      { unfold size. rewrite !length_app. cbn [length]. rewrite length_mk_list_false. rewrite Hrlen. apply N.eqb_refl. }
+      rewrite Hsz. rewrite !rev_app_distr. simpl rev. apply ult_list_be_true_false_head. }
+    rewrite HLHS.
+    assert (HRHS : bv_slt (mk_list_false (N.to_nat n - 1) ++ [false]) t = false).
+    { apply Bool.not_true_is_false. intro Habs.
+      assert (Hback : bv_slt t (mk_list_false (N.to_nat n - 1) ++ [false]) = true).
+      { apply bv_slt_tf.
+        - unfold size. rewrite Ht_len. rewrite length_app. cbn [length]. rewrite length_mk_list_false.
+          f_equal. lia.
+        - exact Hlast.
+        - apply last_app. }
+      pose proof (bv_slt_trans Habs Hback) as Htrans.
+      pose proof (bv_slt_nrefl (mk_list_false (N.to_nat n - 1) ++ [false])) as Hnrefl.
+      rewrite Hnrefl in Htrans. discriminate. }
+    rewrite HRHS. reflexivity.
+  - (* last t = false: both sides equal bv_ult (mk_list_false ..) (removelast t) *)
+    simpl negb.
+    rewrite bv_ult_cancel_app by (rewrite length_mk_list_false; exact (eq_sym Hrlen)).
+    assert (Hlast_eq : last (mk_list_false (N.to_nat n - 1) ++ [false]) false = last t false).
+    { rewrite last_app. exact (eq_sym Hlast). }
+    rewrite (bv_slt_ult_last_eq Hlast_eq).
+    rewrite (app_removelast_last false Ht_ne) at 2.
+    rewrite Hlast.
+    rewrite bv_ult_cancel_app by (rewrite length_mk_list_false; exact (eq_sym Hrlen)).
+    reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.
