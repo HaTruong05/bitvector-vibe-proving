@@ -241,10 +241,20 @@ Qed.
 (* ~(s - t) | s <s t <=> (exists x, x | s <s t) *)
 Theorem bvor_slt : forall (n : N), forall (s t : bitvector),
   (size s) = n -> (size t) = n -> iff
-    ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true) 
+    ((bv_slt (bv_or (bv_not (bv_subt s t)) s) t) = true)
     (exists (x : bitvector), (size x = n) /\ ((bv_slt (bv_or x s) t) = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  split.
+  - intro H.
+    exists (bv_not (bv_subt s t)).
+    split.
+    + apply bv_not_size. apply bv_subt_size; assumption.
+    + exact H.
+  - intro H.
+    destruct H as [x [Hx_size H_slt]].
+    exact (bvor_slt_key Hs Ht Hx_size H_slt).
+Qed.
 
 
 (* t <s s | smax <=> (exists x, x | s >s t) *)
