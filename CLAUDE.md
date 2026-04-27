@@ -69,8 +69,6 @@ replace (length t - 1)%nat with (length s - 1)%nat in H by lia.
 
 `sbv2int n v = bv2int v - 2ⁿ` if MSB=1, else `bv2int v`.
 
-Key bridge lemma: `bv_slt_iff_sbv2int` — connects `bv_slt` to `<` on Z via `sbv2int`.
-For unsigned arithmetic, prefer `bv_ult_nat` (connects `bv_ult` to `<?` on nat).
 
 ## Finding Lemmas in BVList.v
 
@@ -105,6 +103,8 @@ make InvCond.vo                  # must succeed
 grep "Admitted" InvCond.v        # must return nothing
 ```
 
+If any non-obvious patterns or recurring errors were encountered during the proof, add them to CLAUDE.md now — before reporting done. If nothing surprising came up, skip this step.
+
 ## Current Open Problem
 
-**`bvor_slt`** (InvCond.v line 247): `~(s - t) | s <s t ↔ ∃x. x | s <s t`
+None — `bvor_slt` was the last open theorem and is now proven.
