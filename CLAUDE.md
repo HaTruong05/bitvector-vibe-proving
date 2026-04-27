@@ -69,7 +69,6 @@ replace (length t - 1)%nat with (length s - 1)%nat in H by lia.
 
 `sbv2int n v = bv2int v - 2ⁿ` if MSB=1, else `bv2int v`.
 
-
 ## Finding Lemmas in BVList.v
 
 **NEVER `cat BVList.v` or read the full file.** It is 14,000+ lines.
@@ -107,4 +106,4 @@ If any non-obvious patterns or recurring errors were encountered during the proo
 
 ## Current Open Problem
 
-**`bvmult_slt`** (InvCond.v line 2736): `∃x. x*s <s t ↔ ~(neg t) & (neg s | s) <s t`
+**`bvmult_sgt`** (InvCond.v line 2805)

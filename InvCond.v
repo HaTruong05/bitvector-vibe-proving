@@ -2739,8 +2739,67 @@ Theorem bvmult_slt : forall (n : N) (s t : bitvector),
     (exists (x : bitvector), size x = n /\ bv_slt (bv_mult x s) t = true)
     (bv_slt (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) t = true).
 Proof.
-Admitted. 
-   
+  intros n s t Hs Ht.
+  assert (HM : size (bv_or (bv_neg s) s) = n).
+  { apply bv_or_size; [apply bv_neg_size|]; exact Hs. }
+  assert (HA : size (bv_not (bv_neg t)) = n).
+  { apply bv_not_size. apply bv_neg_size. exact Ht. }
+  assert (HAM : size (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) = n).
+  { apply bv_and_size; [exact HA | exact HM]. }
+  split.
+  - intros (x, (Hx, Hxs)).
+    pose proof (@not_signed_min_if_gt n (bv_mult x s) t (bv_mult_size Hx Hs) Ht Hxs) as H_not_min.
+    pose proof (bv_not_neg_slt Ht H_not_min) as HA_lt_t.
+    destruct (@zeros_one_factorization s) as [Hzeros | (k, (z, Hfact))].
+    + rewrite Hzeros in Hxs.
+      rewrite Hs in Hxs.
+      rewrite (@bv_mult_zeros_r n x Hx) in Hxs.
+      assert (H_simp : bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s) = zeros n).
+      {
+        pose proof (bv_neg_zeros_zeros (size s)) as H1.
+        pose proof (@bv_or_0_neutral (zeros (size s))) as H2.
+        rewrite zeros_size in H2.
+        rewrite Hzeros, H1, H2, Hs.
+        rewrite <- HA.
+        apply bv_and_0_absorb.
+      }
+      rewrite H_simp. exact Hxs.
+    + assert (H_M_eq : bv_or (bv_neg s) s = bv_concat (ones (size z + 1)) (zeros k)).
+      {
+        rewrite Hfact, bv_neg_zeros_one.
+        apply bv_or_neg_zeros_one.
+      }
+      assert (H_ne : mk_list_true (N.to_nat (size z + 1)) <> nil).
+      {
+        rewrite N.add_1_r, N2Nat.inj_succ. simpl. discriminate.
+      }
+      assert (H_M_neg : bv_slt (bv_or (bv_neg s) s) (zeros n) = true).
+      {
+        rewrite <- HM, bv_slt_zeros, H_M_eq.
+        unfold bv_concat, ones, zeros.
+        rewrite (@last_append (mk_list_false (N.to_nat k))
+                              (mk_list_true (N.to_nat (size z + 1))) false H_ne).
+        apply last_mk_list_true.
+        rewrite N.add_1_r, N2Nat.inj_succ. lia.
+      }
+      apply (bv_sle_slt_trans
+        (@bv_and_neg_sle_itself n _ _ HA HM H_M_neg)
+        HA_lt_t).
+  - intro H.
+    assert (H_idemp : bv_and (bv_or (bv_neg s) s)
+                              (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s))
+                      = bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)).
+    {
+      rewrite (@bv_and_comm n _ _ HM HAM).
+      apply (@bv_and_idem2 _ _ n HA HM).
+    }
+    destruct (@bvmult_eq n s (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) Hs HAM)
+      as (Hfw, _).
+    destruct (Hfw H_idemp) as (x, (Hx, Hx_eq)).
+    exists x. split. exact Hx.
+    rewrite Hx_eq. exact H.
+Qed.
+
 
 (* t <s t - ((s | t) | -s) <=> (exists x, x * s >s t) *)
 Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
