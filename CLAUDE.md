@@ -107,4 +107,4 @@ If any non-obvious patterns or recurring errors were encountered during the proo
 
 ## Current Open Problem
 
-None — `bvor_slt` was the last open theorem and is now proven.
+**`bvmult_slt`** (InvCond.v line 2736): `∃x. x*s <s t ↔ ~(neg t) & (neg s | s) <s t`

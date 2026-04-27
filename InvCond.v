@@ -2732,4 +2732,44 @@ Proof.
 Qed.
 
 
+(* ~(-t) & (-s | s) <s t <=> (exists x, x * s <s t) *)
+Theorem bvmult_slt : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_slt (bv_mult x s) t = true)
+    (bv_slt (bv_and (bv_not (bv_neg t)) (bv_or (bv_neg s) s)) t = true).
+Proof.
+Admitted. 
+   
+
+(* t <s t - ((s | t) | -s) <=> (exists x, x * s >s t) *)
+Theorem bvmult_sgt: forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_slt t (bv_mult x s) = true)
+    (bv_slt t (bv_subt t (bv_or (bv_or s t) (bv_neg s))) = true).
+Proof.
+Admitted.
+
+
+(* ~(s = 0 /\ t <s s) <=> (exists x, x * s <=s t) *)
+Theorem bvmult_sle : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sle (bv_mult x s) t = true)
+    (~ (s = zeros n /\ bv_slt t s = true)).
+Proof.
+Admitted.
+
+
+(* (-s | s) & max_s >=s t <=> (exists x, x * s >=s t) *)
+Theorem bvmult_sge: forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sge (bv_mult x s) t = true)
+    (bv_sge (bv_and (bv_or (bv_neg s) s) (signed_max n)) t = true).
+Proof.
+Admitted.
+
+
 (*------------------------------------------------------------*)
