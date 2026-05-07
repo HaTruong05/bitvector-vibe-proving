@@ -182,6 +182,8 @@ Parameter bv_or      : bitvector -> bitvector -> bitvector.
 Parameter bv_xor     : bitvector -> bitvector -> bitvector.
 Parameter bv_add     : bitvector -> bitvector -> bitvector.
 Parameter bv_mult    : bitvector -> bitvector -> bitvector.
+Parameter bv_udiv    : bitvector -> bitvector -> bitvector.
+Parameter bv_urem    : bitvector -> bitvector -> bitvector.
 Parameter bv_subt    : bitvector -> bitvector -> bitvector.
 Parameter bv_subt'   : bitvector -> bitvector -> bitvector.
 Parameter bv_ult     : bitvector -> bitvector -> bool.
@@ -241,6 +243,8 @@ Axiom bv_add_size    : forall n a b, size a = n -> size b = n -> size (bv_add a 
 Axiom bv_subt_size   : forall n a b, size a = n -> size b = n -> size (bv_subt a b) = n.
 Axiom bv_subt'_size  : forall n a b, size a = n -> size b = n -> size (bv_subt' a b) = n.
 Axiom bv_mult_size   : forall n a b, size a = n -> size b = n -> size (bv_mult a b) = n.
+Axiom bv_udiv_size   : forall n a b, size a = n -> size b = n -> size (bv_udiv a b) = n.
+Axiom bv_urem_size   : forall n a b, size a = n -> size b = n -> size (bv_urem a b) = n.
 Axiom bv_not_size    : forall n a, size a = n -> size (bv_not a) = n.
 Axiom bv_neg_size    : forall n a, size a = n -> size (bv_neg a) = n.
 Axiom bv_shl_size    : forall n a b, size a = n -> size b = n -> size (bv_shl a b) = n.
@@ -380,6 +384,12 @@ Module RAW2BITVECTOR (M:RAWBITVECTOR) <: BITVECTOR.
 
   Definition bv_mult n (bv1 bv2:bitvector n) : bitvector n :=
     @MkBitvector n (M.bv_mult bv1 bv2) (M.bv_mult_size (wf bv1) (wf bv2)).
+
+  Definition bv_udiv n (bv1 bv2:bitvector n) : bitvector n :=
+    @MkBitvector n (M.bv_udiv bv1 bv2) (M.bv_udiv_size (wf bv1) (wf bv2)).
+
+  Definition bv_urem n (bv1 bv2:bitvector n) : bitvector n :=
+    @MkBitvector n (M.bv_urem bv1 bv2) (M.bv_urem_size (wf bv1) (wf bv2)).
 
   Definition bv_xor n (bv1 bv2:bitvector n) : bitvector n :=
     @MkBitvector n (M.bv_xor bv1 bv2) (M.bv_xor_size (wf bv1) (wf bv2)).
@@ -4750,8 +4760,48 @@ Qed.
 
 Lemma nat2bv_size: forall (n: nat) (s: N), size (nat2bv n s) = s.
 Proof. intros.
-       Reconstr.reasy (@Coq.NArith.Nnat.N2Nat.id, 
+       Reconstr.reasy (@Coq.NArith.Nnat.N2Nat.id,
         @RAWBITVECTOR_LIST.length_nat2bv) (@RAWBITVECTOR_LIST.size).
+Qed.
+
+(* unsigned division: b=0 yields all-ones (SMT-LIB bvudiv semantics) *)
+Definition udiv_list (a b : list bool) : list bool :=
+  if beq_list b (mk_list_false (length b))
+  then mk_list_true (length a)
+  else N2list (N.div (list2N a) (list2N b)) (length a).
+
+Definition bv_udiv (a b : bitvector) : bitvector :=
+  if ((@size a) =? (@size b))
+  then udiv_list a b
+  else nil.
+
+(* unsigned remainder: b=0 yields a (SMT-LIB bvurem semantics) *)
+Definition urem_list (a b : list bool) : list bool :=
+  if beq_list b (mk_list_false (length b))
+  then a
+  else N2list (N.modulo (list2N a) (list2N b)) (length a).
+
+Definition bv_urem (a b : bitvector) : bitvector :=
+  if ((@size a) =? (@size b))
+  then urem_list a b
+  else nil.
+
+Lemma bv_udiv_size: forall n a b, (size a) = n -> (@size b) = n -> size (bv_udiv a b) = n.
+Proof. intros n a b H0 H1.
+       unfold bv_udiv, udiv_list, size, bits in *.
+       rewrite H0, H1. rewrite N.eqb_compare. rewrite N.compare_refl.
+       destruct (beq_list b (mk_list_false (length b))).
+       - now rewrite length_mk_list_true.
+       - now rewrite length_N2list.
+Qed.
+
+Lemma bv_urem_size: forall n a b, (size a) = n -> (@size b) = n -> size (bv_urem a b) = n.
+Proof. intros n a b H0 H1.
+       unfold bv_urem, urem_list, size, bits in *.
+       rewrite H0, H1. rewrite N.eqb_compare. rewrite N.compare_refl.
+       destruct (beq_list b (mk_list_false (length b))).
+       - easy.
+       - now rewrite length_N2list.
 Qed.
 
 Lemma N2list_S_true: forall n m,
