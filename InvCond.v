@@ -2955,3 +2955,129 @@ Qed.
 
 
 (*------------------------------------------------------------*)
+
+(*-----------------------Division 1---------------------------*)
+
+(* (s * t) / t & s = s <=> (exists x, x /u s >=u t) *)
+Theorem bvudiv_uge : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_uge (bv_udiv x s) t = true)
+    (bv_eq 
+       (bv_and (bv_udiv (bv_mult s t) t) s) 
+       s 
+     = true). 
+Proof.
+Admitted.
+
+(*------------------------------------------------------------*)
+
+(*-----------------------Division 2---------------------------*)
+
+(* n = 1 -> s & t = 0 ; otherwise True <=> (exists x, s /u x != t) *)
+Theorem bvudiv_reverse_neq : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_eq (bv_udiv s x) t = false)
+    (if N.eq_dec n 1 then
+       bv_eq (bv_and s t) (zeros n) = true
+     else
+       True).
+Proof.
+Admitted.
+
+(* n = 1 -> s >s t ; n != 1 -> ( (s >=s 0 => s >s t) /\ (s <s 0 => (s >> 1) >s t) ) 
+   <=> (exists x, s /u x >s t) *)
+Theorem bvudiv_reverse_sgt : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sgt (bv_udiv s x) t = true)
+    (if N.eq_dec n 1 then
+       bv_sgt s t = true
+     else
+       (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
+       (bv_slt s (zeros n) = true -> bv_sgt (bv_shr s (one n)) t = true)).
+Proof.
+Admitted.
+
+(* (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) <=> (exists x, s /u x >=s t) *)
+Theorem bvudiv_reverse_sge : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sge (bv_udiv s x) t = true)
+    ((bv_sge s (zeros n) = true -> bv_sge s t = true) /\
+     (bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t = true)).
+Proof.
+Admitted.
+
+(*------------------------------------------------------------*)
+
+(*-----------------------Remainder 1--------------------------*)
+
+(* ~t <s (-s | -t) <=> (exists x, (x urem s) <s t) *)
+Theorem bvurem_slt : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_slt (bv_urem x s) t = true)
+    (bv_slt 
+       (bv_not t) 
+       (bv_or (bv_neg s) (bv_neg t))
+     = true).
+Proof.
+Admitted.
+    
+(* ~0 <s -s & t <=> (exists x, x urem s <=s t) *)
+Theorem bvurem_sle : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sle (bv_urem x s) t = true)
+    (bv_slt 
+       (bv_not (zeros n)) 
+       (bv_and (bv_neg s) t)
+     = true).
+Proof.
+Admitted.
+
+(*------------------------------------------------------------*)
+
+(*-----------------------Remainder 2--------------------------*)
+ 
+(* (t + t - s) & s >=u t <=> (exists x, s urem x = t) *)
+Theorem bvurem_reverse_eq : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_eq (bv_urem s x) t = true)
+    (bv_uge 
+       (bv_and (bv_subt (bv_add t t) s) s) 
+       t
+     = true).
+Proof.
+Admitted.
+
+ 
+(* (s >=s 0 => s >s t) /\ (s <s 0 => ((s - 1) >> 1) >s t) <=> (exists x, s urem x >s t) *)
+Theorem bvurem_reverse_sgt : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sgt (bv_urem s x) t = true)
+    (
+      (bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
+      (bv_slt s (zeros n) = true -> bv_sgt (bv_shr (bv_subt s (one n)) (one n)) t = true)
+    ).
+Proof.
+Admitted.
+
+(* (s >=s 0 => s >=s t) /\ ((s <s 0 /\ t >=s 0) => s - t >u t) <=> (exists x, s urem x >=s t) *)
+Theorem bvurem_reverse_sge : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  iff
+    (exists (x : bitvector), size x = n /\ bv_sge (bv_urem s x) t = true)
+    (
+      (bv_sge s (zeros n) = true -> bv_sge s t = true) /\
+      ((bv_slt s (zeros n) = true /\ bv_sge t (zeros n) = true) -> 
+       bv_ugt (bv_subt s t) t = true)
+    ).
+Proof.
+Admitted.
+
+(*------------------------------------------------------------*)

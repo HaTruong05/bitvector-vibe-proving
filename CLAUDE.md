@@ -85,7 +85,7 @@ Use the line number from grep to read ~30 lines around the lemma.
 **Keyword index** — seed your searches with these names:
 
 Operations: `bv_and`, `bv_or`, `bv_xor`, `bv_not`, `bv_neg`, `bv_add`, `bv_subt'`,
-`bv_mult`, `bv_shl`, `bv_shr`, `bv_shl_a`, `bv_concat`
+`bv_mult`, `bv_shl`, `bv_shr`, `bv_shl_a`, `bv_concat`, `bv_udiv`, `bv_urem`
 
 Comparisons: `bv_ult`, `bv_ule`, `bv_ugt`, `bv_uge`, `bv_slt`, `bv_sle`, `bv_sgt`, `bv_sge`
 
@@ -93,7 +93,7 @@ Constants: `zeros`, `one`, `signed_min`, `signed_max`, `mk_list_false`, `mk_list
 
 Bridges: `bv2nat_a`, `bv2int`, `sbv2int`, `pow2_int_N`
 
-Sizes: `bv_shl_size`, `bv_add_size`, `signed_min_size`, `bv_neg_size`, `bv_not_size`
+Sizes: `{operation}_size`
 
 ## Checklist Before Claiming a Proof Done
 
@@ -110,4 +110,4 @@ Do NOT spawn subagents for proof work. All Coq proof attempts must be done inlin
 
 ## Current Open Problem
 
-**`bvmult_sgt`** (InvCond.v line 2805)
+bvudiv_uge (Line 2962)
