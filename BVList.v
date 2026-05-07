@@ -15870,6 +15870,366 @@ Proof.
       rewrite HVs_unfold in HVs_pos. rewrite HVs_pos, Ht_last_false. simpl. lia.
 Qed.
 
+(* M = bv_or(-s, s) = ones|zeros mask, v = t - (M|t): bv_and M v = v *)
+Lemma bv_and_mult_subt_idemp : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  bv_and (bv_or (bv_neg s) s)
+         (bv_subt t (bv_or (bv_or (bv_neg s) s) t))
+  = bv_subt t (bv_or (bv_or (bv_neg s) s) t).
+Proof.
+  intros n s t Hs Ht.
+  assert (HM : size (bv_or (bv_neg s) s) = n).
+  { apply bv_or_size; [apply bv_neg_size|]; exact Hs. }
+  assert (HMt : size (bv_or (bv_or (bv_neg s) s) t) = n).
+  { apply bv_or_size; [exact HM | exact Ht]. }
+  assert (Hv : size (bv_subt t (bv_or (bv_or (bv_neg s) s) t)) = n).
+  { apply bv_subt_size; [exact Ht | exact HMt]. }
+  pose proof (@size_to_length n t Ht) as Hlen_t.
+  destruct (@zeros_one_factorization s) as [Hzeros | (k, (z, Hfact))].
+  - (* s = zeros n: M = zeros n *)
+    assert (HM_zero : bv_or (bv_neg s) s = zeros n).
+    {
+      rewrite Hzeros, Hs, bv_neg_zeros_zeros.
+      pose proof (bv_or_0_neutral (zeros n)) as H.
+      rewrite zeros_size in H. exact H.
+    }
+    rewrite HM_zero.
+    assert (HMt_eq : bv_or (zeros n) t = t).
+    {
+      rewrite (bv_or_comm (zeros_size n) Ht).
+      pose proof (bv_or_0_neutral t) as H.
+      rewrite Ht in H. exact H.
+    }
+    rewrite HMt_eq.
+    (* bv_subt t t = zeros n *)
+    assert (Hsubt_tt : bv_subt t t = zeros n).
+    {
+      apply list2int_inj.
+      + pose proof (@size_to_length n (bv_subt t t) (bv_subt_size Ht Ht)) as Hlensubt.
+        pose proof (@size_to_length n (zeros n) (zeros_size n)) as Hlenz.
+        lia.
+      + unfold bv_subt. rewrite N.eqb_refl.
+        pose proof (@list2int_subst_list_formula t t eq_refl) as Hform.
+        rewrite Z.sub_diag, Z.add_0_l in Hform.
+        pose proof (zero_lt_pow2_int (length t)) as Hlt.
+        rewrite Z.mod_same in Hform; [| lia].
+        unfold zeros. rewrite list2int_mk_list_false.
+        exact Hform.
+    }
+    rewrite Hsubt_tt.
+    apply bv_and_idem.
+  - (* s = bv_concat(bv_concat z (one 1))(zeros k) *)
+    assert (H_M_eq : bv_or (bv_neg s) s = bv_concat (ones (size z + 1)) (zeros k)).
+    {
+      rewrite Hfact, bv_neg_zeros_one. apply bv_or_neg_zeros_one.
+    }
+    assert (Hn_eq : n = size z + 1 + k).
+    {
+      rewrite <- Hs, Hfact.
+      apply (@bv_concat_size (size z + 1) k).
+      + now apply (@bv_concat_size (size z) 1).
+      + apply zeros_size.
+    }
+    pose proof (@size_to_length n (bv_or (bv_neg s) s) HM) as Hlen_M.
+    (* set v first so it folds into goal and Hv before H_M_eq rewrites the goal *)
+    set (v := bv_subt t (bv_or (bv_or (bv_neg s) s) t)).
+    rewrite H_M_eq.
+    assert (H_and_eq : bv_and (bv_concat (ones (size z + 1)) (zeros k)) v
+                       = bv_concat (skipn (N.to_nat k) v) (zeros k)).
+    { apply bv_and_or_neg_zeros_one.
+      assert (Hv' : size v = n) by exact Hv.
+      rewrite Hv', Hn_eq. ring. }
+    rewrite H_and_eq.
+    (* Use bv_and_or_neg_eq_zeros_one backward: suffices to provide witness x s.t. x*Pk ≡ bv2int v mod P *)
+    assert (Hkv : k <= size v).
+    { assert (Hv' : size v = n) by exact Hv.
+      rewrite Hv', Hn_eq. apply N.le_add_l. }
+    apply (proj2 (@bv_and_or_neg_eq_zeros_one v k Hkv)).
+    (* Integer abbreviations *)
+    set (Pk := pow2_int_N k) in *.
+    set (P := pow2_int_N n) in *.
+    set (T := list2int t).
+    set (Tk := list2int (skipn (N.to_nat k) t)).
+    (* Witness: Tk + 1 *)
+    exists (Tk + 1)%Z.
+    (* Unfold bv2int v to list2int (subst_list t (map2 orb M t)) *)
+    assert (Hv_eq : bv2int v = list2int (subst_list t (map2 orb (bv_or (bv_neg s) s) t))).
+    {
+      unfold v, bv2int, bv_subt.
+      rewrite Ht, HMt, N.eqb_refl.
+      unfold bv_or at 1. rewrite HM, Ht, N.eqb_refl. reflexivity.
+    }
+    rewrite Hv_eq.
+    (* Length of map2 orb M t *)
+    assert (Hlen_Mt : length (map2 orb (bv_or (bv_neg s) s) t) = length t).
+    {
+      assert (H : length (bv_or (bv_neg s) s) = length t) by (rewrite Hlen_M, Hlen_t; reflexivity).
+      pose proof (@map2_or_length (bv_or (bv_neg s) s) t H) as Hml.
+      rewrite Hlen_M in Hml. lia.
+    }
+    (* list2int of M = P - Pk *)
+    assert (HM_int : list2int (bv_or (bv_neg s) s) = (P - Pk)%Z).
+    {
+      change (list2int (bv_or (bv_neg s) s)) with (bv2int (bv_or (bv_neg s) s)).
+      rewrite H_M_eq, bv2int_app, bv2int_zeros, Z.add_0_r.
+      unfold ones, bv2int, Pk, P, pow2_int_N.
+      rewrite zeros_size.
+      pose proof (@list2int_map_negb_sum (mk_list_false (N.to_nat (size z + 1)))) as Hsum.
+      rewrite not_list_false_true, list2int_mk_list_false, length_mk_list_false in Hsum.
+      assert (HPn : pow2_int (N.to_nat n) = (pow2_int (N.to_nat (size z + 1)) * pow2_int (N.to_nat k))%Z).
+      { rewrite Hn_eq. rewrite N2Nat.inj_add at 1. rewrite pow2_int_add. ring. }
+      lia.
+    }
+    (* list2int of (M & t) = Pk * Tk *)
+    assert (HMt_and_int : list2int (map2 andb (bv_or (bv_neg s) s) t) = (Pk * Tk)%Z).
+    {
+      assert (Heq : bv_and (bv_or (bv_neg s) s) t = map2 andb (bv_or (bv_neg s) s) t).
+      { unfold bv_and. rewrite HM, Ht, N.eqb_refl. reflexivity. }
+      assert (Hcond : size z + 1 + k = size t) by (rewrite Ht; lia).
+      change (list2int (map2 andb (bv_or (bv_neg s) s) t))
+        with (bv2int (map2 andb (bv_or (bv_neg s) s) t)).
+      rewrite <- Heq, H_M_eq.
+      rewrite (bv_and_or_neg_zeros_one Hcond).
+      rewrite bv2int_app, bv2int_zeros, Z.add_0_r.
+      unfold Pk, Tk, pow2_int_N. rewrite zeros_size. reflexivity.
+    }
+    (* list2int of (M | t) = P - Pk + T - Pk*Tk via inclusion-exclusion *)
+    assert (HMt_or_int : list2int (map2 orb (bv_or (bv_neg s) s) t) = (P - Pk + T - Pk * Tk)%Z).
+    {
+      pose proof (@list2int_map2_and_or_sum (bv_or (bv_neg s) s) t) as HIE.
+      rewrite Hlen_M, Hlen_t in HIE.
+      specialize (HIE eq_refl).
+      rewrite HMt_and_int in HIE.
+      unfold bv2int in HM_int. rewrite HM_int in HIE. lia.
+    }
+    (* Subtraction formula: list2int(subst_list t (M|t)) = (T - (P-Pk+T-Pk*Tk) + P) mod P = Pk*(Tk+1) mod P *)
+    rewrite list2int_subst_list_formula; [| exact (eq_sym Hlen_Mt)].
+    rewrite HMt_or_int.
+    assert (Hsize_v : size v = n) by exact Hv.
+    unfold P, Pk, pow2_int_N. rewrite Hlen_t, Hsize_v.
+    assert (Hnum : (list2int t - (pow2_int (N.to_nat n) - pow2_int (N.to_nat k) + T
+                               - pow2_int (N.to_nat k) * Tk) + pow2_int (N.to_nat n))%Z
+                 = ((Tk + 1) * pow2_int (N.to_nat k))%Z) by (unfold T, Tk; ring).
+    rewrite Hnum.
+    rewrite Z.mod_mod by (pose proof (zero_lt_pow2_int (N.to_nat n)); lia).
+    reflexivity.
+Qed.
+
+(* Forward direction of bvmult_sgt: s nonzero, t <s x*s -> t <s bv_subt t (M|t) *)
+Lemma bvmult_sgt_fwd_key : forall (n : N) (z : bitvector) (k : N) (t x_s : bitvector),
+  size t = n -> size x_s = n ->
+  n = size z + 1 + k ->
+  bv_and (bv_concat (ones (size z + 1)) (zeros k)) x_s = x_s ->
+  bv_slt t x_s = true ->
+  bv_slt t (bv_subt t (bv_or (bv_concat (ones (size z + 1)) (zeros k)) t)) = true.
+Proof.
+  intros n z k t x_s Ht Hxs Hn_eq HXinM Hslt.
+  assert (HMsz : size (bv_concat (ones (size z + 1)) (zeros k)) = n).
+  { rewrite Hn_eq. apply bv_concat_size; [apply ones_size | apply zeros_size]. }
+  assert (HMOtsz : size (bv_or (bv_concat (ones (size z + 1)) (zeros k)) t) = n).
+  { apply bv_or_size; [exact HMsz | exact Ht]. }
+  assert (Hvsz : size (bv_subt t (bv_or (bv_concat (ones (size z + 1)) (zeros k)) t)) = n).
+  { apply bv_subt_size; [exact Ht | exact HMOtsz]. }
+  set (v := bv_subt t (bv_or (bv_concat (ones (size z + 1)) (zeros k)) t)).
+  pose proof (size_to_length Ht) as Hlen_t.
+  pose proof (size_to_length Hxs) as Hlen_xs.
+  pose proof (size_to_length Hvsz) as Hlen_v.
+  set (h := N.to_nat (size z + 1)).
+  set (kn := N.to_nat k).
+  set (hk := (h + kn)%nat).
+  assert (Hh_pos : (1 <= h)%nat).
+  { unfold h. rewrite N.add_1_r. rewrite N2Nat.inj_succ. lia. }
+  assert (Hlen_eq : length t = hk).
+  { unfold hk, h, kn. rewrite <- N2Nat.inj_add, <- Hn_eq. exact Hlen_t. }
+  assert (Hlen_xs_eq : length x_s = hk). { lia. }
+  assert (Hlen_v_eq : length v = hk). { unfold v. rewrite Hlen_v, <- Hlen_t. exact Hlen_eq. }
+  set (Pk := pow2_int kn).
+  set (Ph := pow2_int h).
+  set (P := pow2_int hk).
+  assert (HP_split : P = (Pk * Ph)%Z).
+  { unfold P, Pk, Ph, hk. rewrite pow2_int_add. ring. }
+  assert (HPk_pos : (0 < Pk)%Z) by apply zero_lt_pow2_int.
+  assert (HPh_pos : (0 < Ph)%Z) by apply zero_lt_pow2_int.
+  assert (HP_pos : (0 < P)%Z) by lia.
+  assert (HPow_n : pow2_int_N n = P).
+  { unfold P, pow2_int_N, hk, h, kn. rewrite Hn_eq, N2Nat.inj_add. reflexivity. }
+  assert (HPow_k : pow2_int_N k = Pk).
+  { unfold Pk, pow2_int_N, kn. reflexivity. }
+  assert (Hhk_pos : (1 <= hk)%nat) by (unfold hk; lia).
+  assert (HPk_Ph1 : (Pk * pow2_int (h - 1)%nat = pow2_int (hk - 1)%nat)%Z).
+  { unfold Pk, hk. rewrite <- pow2_int_add. f_equal. lia. }
+  assert (HPow2_double : (2 * pow2_int (hk - 1)%nat = P)%Z).
+  { unfold P. rewrite <- pow2_int_succ. f_equal. lia. }
+  set (Tk := list2int (skipn kn t)).
+  set (T_lo := list2int (firstn kn t)).
+  set (T := list2int t).
+  set (V := list2int v).
+  set (Xu := list2int (skipn kn x_s)).
+  set (X := list2int x_s).
+  assert (HT_lb : (0 <= T)%Z) by (unfold T; apply list2int_geq_zero).
+  assert (HT_ub : (T < P)%Z).
+  { unfold T, P. apply list2int_lt_pow2_int. lia. }
+  assert (HV_lb : (0 <= V)%Z) by (unfold V; apply list2int_geq_zero).
+  assert (HV_ub : (V < P)%Z).
+  { unfold V, P. apply list2int_lt_pow2_int. lia. }
+  assert (HX_lb : (0 <= X)%Z) by (unfold X; apply list2int_geq_zero).
+  assert (HX_ub : (X < P)%Z).
+  { unfold X, P. apply list2int_lt_pow2_int. lia. }
+  assert (HTk_lb : (0 <= Tk)%Z) by (unfold Tk; apply list2int_geq_zero).
+  assert (HTk_ub : (Tk < Ph)%Z).
+  { unfold Tk, Ph. apply list2int_lt_pow2_int.
+    rewrite length_skipn. lia. }
+  assert (HT_lo_lb : (0 <= T_lo)%Z) by (unfold T_lo; apply list2int_geq_zero).
+  assert (HT_lo_ub : (T_lo < Pk)%Z).
+  { unfold T_lo, Pk. apply list2int_lt_pow2_int.
+    rewrite firstn_length_le; lia. }
+  assert (HXu_lb : (0 <= Xu)%Z) by (unfold Xu; apply list2int_geq_zero).
+  assert (HXu_ub : (Xu < Ph)%Z).
+  { unfold Xu, Ph. apply list2int_lt_pow2_int.
+    rewrite length_skipn. lia. }
+  (* T = Pk*Tk + T_lo *)
+  assert (HT_split : T = (Pk * Tk + T_lo)%Z).
+  { unfold T, Tk, T_lo, Pk.
+    rewrite <- (firstn_skipn kn t) at 1.
+    rewrite list2int_app.
+    rewrite firstn_length_le; [ring | lia]. }
+  (* X = Pk*Xu (lower k bits of x_s are all zero) *)
+  assert (HX_concat : bv_concat (skipn kn x_s) (zeros k) = x_s).
+  { assert (Hcond : size z + 1 + k = size x_s). { rewrite Hxs. exact (eq_sym Hn_eq). }
+    exact (eq_trans (eq_sym (bv_and_or_neg_zeros_one Hcond)) HXinM). }
+  assert (HX_val : X = (Pk * Xu)%Z).
+  { unfold X, Xu, Pk. rewrite <- HX_concat at 1.
+    change (list2int (bv_concat (skipn kn x_s) (zeros k)))
+      with (bv2int (bv_concat (skipn kn x_s) (zeros k))).
+    change (list2int (skipn kn x_s)) with (bv2int (skipn kn x_s)).
+    rewrite bv2int_app, bv2int_zeros, zeros_size, Z.add_0_r.
+    unfold kn, pow2_int_N. reflexivity. }
+  (* Compute list2int(M) = P - Pk *)
+  assert (HM_int : list2int (bv_concat (ones (size z + 1)) (zeros k)) = (P - Pk)%Z).
+  { change (list2int _) with (bv2int (bv_concat (ones (size z + 1)) (zeros k))).
+    rewrite bv2int_app, bv2int_zeros, Z.add_0_r.
+    unfold ones, bv2int. rewrite zeros_size.
+    pose proof (@list2int_map_negb_sum (mk_list_false (N.to_nat (size z + 1)))) as Hsum.
+    rewrite not_list_false_true, list2int_mk_list_false, length_mk_list_false in Hsum.
+    unfold Pk, P, hk. rewrite pow2_int_add. unfold h, kn, pow2_int_N. nia. }
+  (* Compute list2int(M & t) = Pk*Tk *)
+  assert (HMt_and_int : list2int (map2 andb (bv_concat (ones (size z + 1)) (zeros k)) t) = (Pk * Tk)%Z).
+  { assert (Hcond : size z + 1 + k = size t). { rewrite Ht. exact (eq_sym Hn_eq). }
+    change (list2int (map2 andb _ t)) with
+           (bv2int (map2 andb (bv_concat (ones (size z + 1)) (zeros k)) t)).
+    assert (Heq : bv_and (bv_concat (ones (size z + 1)) (zeros k)) t
+                  = map2 andb (bv_concat (ones (size z + 1)) (zeros k)) t).
+    { unfold bv_and. rewrite HMsz, Ht, N.eqb_refl. reflexivity. }
+    rewrite <- Heq, (bv_and_or_neg_zeros_one Hcond).
+    rewrite bv2int_app, bv2int_zeros, zeros_size, Z.add_0_r.
+    unfold Pk, Tk, pow2_int_N. reflexivity. }
+  (* Compute list2int(M | t) = P - Pk + T - Pk*Tk by inclusion-exclusion *)
+  assert (Hlen_Mt : length (map2 orb (bv_concat (ones (size z + 1)) (zeros k)) t) = length t).
+  { assert (HlenM : length (bv_concat (ones (size z + 1)) (zeros k)) = length t).
+    { pose proof (size_to_length HMsz). lia. }
+    pose proof (@map2_or_length (bv_concat (ones (size z + 1)) (zeros k)) t HlenM) as Hml.
+    rewrite HlenM in Hml. lia. }
+  assert (HMt_or_int : list2int (map2 orb (bv_concat (ones (size z + 1)) (zeros k)) t) = (P - Pk + T - Pk * Tk)%Z).
+  { pose proof (@list2int_map2_and_or_sum (bv_concat (ones (size z + 1)) (zeros k)) t) as HIE.
+    assert (HlenM : length (bv_concat (ones (size z + 1)) (zeros k)) = length t).
+    { pose proof (size_to_length HMsz). lia. }
+    specialize (HIE HlenM).
+    rewrite HMt_and_int in HIE.
+    change (list2int (bv_concat (ones (size z + 1)) (zeros k))) with
+           (bv2int (bv_concat (ones (size z + 1)) (zeros k))) in HM_int.
+    unfold bv2int in HM_int. rewrite HM_int in HIE. lia. }
+  (* V = Pk*(Tk+1) mod P *)
+  assert (HV_formula : V = ((Pk * (Tk + 1)) mod P)%Z).
+  { unfold V, v, bv_subt.
+    rewrite Ht, HMOtsz, N.eqb_refl.
+    assert (Hbvor : bv_or (bv_concat (ones (size z + 1)) (zeros k)) t
+                  = map2 orb (bv_concat (ones (size z + 1)) (zeros k)) t).
+    { unfold bv_or. rewrite HMsz, Ht, N.eqb_refl. reflexivity. }
+    rewrite Hbvor. unfold bits.
+    rewrite list2int_subst_list_formula; [| exact (eq_sym Hlen_Mt)].
+    rewrite HMt_or_int.
+    fold T.
+    replace (pow2_int (length t)) with P by (unfold P; f_equal; exact (eq_sym Hlen_eq)).
+    assert (Hnum : (T - (P - Pk + T - Pk * Tk) + P)%Z = (Pk * (Tk + 1))%Z) by (unfold T; ring).
+    rewrite Hnum. reflexivity. }
+  (* Convert Hxs and goal using bv_slt_iff_sbv2int *)
+  rewrite (@bv_slt_iff_sbv2int n t x_s Ht Hxs) in Hslt.
+  rewrite (@bv_slt_iff_sbv2int n t v Ht Hvsz).
+  unfold sbv2int in *.
+  rewrite HPow_n in *.
+  change (bv2int t) with T in *.
+  change (bv2int v) with V in *.
+  change (bv2int x_s) with X in *.
+  (* Non-empty witnesses *)
+  assert (Hskip_t_ne : skipn kn t <> []).
+  { intro H. apply length_zero_iff_nil in H. rewrite length_skipn in H. lia. }
+  assert (Hskip_xs_ne : skipn kn x_s <> []).
+  { intro H. apply length_zero_iff_nil in H. rewrite length_skipn in H. lia. }
+  assert (Hv_ne : v <> []).
+  { intro H. apply length_zero_iff_nil in H. lia. }
+  assert (Ht_ne : t <> []).
+  { intro H. apply length_zero_iff_nil in H. lia. }
+  assert (Hxs_ne : x_s <> []).
+  { intro H. apply length_zero_iff_nil in H. lia. }
+  (* last(skipn kn t) = last t *)
+  assert (Hlast_t_skip : last (skipn kn t) false = last t false).
+  { rewrite <- (firstn_skipn kn t) at 2.
+    rewrite last_append; [reflexivity | exact Hskip_t_ne]. }
+  assert (Hlast_xs_skip : last (skipn kn x_s) false = last x_s false).
+  { rewrite <- (firstn_skipn kn x_s) at 2.
+    rewrite last_append; [reflexivity | exact Hskip_xs_ne]. }
+  (* Case split on last t and last v *)
+  destruct (last t false) eqn:Hlast_t; destruct (last v false) eqn:Hlast_v.
+  - (* last t = true, last v = true: need T - P < V - P, i.e., T < V *)
+    destruct (Z.lt_ge_cases (Pk * (Tk + 1)) P) as [HPlt | HPge].
+    + assert (HV_eq : V = (Pk * (Tk + 1))%Z).
+      { rewrite HV_formula. apply Z.mod_small. lia. }
+      lia.
+    + assert (HPge_eq : (Pk * (Tk + 1) = P)%Z) by nia.
+      assert (HV_eq : V = 0%Z).
+      { rewrite HV_formula, HPge_eq. apply Z.mod_same. lia. }
+      pose proof (last_true_list2int_lb Hv_ne Hlast_v) as HV_half.
+      rewrite Hlen_v_eq in HV_half. fold V in HV_half.
+      lia.
+  - (* last t = true, last v = false: T - P < V since T - P < 0 ≤ V *)
+    lia.
+  - (* last t = false, last v = true: contradiction from Hxs *)
+    exfalso.
+    pose proof (last_false_list2int_ub Ht_ne Hlast_t) as HT_half.
+    rewrite Hlen_eq in HT_half. fold T in HT_half.
+    (* Pk*(Tk+1) ≤ Pk*pow2_int(h-1) = pow2_int(hk-1) *)
+    assert (HTk_ub2 : (Tk < pow2_int (h - 1)%nat)%Z) by nia.
+    assert (HPk_Tk1_ub : (Pk * (Tk + 1) <= pow2_int (hk - 1)%nat)%Z).
+    { rewrite <- HPk_Ph1. nia. }
+    assert (HPk_Tk1_lt_P : (Pk * (Tk + 1) < P)%Z) by lia.
+    assert (HV_eq : V = (Pk * (Tk + 1))%Z).
+    { rewrite HV_formula. apply Z.mod_small. lia. }
+    pose proof (last_true_list2int_lb Hv_ne Hlast_v) as HV_half.
+    rewrite Hlen_v_eq in HV_half. fold V in HV_half.
+    destruct (last x_s false) eqn:Hlast_xs.
+    + (* last x_s = true: X - P < 0 ≤ T, but Hxs says T < X - P *)
+      lia.
+    + (* last x_s = false: Xu < pow2_int(h-1) *)
+      pose proof (last_false_list2int_ub Hskip_xs_ne) as HXu_half.
+      rewrite length_skipn, Hlen_xs_eq in HXu_half.
+      specialize (HXu_half Hlast_xs_skip).
+      assert (HhkSub : (hk - kn = h)%nat) by (unfold hk; lia).
+      rewrite HhkSub in HXu_half. fold Xu in HXu_half.
+      (* HXu_half : Xu < pow2_int(h-1) *)
+      (* Hxs: T < X = Pk*Xu (last t=false, last x_s=false) *)
+      nia.
+  - (* last t = false, last v = false: T < V *)
+    pose proof (last_false_list2int_ub Ht_ne Hlast_t) as HT_half.
+    rewrite Hlen_eq in HT_half. fold T in HT_half.
+    assert (HTk_ub2 : (Tk < pow2_int (h - 1)%nat)%Z) by nia.
+    assert (HPk_Tk1_ub : (Pk * (Tk + 1) <= pow2_int (hk - 1)%nat)%Z).
+    { rewrite <- HPk_Ph1. nia. }
+    assert (HPk_Tk1_lt_P : (Pk * (Tk + 1) < P)%Z) by lia.
+    assert (HV_eq : V = (Pk * (Tk + 1))%Z).
+    { rewrite HV_formula. apply Z.mod_small. lia. }
+    nia.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.
