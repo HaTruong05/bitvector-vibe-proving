@@ -104,6 +104,10 @@ grep "Admitted" InvCond.v        # must return nothing
 
 If any non-obvious patterns or recurring errors were encountered during the proof, add them to CLAUDE.md now — before reporting done. If nothing surprising came up, skip this step.
 
+## Subagents
+
+Do NOT spawn subagents for proof work. All Coq proof attempts must be done inline in the main conversation.
+
 ## Current Open Problem
 
 **`bvmult_sgt`** (InvCond.v line 2805)
