@@ -49,7 +49,7 @@ pose proof (@list2int_lt_pow2_int l (length l) eq_refl) as H.
 exact (@bv_and_idem2 x s n Hx Hs).
 ```
 
-## N_scope Infects Tactic Terms
+## N_scope Infects Tactic Terms and Lemma Statements
 
 **`Local Open Scope N_scope` (BVList.v line 27)** means bare `-`, `+`, `*` inside tactic arguments (`replace`, `assert`, `ring`) are parsed as `N` operations — even when the values are `Z` or `nat`. Error symptom: `"list2int t" has type "Z" while it is expected to have type "N"`. Fix: always annotate with `%Z` or `%nat`:
 
@@ -58,6 +58,19 @@ replace (a - b + c)%Z with (a - b + 1 * c)%Z by ring.
 assert (Hls : length s = 0%nat) by lia.
 replace (length t - 1)%nat with (length s - 1)%nat in H by lia.
 ```
+
+**This also affects lemma statement conclusions.** If you write a helper lemma in BVList.v whose conclusion has bare `*`, `mod`, or `^` over `nat` values, they'll be parsed as `N` operators. Fix: wrap the conclusion with `%nat`:
+
+```coq
+(* Wrong — * and mod parsed as N operators *)
+bv2nat_a (bv_mult s t) = (bv2nat_a s * bv2nat_a t) mod 2^(N.to_nat n).
+(* Right *)
+(bv2nat_a (bv_mult s t) = (bv2nat_a s * bv2nat_a t) mod 2^(N.to_nat n))%nat.
+```
+
+## Helper Lemmas in BVList.v Inherit Implicit Arguments
+
+When inserting helper lemmas into BVList.v, `Set Implicit Arguments` (line 33) makes bitvector/N forall-args implicit when they can be inferred from a proof argument. A call like `bv2nat_a_lt_pow2 n x Hx` in test_scratch.v (where args are explicit) must become `bv2nat_a_lt_pow2 Hx` in InvCond.v (which imports the lemma from BVList.v). Error symptom: `"n" has type "N" while expected "size ?a = ?n"` — you're passing a bitvector/N where a proof is expected.
 
 ## Integer Bridges (critical for signed arithmetic)
 
@@ -110,4 +123,4 @@ Do NOT spawn subagents for proof work. All Coq proof attempts must be done inlin
 
 ## Current Open Problem
 
-bvudiv_uge (Line 2962)
+Next Admitted stubs begin at InvCond.v line 3078.

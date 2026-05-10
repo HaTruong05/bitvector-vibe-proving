@@ -16280,6 +16280,95 @@ Proof.
     nia.
 Qed.
 
+Lemma list2int_eq_Z_of_N_list2N : forall a, (list2int a = Z.of_N (list2N a))%Z.
+Proof.
+  induction a as [| b t IH]; [reflexivity |].
+  rewrite list2int_cons. simpl list2N. destruct b.
+  - rewrite N.succ_double_spec, N2Z.inj_add, N2Z.inj_mul, <- IH.
+    replace (Z.of_N 2) with 2%Z by reflexivity.
+    replace (Z.of_N 1) with 1%Z by reflexivity. simpl bool2int. ring.
+  - rewrite N.double_spec, N2Z.inj_mul, <- IH.
+    replace (Z.of_N 2) with 2%Z by reflexivity. simpl bool2int. ring.
+Qed.
+
+Lemma bv2int_eq_Z_of_nat_bv2nat_a : forall a, (bv2int a = Z.of_nat (bv2nat_a a))%Z.
+Proof.
+  intro a. unfold bv2int, bv2nat_a, list2nat_be_a.
+  rewrite list2int_eq_Z_of_N_list2N, N_nat_Z. reflexivity.
+Qed.
+
+Lemma pow2_int_eq_Z_of_nat_pow2 : forall k, pow2_int k = Z.of_nat (2^k).
+Proof.
+  induction k as [| k IH]; [reflexivity |].
+  rewrite pow2_int_succ, IH. simpl (2^(S k))%nat. rewrite Nat2Z.inj_add. lia.
+Qed.
+
+Lemma bv2nat_a_lt_pow2 : forall (n : N) (a : bitvector),
+  size a = n -> (bv2nat_a a < 2^(N.to_nat n))%nat.
+Proof.
+  intros n a Ha. unfold bv2nat_a, list2nat_be_a.
+  pose proof (pow_gt a) as Hpg. apply Nat.ltb_lt in Hpg.
+  now rewrite (size_to_length Ha) in Hpg.
+Qed.
+
+Lemma bv2nat_a_mult_mod : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  (bv2nat_a (bv_mult s t) = (bv2nat_a s * bv2nat_a t) mod 2^(N.to_nat n))%nat.
+Proof.
+  intros n s t Hs Ht. apply Nat2Z.inj.
+  rewrite Nat2Z.inj_mod, Nat2Z.inj_mul.
+  rewrite <- pow2_int_eq_Z_of_nat_pow2. unfold pow2_int_N.
+  rewrite <- bv2int_eq_Z_of_nat_bv2nat_a, <- (bv2int_eq_Z_of_nat_bv2nat_a s), <- (bv2int_eq_Z_of_nat_bv2nat_a t).
+  pose proof (bv2int_mult Hs Ht) as Hmult. unfold pow2_int_N in Hmult.
+  rewrite Z.mod_small in Hmult; [exact Hmult |].
+  split.
+  - rewrite bv2int_eq_Z_of_nat_bv2nat_a. apply Nat2Z.is_nonneg.
+  - rewrite bv2int_eq_Z_of_nat_bv2nat_a, pow2_int_eq_Z_of_nat_pow2.
+    apply Nat2Z.inj_lt. exact (bv2nat_a_lt_pow2 (bv_mult_size Hs Ht)).
+Qed.
+
+Lemma N_size_le_nat : forall (q : N) (k : nat),
+  (N.to_nat q < 2^k)%nat -> (N.to_nat (N.size q) <= k)%nat.
+Proof.
+  intros q k Hlt. destruct q as [| p]; [simpl; lia |].
+  assert (Hpos : (0 < N.pos p)%N) by constructor.
+  assert (HN : (N.pos p < N.pow 2 (N.of_nat k))%N).
+  { rewrite <- N.compare_lt_iff, N2Nat.inj_compare.
+    apply PeanoNat.Nat.compare_lt_iff.
+    rewrite N2Nat.inj_pow, Nat2N.id. simpl N.to_nat. exact Hlt. }
+  apply N.log2_lt_pow2 in HN; [| exact Hpos].
+  rewrite N.size_log2 by discriminate. rewrite N2Nat.inj_succ. lia.
+Qed.
+
+Lemma bv2nat_a_udiv_nonzero : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n -> b <> zeros n ->
+  (bv2nat_a (bv_udiv a b) = bv2nat_a a / bv2nat_a b)%nat.
+Proof.
+  intros n a b Ha Hb Hbne.
+  unfold bv2nat_a, list2nat_be_a, bv_udiv, udiv_list.
+  pose proof (size_to_length Ha) as Hlen_a. pose proof (size_to_length Hb) as Hlen_b.
+  rewrite Ha, Hb, N.eqb_refl.
+  assert (Hbeq : beq_list b (mk_list_false (length b)) = false).
+  { apply List_neq2. intro Heq. apply Hbne. unfold zeros. now rewrite <- Hlen_b. }
+  rewrite Hbeq, Hlen_a.
+  rewrite list2N_N2List_s; [rewrite N2Nat.inj_div; reflexivity |].
+  apply Nat.leb_le. apply N_size_le_nat.
+  apply Nat.le_lt_trans with (m := N.to_nat (list2N a)).
+  - rewrite N2Nat.inj_div. destruct (N.to_nat (list2N b)); [simpl; lia |].
+    apply Nat.Div0.div_le_upper_bound. lia.
+  - pose proof (pow_gt a) as Hpg. apply Nat.ltb_lt in Hpg.
+    rewrite Hlen_a in Hpg. exact Hpg.
+Qed.
+
+Lemma bv2nat_a_inj : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n -> bv2nat_a a = bv2nat_a b -> a = b.
+Proof.
+  intros n a b Ha Hb Heq. unfold bv2nat_a, list2nat_be_a in Heq.
+  apply N2Nat.inj in Heq.
+  rewrite <- N2List_list2N with (a := a), <- N2List_list2N with (a := b).
+  rewrite Heq, (size_to_length Ha), (size_to_length Hb). reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.
