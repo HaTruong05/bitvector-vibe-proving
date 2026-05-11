@@ -16391,6 +16391,194 @@ Proof.
   rewrite list2N_mk_list_false. reflexivity.
 Qed.
 
+Lemma bv2nat_a_one : forall (n : N),
+  (0 < N.to_nat n)%nat -> (bv2nat_a (one n) = 1)%nat.
+Proof.
+  intros n Hn.
+  unfold bv2nat_a, list2nat_be_a, one.
+  assert (H : N.to_nat n = S (N.to_nat n - 1)) by lia.
+  rewrite H. rewrite rev_mk_list_one_succ. simpl.
+  rewrite listE. reflexivity.
+Qed.
+
+Lemma bv_udiv_one : forall (n : N) (s : bitvector),
+  size s = n -> (0 < N.to_nat n)%nat -> bv_udiv s (one n) = s.
+Proof.
+  intros n s Hs Hn.
+  pose proof (size_to_length Hs) as Hlen_s.
+  pose proof (size_to_length (one_size n)) as Hlen_one.
+  assert (Hone_val : list2N (one n) = 1%N).
+  { pose proof (bv2nat_a_one Hn) as H.
+    unfold bv2nat_a, list2nat_be_a in H.
+    apply N2Nat.inj. simpl. exact H. }
+  assert (Hne : one n <> zeros n).
+  { intro Heq. apply (f_equal bv2nat_a) in Heq.
+    rewrite bv2nat_a_one, bv2nat_a_zeros_eq in Heq. discriminate. exact Hn. }
+  unfold bv_udiv. rewrite Hs, one_size, N.eqb_refl.
+  unfold udiv_list.
+  assert (Hbeq : beq_list (one n) (mk_list_false (length (one n))) = false).
+  { apply List_neq2. rewrite Hlen_one. unfold zeros in Hne. exact Hne. }
+  rewrite Hbeq, Hone_val, N.div_1_r.
+  apply N2List_list2N.
+Qed.
+
+Lemma bv2nat_a_shr_one : forall (n : N) (s : bitvector),
+  size s = n -> (0 < N.to_nat n)%nat ->
+  (bv2nat_a (bv_shr s (one n)) = bv2nat_a s / 2)%nat.
+Proof.
+  intros n s Hs Hn.
+  pose proof (size_to_length Hs) as Hlen_s.
+  rewrite bv_shr_eq_shr_n_bits by (rewrite Hs; symmetry; apply one_size).
+  rewrite (bv2nat_a_one Hn).
+  rewrite bv_shr_aux_eq.
+  unfold bv2nat_a, list2nat_be_a, shr_n_bits_a.
+  destruct (1 <? length s)%nat eqn:Hltb.
+  - destruct s as [| b rest].
+    + simpl in Hltb. discriminate.
+    + simpl skipn. simpl (mk_list_false 1).
+      pose proof (list2N_app_false rest) as Happ.
+      rewrite Happ.
+      assert (Hdiv : list2N rest = N.div (list2N (b :: rest)) 2).
+      { destruct b; simpl list2N.
+        - rewrite <- N.div2_div. symmetry. apply N.div2_succ_double.
+        - rewrite <- N.div2_div. symmetry. apply N.div2_double. }
+      rewrite Hdiv. rewrite N2Nat.inj_div. simpl (N.to_nat 2). reflexivity.
+  - rewrite listE. simpl.
+    destruct s as [| b [| b2 rest]].
+    + simpl in Hlen_s. lia.
+    + destruct b; simpl; lia.
+    + simpl in Hltb. discriminate.
+Qed.
+
+Lemma bv2nat_a_nat2bv_two : forall (n : N),
+  (2 <= N.to_nat n)%nat -> (bv2nat_a (nat2bv 2 n) = 2)%nat.
+Proof.
+  intros n Hn.
+  unfold bv2nat_a, list2nat_be_a, nat2bv.
+  rewrite list2N_N2List_s.
+  - reflexivity.
+  - apply Nat.leb_le. simpl. exact Hn.
+Qed.
+
+Lemma bv_sle_udiv_nonneg : forall (n : N) (s x : bitvector),
+  size s = n -> size x = n -> last s false = false ->
+  bv_sle (bv_udiv s x) s = true.
+Proof.
+  intros n s x Hs Hx Hlast_s.
+  destruct (N.eq_dec n 0) as [Hn0 | Hn0].
+  - rewrite Hn0 in Hs, Hx. pose proof (size_to_length Hs) as Hls. simpl in Hls.
+    apply length_zero_iff_nil in Hls. subst s.
+    pose proof (size_to_length (bv_udiv_size Hs Hx)) as Hludiv.
+    simpl in Hludiv. apply length_zero_iff_nil in Hludiv.
+    rewrite Hludiv. apply bv_sle_refl.
+  - assert (Hn : (0 < N.to_nat n)%nat).
+    { destruct n. contradiction. simpl. lia. }
+    destruct (bv_eq x (zeros n)) eqn:Hxzero.
+    + apply bv_eq_reflect in Hxzero. subst x.
+      rewrite bv_udiv_zeros by exact Hs.
+      apply neg_sle_pos with (n := n).
+      * apply ones_size.
+      * exact Hs.
+      * unfold ones. apply last_mk_list_true. lia.
+      * exact Hlast_s.
+    + assert (Hx_ne : x <> zeros n).
+      { intro Heq. rewrite Heq, bv_eq_refl in Hxzero. discriminate. }
+      pose proof (bv2nat_a_udiv_nonzero Hs Hx Hx_ne) as Hudiv_eq.
+      assert (Hudiv_le : (bv2nat_a (bv_udiv s x) <= bv2nat_a s)%nat).
+      { rewrite Hudiv_eq.
+        destruct (bv2nat_a x).
+        - simpl. lia.
+        - transitivity (bv2nat_a s / 1)%nat.
+          + apply Nat.div_le_compat_l. lia.
+          + rewrite Nat.div_1_r. lia. }
+      destruct (last (bv_udiv s x) false) eqn:Hlast_udiv.
+      * apply neg_sle_pos with (n := n).
+        -- exact (bv_udiv_size Hs Hx).
+        -- exact Hs.
+        -- exact Hlast_udiv.
+        -- exact Hlast_s.
+      * rewrite (bv_sle_ule_equiv_when_msb_zero Hlast_udiv Hlast_s).
+        apply not_bv_ugt_implies_bv_ule.
+        -- rewrite (bv_udiv_size Hs Hx). symmetry. exact Hs.
+        -- apply Bool.not_true_is_false. intro Hugt.
+           apply bv_ugt_bv_ult in Hugt.
+           rewrite bv_ult_nat in Hugt.
+           ++ apply Nat.ltb_lt in Hugt. lia.
+           ++ apply N.eqb_eq. rewrite (bv_udiv_size Hs Hx). exact Hs.
+Qed.
+
+Lemma bv_sle_udiv_shr : forall (n : N) (s x : bitvector),
+  size s = n -> size x = n -> (0 < N.to_nat n)%nat ->
+  last s false = true ->
+  bv_sle (bv_udiv s x) (bv_shr s (one n)) = true.
+Proof.
+  intros n s x Hs Hx Hn Hlast_s.
+  assert (Hlast_shr : last (bv_shr s (one n)) false = false).
+  { apply last_bv_shr_pos with (n := n).
+    - exact Hs.
+    - apply one_size.
+    - rewrite bv2nat_a_one by exact Hn. lia. }
+  pose proof (bv_shr_size Hs (one_size n)) as Hshr_size.
+  destruct (bv_eq x (zeros n)) eqn:Hxzero.
+  - apply bv_eq_reflect in Hxzero. subst x.
+    rewrite bv_udiv_zeros by exact Hs.
+    apply neg_sle_pos with (n := n).
+    + apply ones_size.
+    + exact Hshr_size.
+    + unfold ones. apply last_mk_list_true. lia.
+    + exact Hlast_shr.
+  - assert (Hx_ne : x <> zeros n).
+    { intro Heq. rewrite Heq, bv_eq_refl in Hxzero. discriminate. }
+    pose proof (bv2nat_a_udiv_nonzero Hs Hx Hx_ne) as Hudiv_eq.
+    assert (Hshr_val : (bv2nat_a (bv_shr s (one n)) = bv2nat_a s / 2)%nat)
+      by (apply bv2nat_a_shr_one; [exact Hs | exact Hn]).
+    destruct (last (bv_udiv s x) false) eqn:Hlast_udiv.
+    + apply neg_sle_pos with (n := n).
+      * exact (bv_udiv_size Hs Hx).
+      * exact Hshr_size.
+      * exact Hlast_udiv.
+      * exact Hlast_shr.
+    + (* Both non-negative. Need bv2nat_a(udiv) ≤ bv2nat_a(shr) = S/2.
+         Since udiv is non-negative: bv2nat_a(udiv) = S/X < 2^(n-1).
+         Since s is negative: bv2nat_a(s) >= 2^(n-1).
+         So S/X < 2^(n-1) <= S, hence X >= 2, hence S/X <= S/2. *)
+      rewrite (bv_sle_ule_equiv_when_msb_zero Hlast_udiv Hlast_shr).
+      apply not_bv_ugt_implies_bv_ule.
+      * rewrite (bv_udiv_size Hs Hx), Hshr_size. reflexivity.
+      * apply Bool.not_true_is_false. intro Hugt.
+        apply bv_ugt_bv_ult in Hugt.
+        rewrite bv_ult_nat in Hugt.
+        -- apply Nat.ltb_lt in Hugt.
+           (* Hugt : bv2nat_a(shr) < bv2nat_a(udiv), i.e. S/2 < S/X *)
+           (* But S/X <= S/2: we need X <= 2... *)
+           (* bv2nat_a(udiv) = S/X. bv2nat_a(shr) = S/2. S/2 < S/X means X < 2, so X = 1. *)
+           (* X = 1 means udiv = s (last = true), contradicting Hlast_udiv = false. *)
+           assert (Hbv2_x : (bv2nat_a x = 1)%nat).
+           { rewrite Hudiv_eq in Hugt. rewrite Hshr_val in Hugt.
+             assert (Hxne0 : (bv2nat_a x <> 0)%nat).
+             { intro H0. apply Hx_ne.
+               apply bv2nat_a_inj with (n := n); [exact Hx | apply zeros_size |].
+               rewrite bv2nat_a_zeros_eq. exact H0. }
+             remember (bv2nat_a x) as xv eqn:Hxv.
+             destruct xv as [| [| k]].
+             - contradiction.
+             - reflexivity.
+             - exfalso.
+               assert (Hle : (bv2nat_a s / S (S k) <= bv2nat_a s / 2)%nat).
+               { apply Nat.div_le_compat_l. lia. }
+               lia. }
+           (* bv2nat_a x = 1 means x = one n... but wait, we have bv2nat_a(udiv) = S/1 = S *)
+           (* and last(s) = true but last(udiv) = false. But bv_udiv s x = N2list(S/1)(n) = N2list(S)(n) = s *)
+           (* And last(s) = true, contradicting Hlast_udiv = false. *)
+           assert (Heq : bv_udiv s x = s).
+           { apply bv2nat_a_inj with (n := n).
+             - exact (bv_udiv_size Hs Hx).
+             - exact Hs.
+             - rewrite Hudiv_eq, Hbv2_x, Nat.div_1_r. reflexivity. }
+           rewrite Heq in Hlast_udiv. rewrite Hlast_s in Hlast_udiv. discriminate.
+        -- apply N.eqb_eq. rewrite (bv_udiv_size Hs Hx), Hshr_size. reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.
