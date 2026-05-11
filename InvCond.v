@@ -3073,9 +3073,76 @@ Theorem bvudiv_reverse_neq : forall (n : N) (s t : bitvector),
     (if N.eq_dec n 1 then
        bv_eq (bv_and s t) (zeros n) = true
      else
-       True).
+       (0 < n)%N).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  destruct (N.eq_dec n 1) as [Hn1 | Hn1].
+  { split.
+    - intros [x [Hx Hneq]].
+      rewrite Hn1 in Hs, Ht, Hx |- *.
+      pose proof (size_to_length Hs) as Hls. simpl in Hls.
+      pose proof (size_to_length Ht) as Hlt. simpl in Hlt.
+      pose proof (size_to_length Hx) as Hlx. simpl in Hlx.
+      destruct s as [| bs [| ? ?]]; [discriminate | | simpl in Hls; lia].
+      destruct t as [| bt [| ? ?]]; [discriminate | | simpl in Hlt; lia].
+      destruct x as [| bx [| ? ?]]; [discriminate | | simpl in Hlx; lia].
+      destruct bs, bt, bx; vm_compute in Hneq |- *; try discriminate; try reflexivity.
+    - intro Hst.
+      rewrite Hn1 in Hs, Ht, Hst |- *.
+      pose proof (size_to_length Hs) as Hls. simpl in Hls.
+      pose proof (size_to_length Ht) as Hlt. simpl in Hlt.
+      destruct s as [| bs [| ? ?]]; [discriminate | | simpl in Hls; lia].
+      destruct t as [| bt [| ? ?]]; [discriminate | | simpl in Hlt; lia].
+      destruct bs, bt; try (vm_compute in Hst; discriminate).
+      + exists (zeros 1). split; [apply zeros_size |]. vm_compute. reflexivity.
+      + exists (ones 1). split; [apply ones_size |]. vm_compute. reflexivity.
+      + exists (zeros 1). split; [apply zeros_size |]. vm_compute. reflexivity. }
+  { split.
+    - intros [x [Hx Hneq]].
+      destruct (N.eq_dec n 0) as [Hn0 | Hn0].
+      + exfalso.
+        rewrite Hn0 in Hs, Ht, Hx.
+        pose proof (size_to_length Hs) as Hls. simpl in Hls.
+        pose proof (size_to_length Ht) as Hlt. simpl in Hlt.
+        pose proof (size_to_length Hx) as Hlx. simpl in Hlx.
+        apply length_zero_iff_nil in Hls, Hlt, Hlx. subst s t x.
+        vm_compute in Hneq. discriminate.
+      + lia.
+    - intro Hn_pos.
+      assert (Hn2 : (2 <= n)%N) by lia.
+      destruct (bv_eq (ones n) t) eqn:Hteq.
+      + apply bv_eq_reflect in Hteq. subst t.
+        exists (ones n). split; [apply ones_size |].
+        apply Bool.not_true_is_false. intro Heq. apply bv_eq_reflect in Heq.
+        apply (f_equal bv2nat_a) in Heq.
+        assert (H2n_ge : (2 < 2^(N.to_nat n))%nat).
+        { assert (H2n : (2 <= N.to_nat n)%nat).
+          { assert (Hn_eq : (n = 2 + (n - 2))%N) by lia.
+            rewrite Hn_eq, N2Nat.inj_add. simpl. lia. }
+          destruct (N.to_nat n) as [| [| k]]; [lia | lia |].
+          simpl.
+          assert (Hpow_k : (1 <= 2^k)%nat).
+          { assert (H2ne : (2 <> 0)%nat) by lia.
+            pose proof (Nat.pow_nonzero 2 k H2ne) as Hne. lia. }
+          lia. }
+        assert (Hones_ne_zeros : ones n <> zeros n).
+        { intro H. apply (f_equal bv2nat_a) in H.
+          rewrite bv2nat_a_ones, bv2nat_a_zeros_eq in H. lia. }
+        rewrite (bv2nat_a_udiv_nonzero Hs (ones_size n) Hones_ne_zeros) in Heq.
+        rewrite bv2nat_a_ones in Heq.
+        pose proof (bv2nat_a_lt_pow2 Hs) as Hs_lt.
+        destruct (lt_dec (bv2nat_a s) (2^(N.to_nat n) - 1)) as [Hlt | Hge].
+        * assert (Hdiv0 : (bv2nat_a s / (2^(N.to_nat n) - 1) = 0)%nat).
+          { apply Nat.div_small. lia. }
+          rewrite Hdiv0 in Heq. lia.
+        * assert (Hval : bv2nat_a s = 2^(N.to_nat n) - 1) by lia.
+          rewrite Hval in Heq.
+          assert (Hdiv1 : ((2^(N.to_nat n) - 1) / (2^(N.to_nat n) - 1) = 1)%nat).
+          { apply Nat.div_same. lia. }
+          rewrite Hdiv1 in Heq. lia.
+      + exists (zeros n). split; [apply zeros_size |].
+        rewrite bv_udiv_zeros; [| exact Hs]. exact Hteq. }
+Qed.
 
 (* n = 1 -> s >s t ; n != 1 -> ( (s >=s 0 => s >s t) /\ (s <s 0 => (s >> 1) >s t) ) 
    <=> (exists x, s /u x >s t) *)

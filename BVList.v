@@ -16369,6 +16369,28 @@ Proof.
   rewrite Heq, (size_to_length Ha), (size_to_length Hb). reflexivity.
 Qed.
 
+Lemma bv_udiv_zeros : forall (n : N) (s : bitvector),
+  size s = n -> bv_udiv s (zeros n) = ones n.
+Proof.
+  intros n s Hs.
+  unfold bv_udiv. rewrite Hs, zeros_size, N.eqb_refl.
+  unfold udiv_list, zeros. rewrite length_mk_list_false, List_eq_refl.
+  unfold ones. rewrite (size_to_length Hs). reflexivity.
+Qed.
+
+Lemma bv2nat_a_ones : forall (n : N),
+  (bv2nat_a (ones n) = 2^(N.to_nat n) - 1)%nat.
+Proof.
+  intro n. unfold bv2nat_a, list2nat_be_a, ones. apply pow_eqb_0.
+Qed.
+
+Lemma bv2nat_a_zeros_eq : forall (n : N),
+  (bv2nat_a (zeros n) = 0)%nat.
+Proof.
+  intro n. unfold bv2nat_a, list2nat_be_a, zeros.
+  rewrite list2N_mk_list_false. reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
  
 Module BITVECTOR_LIST <: BITVECTOR.

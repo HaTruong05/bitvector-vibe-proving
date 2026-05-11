@@ -117,10 +117,44 @@ grep "Admitted" InvCond.v        # must return nothing
 
 If any non-obvious patterns or recurring errors were encountered during the proof, add them to CLAUDE.md now — before reporting done. If nothing surprising came up, skip this step.
 
+## `subst n` Destroys Hypotheses in InvCond.v
+
+**`subst n` after `N.eq_dec n 1` mysteriously drops hypotheses** (e.g., `Hs : size s = n` vanishes). Fix: use `rewrite Hn in Hs, Ht, Hx |- *` explicitly to substitute n=1 only where needed. This also makes `vm_compute` work (concrete n, not abstract).
+
+## nat Case Splits: Use Unqualified `lt_dec`
+
+`Nat.lt_dec` and `Nat.le_or_lt` do **not** exist in Coq 8.20. Use unqualified `lt_dec` (from `Coq.Arith.Compare_dec`, auto-imported):
+
+```coq
+destruct (lt_dec (bv2nat_a s) (2^(N.to_nat n) - 1)) as [Hlt | Hge].
+```
+
+## Converting N ≥ 2 to N.to_nat n ≥ 2
+
+`N2Nat.inj_le` does not exist. Use the `inj_add` trick:
+
+```coq
+assert (Hn_eq : (n = 2 + (n - 2))%N) by lia.
+rewrite Hn_eq, N2Nat.inj_add. simpl. lia.
+```
+
+## Proving 1 ≤ 2^k (nat)
+
+`Nat.one_le_pow` does not exist. Use `Nat.pow_nonzero`:
+
+```coq
+assert (H2ne : (2 <> 0)%nat) by lia.
+pose proof (Nat.pow_nonzero 2 k H2ne) as Hne. lia.
+```
+
+## Theorem Statements With `else True` for n=0
+
+`else True` is wrong when n=0 makes the LHS (exists x. ...) **false**: `False ↔ True` is unprovable. Use `else (0 < n)%N` or the actual n=0 condition.
+
 ## Subagents
 
 Do NOT spawn subagents for proof work. All Coq proof attempts must be done inline in the main conversation.
 
 ## Current Open Problem
 
-Next Admitted stubs begin at InvCond.v line 3078.
+bvudiv_reverse_sgt, line 3149.
