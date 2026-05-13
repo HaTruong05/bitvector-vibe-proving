@@ -3288,10 +3288,138 @@ Theorem bvudiv_reverse_sge : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sge (bv_udiv s x) t = true)
-    ((bv_sge s (zeros n) = true -> bv_sge s t = true) /\
-     (bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t = true)).
+    (if N.eq_dec n 1 then
+       bv_sge s t = true
+     else
+       (bv_sge s (zeros n) = true -> bv_sge s t = true) /\
+       (bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t = true)).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  destruct (N.eq_dec n 1) as [Hn1 | Hn1].
+  { (* n = 1: brute force on concrete single-bit bitvectors *)
+    rewrite Hn1 in Hs, Ht |- *.
+    pose proof (size_to_length Hs) as Hlen_s. simpl in Hlen_s.
+    pose proof (size_to_length Ht) as Hlen_t. simpl in Hlen_t.
+    destruct s as [| bs [| ]]; simpl in Hlen_s; [lia | | lia].
+    destruct t as [| bt [| ]]; simpl in Hlen_t; [lia | | lia].
+    split.
+    - intros [x [Hx Hxsge]].
+      pose proof (size_to_length Hx) as Hlen_x. simpl in Hlen_x.
+      destruct x as [| bx [| ]]; simpl in Hlen_x; [lia | | lia].
+      destruct bs; destruct bt; destruct bx; vm_compute in *;
+        try discriminate; try reflexivity.
+    - intro Hrhs.
+      destruct bs; destruct bt; vm_compute in Hrhs; try discriminate;
+        (exists (true :: nil); split;
+         [unfold size; simpl; reflexivity | vm_compute; reflexivity]).
+  }
+  { (* n <> 1 *)
+    split.
+  - (* Forward: (exists x. s/x >=s t) -> RHS *)
+    intros [x [Hx Hsge]].
+    rewrite bv_sge_sle_equiv in Hsge.
+    (* Hsge : bv_sle t (bv_udiv s x) = true *)
+    destruct (last s false) eqn:Hlast_s.
+    + (* s < 0 (MSB = 1) *)
+      assert (Hn_pos : (0 < N.to_nat n)%nat).
+      { destruct (N.to_nat n) eqn:Hnt.
+        - pose proof (size_to_length Hs) as Hlen_s.
+          rewrite Hnt in Hlen_s. simpl in Hlen_s.
+          apply length_zero_iff_nil in Hlen_s. subst s.
+          simpl in Hlast_s. discriminate.
+        - lia. }
+      pose proof (bv_sle_udiv_shr Hs Hx Hn_pos Hlast_s) as Hsle.
+      (* Hsle : bv_sle (bv_udiv s x) (bv_shr s (one n)) = true *)
+      split.
+      * (* bv_sge s (zeros n) = true -> bv_sge s t: vacuous, s is negative *)
+        intro Hsge_z.
+        exfalso.
+        rewrite bv_sge_sle_equiv in Hsge_z.
+        assert (Hzero_sle : bv_sle (zeros n) s = negb (last s false)).
+        { rewrite <- Hs. exact (bv_zeros_sle s). }
+        rewrite Hlast_s in Hzero_sle. simpl in Hzero_sle.
+        rewrite Hsge_z in Hzero_sle. discriminate.
+      * (* bv_slt s (zeros n) = true -> bv_sge (bv_shr s (one n)) t *)
+        intros _.
+        rewrite bv_sge_sle_equiv.
+        exact (bv_sle_trans Hsge Hsle).
+    + (* s >= 0 (MSB = 0) *)
+      pose proof (bv_sle_udiv_nonneg Hs Hx Hlast_s) as Hsle.
+      (* Hsle : bv_sle (bv_udiv s x) s = true *)
+      split.
+      * (* bv_sge s (zeros n) = true -> bv_sge s t *)
+        intros _.
+        rewrite bv_sge_sle_equiv.
+        exact (bv_sle_trans Hsge Hsle).
+      * (* bv_slt s (zeros n) = true -> ...: vacuous, s is nonneg *)
+        intro Hslt.
+        exfalso.
+        assert (Hbslt : bv_slt s (zeros n) = false).
+        { rewrite <- Hs. rewrite bv_slt_zeros. exact Hlast_s. }
+        rewrite Hbslt in Hslt. discriminate.
+  - (* Backward: RHS -> (exists x. s/x >=s t) *)
+    intro Hrhs.
+    destruct Hrhs as [Hrhs1 Hrhs2].
+    destruct (last s false) eqn:Hlast_s.
+    + (* s < 0: witness x = nat2bv 2 n, s/2 = s>>1 *)
+      assert (Hn_pos : (0 < N.to_nat n)%nat).
+      { destruct (N.to_nat n) eqn:Hnt.
+        - pose proof (size_to_length Hs) as Hlen_s.
+          rewrite Hnt in Hlen_s. simpl in Hlen_s.
+          apply length_zero_iff_nil in Hlen_s. subst s.
+          simpl in Hlast_s. discriminate.
+        - lia. }
+      assert (Hslt_s : bv_slt s (zeros n) = true).
+      { rewrite <- Hs. rewrite bv_slt_zeros. exact Hlast_s. }
+      pose proof (Hrhs2 Hslt_s) as Hgoal.
+      (* Hgoal : bv_sge (bv_shr s (one n)) t = true *)
+      (* n > 0 (from last s false = true) and n <> 1, so n >= 2 *)
+      assert (Hn_ne_1 : (N.to_nat n <> 1)%nat).
+      { intro Heq. apply Hn1. apply N2Nat.inj. simpl. exact Heq. }
+      assert (Hn_ge_2 : (2 <= N.to_nat n)%nat) by lia.
+        assert (Hnat2bv2_sz : size (nat2bv 2 n) = n) by apply nat2bv_size.
+        assert (Hnat2bv2_val : (bv2nat_a (nat2bv 2 n) = 2)%nat)
+          by (apply bv2nat_a_nat2bv_two; exact Hn_ge_2).
+        assert (Hnat2bv2_ne : nat2bv 2 n <> zeros n).
+        { intro Heq. apply (f_equal bv2nat_a) in Heq.
+          rewrite Hnat2bv2_val, bv2nat_a_zeros_eq in Heq. discriminate. }
+        assert (Hudiv_val : (bv2nat_a (bv_udiv s (nat2bv 2 n)) = bv2nat_a s / 2)%nat).
+        { rewrite (bv2nat_a_udiv_nonzero Hs Hnat2bv2_sz Hnat2bv2_ne).
+          rewrite Hnat2bv2_val. reflexivity. }
+        assert (Hshr_val : (bv2nat_a (bv_shr s (one n)) = bv2nat_a s / 2)%nat)
+          by (apply bv2nat_a_shr_one; [exact Hs | exact Hn_pos]).
+        assert (Heq_udiv_shr : bv_udiv s (nat2bv 2 n) = bv_shr s (one n)).
+        { apply bv2nat_a_inj with (n := n).
+          - exact (bv_udiv_size Hs Hnat2bv2_sz).
+          - exact (bv_shr_size Hs (one_size n)).
+          - rewrite Hudiv_val, Hshr_val. reflexivity. }
+        exists (nat2bv 2 n). split.
+        -- exact Hnat2bv2_sz.
+        -- rewrite Heq_udiv_shr. exact Hgoal.
+    + (* s >= 0: witness x = one n *)
+      assert (Hsge_z : bv_sge s (zeros n) = true).
+      { rewrite bv_sge_sle_equiv.
+        apply zeros_sle_nonneg; [exact Hs | exact Hlast_s]. }
+      pose proof (Hrhs1 Hsge_z) as Hgoal.
+      (* Hgoal : bv_sge s t = true *)
+      destruct (N.eq_dec n 0) as [Hn0 | Hn0].
+      * (* n = 0: bv_sge [] [] = true, directly by bv_sle_refl *)
+        rewrite Hn0 in Hs, Ht.
+        pose proof (size_to_length Hs) as Hlen_s. simpl in Hlen_s.
+        pose proof (size_to_length Ht) as Hlen_t. simpl in Hlen_t.
+        apply length_zero_iff_nil in Hlen_s.
+        apply length_zero_iff_nil in Hlen_t.
+        subst s. subst t.
+        exists (nil : bitvector). split.
+        -- rewrite Hn0. unfold size. simpl. reflexivity.
+        -- vm_compute. reflexivity.
+      * assert (Hn_pos : (0 < N.to_nat n)%nat).
+        { destruct n. contradiction. simpl. lia. }
+        exists (one n). split.
+        -- apply one_size.
+        -- rewrite (bv_udiv_one Hs Hn_pos). exact Hgoal.
+  }
+Qed.
 
 (*------------------------------------------------------------*)
 
