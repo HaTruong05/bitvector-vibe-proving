@@ -16919,6 +16919,32 @@ Proof.
   - lia.
 Qed.
 
+Lemma bv_slt_not_zeros_nonneg : forall (n : N) (x : bitvector),
+  (0 < n)%N -> size x = n ->
+  bv_slt (bv_not (zeros n)) x = negb (last x false).
+Proof.
+  intros n x Hn Hx.
+  assert (Hones_eq : bv_not (zeros n) = ones n).
+  { unfold bv_not, zeros, ones, bits. apply not_list_false_true. }
+  assert (Hones_sz : size (ones n) = n) by apply ones_size.
+  assert (Hn_nat : (0 < N.to_nat n)%nat)
+    by (destruct n; [simpl in Hn; lia | simpl; lia]).
+  assert (Hlast_ones : last (ones n) false = true).
+  { unfold ones. apply last_mk_list_true. lia. }
+  rewrite Hones_eq, (bv_slt_negb_sle Hones_sz Hx).
+  f_equal.
+  destruct (last x false) eqn:Hlast_x.
+  - assert (Hsign_eq : last x false = last (ones n) false)
+      by (rewrite Hlast_x, Hlast_ones; reflexivity).
+    rewrite (bv_sle_ule_same_sign Hx Hones_sz Hsign_eq).
+    apply not_bv_ugt_implies_bv_ule.
+    + rewrite Hx, Hones_sz. reflexivity.
+    + unfold bv_ugt. rewrite Hx, Hones_sz, N.eqb_refl.
+      rewrite <- Hones_eq, <- Hx. apply not_ugt_list_ones.
+  - apply Bool.not_true_is_false. intro Hsle.
+    exact (bv_sle_pos_neg_absurd Hn Hx Hones_sz Hlast_x Hlast_ones Hsle).
+Qed.
+
 End RAWBITVECTOR_LIST.
 
 Module BITVECTOR_LIST <: BITVECTOR.
