@@ -151,10 +151,31 @@ pose proof (Nat.pow_nonzero 2 k H2ne) as Hne. lia.
 
 `else True` is wrong when n=0 makes the LHS (exists x. ...) **false**: `False ↔ True` is unprovable. Use `else (0 < n)%N` or the actual n=0 condition.
 
+## `have` Syntax Fails; Use `assert`
+
+`have X : T by tac` is invalid in this context. Always use `assert (X : T) by tac`.
+
+## Lemmas About `last` and `zeros`
+
+`last_mk_list_false` expects `last (mk_list_false k) false` — it does NOT match `last (zeros n) false` directly. Add `unfold zeros` first. Likewise, `bv_neg_zeros_zeros` rewrites to `zeros n`, not `mk_list_false`, so `unfold zeros` is needed after both rewrites before applying `last_mk_list_false`.
+
+## `last_bv_neg_neg_nonmin` Needs `s ≠ signed_min n`, NOT `s ≠ zeros n`
+
+When trying to show `last (-t) false = false` from `last t false = true`, the lemma `last_bv_neg_neg_nonmin` requires `t ≠ signed_min n`. If you only have `t ≠ zeros n`, case-split on `t = signed_min n`:
+
+- If `t = signed_min n`: use `Hrhs` for the contradiction (RHS contains `bv_slt (bv_not t) ...` = `bv_slt (signed_max n) ...`, but `signed_max_sle_any` + `bv_slt_negb_sle` give `False`).
+- If `t ≠ signed_min n` and `last t false = true`: `last_bv_neg_neg_nonmin` gives `last (-t) = false`, contradicting `Hlast_neg_t`.
+
+Key helper chain: `bv_not (signed_min n) = signed_max n` via `signed_min_eq_not_smax` + `bv_not_involutive`. Then `signed_max_sle_any` gives `bv_sle (bv_or ...) (signed_max n) = true`, and `bv_slt_negb_sle` makes the contradiction.
+
+## Bridging list2int and bv2nat_a
+
+`last_true_list2int_lb` and `last_false_list2int_ub` return bounds on `list2int v`. To connect with `Z.of_nat (bv2nat_a v)`: use `change (list2int v) with (bv2int v) in H` then `rewrite bv2int_eq_Z_of_nat_bv2nat_a in H`.
+
 ## Subagents
 
 Do NOT spawn subagents for proof work. All Coq proof attempts must be done inline in the main conversation.
 
 ## Current Open Problem
 
-bvurem_slt, line 3429.
+bvurem_sle (line 3758), bvurem_reverse_eq (line 3774), bvurem_reverse_sgt (line 3787), bvurem_reverse_sge (line 3799).

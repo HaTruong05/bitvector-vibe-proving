@@ -3435,8 +3435,325 @@ Theorem bvurem_slt : forall (n : N) (s t : bitvector),
        (bv_or (bv_neg s) (bv_neg t))
      = true).
 Proof.
-Admitted.
-    
+  intros n s t Hs Ht.
+  destruct (N.eq_dec n 0) as [Hn0 | Hn0_ne].
+  { assert (Hs_nil : s = nil).
+    { apply length_zero_iff_nil. rewrite (size_to_length Hs), Hn0. reflexivity. }
+    assert (Ht_nil : t = nil).
+    { apply length_zero_iff_nil. rewrite (size_to_length Ht), Hn0. reflexivity. }
+    subst s t.
+    split.
+    - intros [x [Hx Hr]].
+      assert (Hx_nil : x = nil).
+      { apply length_zero_iff_nil. rewrite (size_to_length Hx), Hn0. reflexivity. }
+      subst x. vm_compute in Hr. discriminate.
+    - intro H. vm_compute in H. discriminate. }
+  assert (Hn_pos : (0 < n)%N) by (destruct n; [contradiction | lia]).
+  assert (Hlen_s : length s = N.to_nat n) by (apply size_to_length; exact Hs).
+  assert (Hlen_t : length t = N.to_nat n) by (apply size_to_length; exact Ht).
+  assert (Hs_ne : s <> nil) by (intro H; subst s; simpl in Hlen_s; lia).
+  assert (Ht_ne : t <> nil) by (intro H; subst t; simpl in Hlen_t; lia).
+  assert (Hn_pos_nat : (0 < N.to_nat n)%nat) by (destruct n; [contradiction | simpl; lia]).
+  assert (Hneg_s_sz : size (bv_neg s) = n) by (apply bv_neg_size; exact Hs).
+  assert (Hneg_t_sz : size (bv_neg t) = n) by (apply bv_neg_size; exact Ht).
+  assert (Hnot_t_sz : size (bv_not t) = n) by (apply bv_not_size; exact Ht).
+  assert (Hor_sz : size (bv_or (bv_neg s) (bv_neg t)) = n)
+    by (apply bv_or_size with (n := n); [exact Hneg_s_sz | exact Hneg_t_sz]).
+  assert (Hneg_s_ne : bv_neg s <> nil) by
+    (intro H; pose proof (size_to_length Hneg_s_sz) as Hl;
+     rewrite H in Hl; simpl in Hl; lia).
+  assert (HNN : N.to_nat (n - 1)%N = (N.to_nat n - 1)%nat)
+    by (rewrite N2Nat.inj_sub; simpl N.to_nat; lia).
+  (* bv2int(bv_neg t) ≤ bv2int(bv_or(bv_neg s)(bv_neg t)) from bv_ule *)
+  assert (Hbv2int_le : (bv2int (bv_neg t) <= bv2int (bv_or (bv_neg s) (bv_neg t)))%Z).
+  { assert (Hule : bv_ule (bv_neg t) (bv_or (bv_neg s) (bv_neg t)) = true).
+    { rewrite (bv_or_comm Hneg_s_sz Hneg_t_sz).
+      apply (@bv_ule_bv_or_l n); [exact Hneg_t_sz | exact Hneg_s_sz]. }
+    unfold bv_ule in Hule. rewrite Hneg_t_sz, Hor_sz, N.eqb_refl in Hule.
+    apply ule_list_list2int.
+    - rewrite (size_to_length Hneg_t_sz), (size_to_length Hor_sz). reflexivity.
+    - exact Hule. }
+  (* last(bv_or(bv_neg s)(bv_neg t)) = OR of last bits *)
+  assert (Hlast_or_eq : last (bv_or (bv_neg s) (bv_neg t)) false =
+    orb (last (bv_neg s) false) (last (bv_neg t) false)).
+  { unfold bv_or. rewrite Hneg_s_sz, Hneg_t_sz, N.eqb_refl.
+    apply last_map2_orb_eq.
+    - rewrite (size_to_length Hneg_s_sz), (size_to_length Hneg_t_sz). reflexivity.
+    - exact Hneg_s_ne. }
+  (* signed_min facts *)
+  assert (Hmin_sz : size (signed_min n) = n) by apply signed_min_size.
+  assert (Hmin_last : last (signed_min n) false = true)
+    by (apply signed_min_msb; lia).
+  assert (Hmin_bv2int : (bv2int (signed_min n) = pow2_int_N (n - 1)%N)%Z)
+    by (apply bv2int_signed_min; exact Hn_pos).
+  assert (Hmin_bv2nat : bv2nat_a (signed_min n) = 2^(N.to_nat n - 1)%nat).
+  { apply Nat2Z.inj. rewrite <- bv2int_eq_Z_of_nat_bv2nat_a, Hmin_bv2int.
+    unfold pow2_int_N. rewrite HNN.
+    rewrite <- pow2_int_eq_Z_of_nat_pow2. reflexivity. }
+  assert (Hpow_half_pos : (0 < pow2_int_N (n - 1)%N)%Z).
+  { unfold pow2_int_N. apply zero_lt_pow2_int. }
+  (* bv_neg(signed_min) = signed_min *)
+  assert (Hneg_min : bv_neg (signed_min n) = signed_min n)
+    by (apply bv_neg_signed_min; exact Hn_pos).
+  (* bv_or(zeros)(-t) = bv_neg t simplification *)
+  assert (Hsimp_zeros_or : bv_or (zeros n) (bv_neg t) = bv_neg t).
+  { rewrite (bv_or_comm (zeros_size n) Hneg_t_sz).
+    rewrite <- Hneg_t_sz. exact (bv_or_0_neutral (bv_neg t)). }
+  (* pow2_int_N n = 2 * pow2_int_N(n-1) *)
+  assert (Hpow_split : (pow2_int_N n = 2 * pow2_int_N (n - 1)%N)%Z).
+  { unfold pow2_int_N. rewrite HNN.
+    assert (Hn_nat : (N.to_nat n = S (N.to_nat n - 1))%nat) by lia.
+    rewrite Hn_nat at 1. apply pow2_int_succ. }
+  (* Helper: t ≠ signed_min iff last(bv_neg t) ≠ true *)
+  assert (Ht_ne_smin_iff : last (bv_neg t) false = false -> t <> signed_min n).
+  { intros Hlast_neg_t_false Heq. subst t.
+    rewrite Hneg_min, Hmin_last in Hlast_neg_t_false. discriminate. }
+  split.
+  (* ===== FORWARD: (exists x, bv_urem x s <_s t) -> RHS ===== *)
+  - intros [x [Hx Hr]].
+    assert (Hr_sz : size (bv_urem x s) = n) by (apply bv_urem_size; [exact Hx | exact Hs]).
+    (* t ≠ signed_min: signed_min is the minimum, nothing is <_s signed_min *)
+    assert (Ht_ne_smin : t <> signed_min n).
+    { intro Heq. subst t.
+      pose proof (signed_min_sle (bv_urem x s)) as Hle. rewrite Hr_sz in Hle.
+      rewrite (bv_slt_negb_sle Hr_sz Hmin_sz) in Hr. rewrite Hle in Hr. discriminate. }
+    assert (Hsbv_not_t : (sbv2int n (bv_not t) = -sbv2int n t - 1)%Z)
+      by (apply sbv2int_bv_not; [exact Ht | exact Hn_pos]).
+    assert (Hsbv_neg_t : (sbv2int n (bv_neg t) = -sbv2int n t)%Z)
+      by (apply sbv2int_bv_neg_nonmin; [exact Ht | exact Hn_pos | exact Ht_ne_smin]).
+    (* Dispatch s = zeros *)
+    destruct (beq_list s (zeros n)) eqn:Hs_zero.
+    { apply List_eq in Hs_zero. subst s.
+      rewrite bv_urem_zeros_s in Hr; [| exact Hx].
+      rewrite bv_neg_zeros_zeros, Hsimp_zeros_or.
+      rewrite (bv_slt_iff_sbv2int Hnot_t_sz Hneg_t_sz).
+      rewrite Hsbv_not_t, Hsbv_neg_t. lia. }
+    apply List_neq in Hs_zero.
+    (* s ≠ zeros: r <_u s *)
+    assert (Hult_r_s : bv_ult (bv_urem x s) s = true)
+      by (apply (@bv_urem_ult_s n); [exact Hx | exact Hs | exact Hs_zero]).
+    rewrite (bv_slt_iff_sbv2int Hnot_t_sz Hor_sz).
+    rewrite Hsbv_not_t.
+    destruct (last (bv_neg t) false) eqn:Hlast_neg_t.
+    + (* last(-t) = true: last(or) = true, same sign *)
+      assert (Hlast_or : last (bv_or (bv_neg s) (bv_neg t)) false = true).
+      { rewrite Hlast_or_eq. apply Bool.orb_true_r. }
+      assert (Hsbv_or_val : (sbv2int n (bv_or (bv_neg s) (bv_neg t)) =
+          bv2int (bv_or (bv_neg s) (bv_neg t)) - pow2_int_N n)%Z)
+        by (unfold sbv2int; rewrite Hlast_or; reflexivity).
+      rewrite Hsbv_or_val.
+      assert (Hbv2int_neg_t_val : (bv2int (bv_neg t) = pow2_int_N n - sbv2int n t)%Z).
+      { assert (H : (sbv2int n (bv_neg t) = bv2int (bv_neg t) - pow2_int_N n)%Z)
+          by (unfold sbv2int; rewrite Hlast_neg_t; reflexivity).
+        lia. }
+      lia.
+    + (* last(-t) = false *)
+      destruct (last (bv_neg s) false) eqn:Hlast_neg_s.
+      * (* last(-s) = true, last(-t) = false: impossible from Hr *)
+        exfalso.
+        (* r <_u s → bv2nat(r) < bv2nat(s) *)
+        assert (Hbv2nat_r_lt_s : (bv2nat_a (bv_urem x s) < bv2nat_a s)%nat).
+        { rewrite bv_ult_nat in Hult_r_s;
+            [apply Nat.ltb_lt; exact Hult_r_s |
+             rewrite Hr_sz, Hs; apply N.eqb_refl]. }
+        (* bv2nat(s) ≤ 2^(n-1): case on last(s) *)
+        assert (Hbv2nat_s_le : (bv2nat_a s <= 2^(N.to_nat n - 1))%nat).
+        { destruct (last s false) eqn:Hlast_s.
+          - (* last(s)=true: s=signed_min (else last(-s)=false) *)
+            destruct (beq_list s (signed_min n)) eqn:Hsmin_eq.
+            + apply List_eq in Hsmin_eq. subst s. rewrite Hmin_bv2nat. lia.
+            + apply List_neq in Hsmin_eq.
+              pose proof (last_bv_neg_neg_nonmin Hs Hn_pos Hlast_s Hsmin_eq) as Hfls.
+              rewrite Hfls in Hlast_neg_s. discriminate.
+          - apply Nat.lt_le_incl. apply Nat2Z.inj_lt.
+            rewrite <- bv2int_eq_Z_of_nat_bv2nat_a. unfold bv2int.
+            pose proof (last_false_list2int_ub Hs_ne Hlast_s) as Hub.
+            rewrite Hlen_s in Hub.
+            rewrite <- pow2_int_eq_Z_of_nat_pow2. exact Hub. }
+        (* bv2nat(r) < 2^(n-1) → last(r) = false *)
+        assert (Hbv2nat_r_lt : (bv2nat_a (bv_urem x s) < 2^(N.to_nat n - 1))%nat) by lia.
+        assert (Hlast_r_false : last (bv_urem x s) false = false).
+        { destruct (last (bv_urem x s) false) eqn:Hlast_r; [| reflexivity]. exfalso.
+          pose proof (size_to_length Hr_sz) as Hlen_r.
+          assert (Hr_ne : bv_urem x s <> nil) by (intro H; rewrite H in Hlen_r; simpl in Hlen_r; lia).
+          pose proof (last_true_list2int_lb Hr_ne Hlast_r) as Hlb.
+          rewrite Hlen_r in Hlb.
+          apply Nat2Z.inj_lt in Hbv2nat_r_lt.
+          rewrite bv2int_eq_Z_of_nat_bv2nat_a in Hlb.
+          rewrite pow2_int_eq_Z_of_nat_pow2 in Hlb.
+          lia. }
+        (* sbv2int(r) = bv2int(r) ≥ 0 *)
+        assert (Hsbv_r_nonneg : (0 <= sbv2int n (bv_urem x s))%Z).
+        { unfold sbv2int. rewrite Hlast_r_false.
+          unfold bv2int. apply list2int_geq_zero. }
+        (* sbv2int(t) ≤ 0 from last(-t)=false *)
+        assert (Hsbv_t_nonpos : (sbv2int n t <= 0)%Z).
+        { assert (Ht_ne_smin2 := Ht_ne_smin_iff eq_refl).
+          assert (H : (sbv2int n (bv_neg t) = bv2int (bv_neg t))%Z)
+            by (unfold sbv2int; rewrite Hlast_neg_t; reflexivity).
+          rewrite Hsbv_neg_t in H.
+          assert (Hge : (0 <= bv2int (bv_neg t))%Z) by (unfold bv2int; apply list2int_geq_zero).
+          lia. }
+        (* Hr: sbv2int(r) < sbv2int(t) ≤ 0. Contradicts ≥ 0. *)
+        pose proof (bv_slt_iff_sbv2int Hr_sz Ht) as Hiff.
+        apply Hiff in Hr. lia.
+      * (* last(-s) = false, last(-t) = false: last(or) = false *)
+        assert (Hlast_or : last (bv_or (bv_neg s) (bv_neg t)) false = false)
+          by (rewrite Hlast_or_eq; reflexivity).
+        assert (Hsbv_or_val : (sbv2int n (bv_or (bv_neg s) (bv_neg t)) =
+            bv2int (bv_or (bv_neg s) (bv_neg t)))%Z)
+          by (unfold sbv2int; rewrite Hlast_or; reflexivity).
+        rewrite Hsbv_or_val.
+        assert (Hbv2int_neg_t_val : (bv2int (bv_neg t) = -sbv2int n t)%Z).
+        { assert (H : (sbv2int n (bv_neg t) = bv2int (bv_neg t))%Z)
+            by (unfold sbv2int; rewrite Hlast_neg_t; reflexivity).
+          lia. }
+        lia.
+  (* ===== BACKWARD: RHS -> (exists x, bv_urem x s <_s t) ===== *)
+  - intro Hrhs.
+    (* Case s = zeros *)
+    destruct (beq_list s (zeros n)) eqn:Hs_zero.
+    { apply List_eq in Hs_zero. subst s.
+      rewrite bv_neg_zeros_zeros, Hsimp_zeros_or in Hrhs.
+      (* Hrhs: bv_slt(bv_not t)(bv_neg t) = true *)
+      rewrite (bv_slt_iff_sbv2int Hnot_t_sz Hneg_t_sz) in Hrhs.
+      rewrite (sbv2int_bv_not Ht Hn_pos) in Hrhs.
+      (* t ≠ signed_min: if t=signed_min, Hr gives 2^(n-1)-1 < -2^(n-1), impossible *)
+      assert (Ht_ne_smin : t <> signed_min n).
+      { intro Heq. subst t.
+        rewrite Hneg_min in Hrhs.
+        assert (Hsbv_min : (sbv2int n (signed_min n) = bv2int (signed_min n) - pow2_int_N n)%Z)
+          by (unfold sbv2int; rewrite Hmin_last; reflexivity).
+        lia. }
+      (* Witness: signed_min n. bv_urem(signed_min)(zeros) = signed_min. *)
+      exists (signed_min n). split; [exact Hmin_sz |].
+      rewrite (bv_urem_zeros_s Hmin_sz).
+      (* signed_min <_s t: from signed_min_sle + t ≠ signed_min *)
+      pose proof (signed_min_sle t) as Hsle. rewrite Ht in Hsle.
+      apply bv_sle_eq in Hsle. destruct Hsle as [Hslt | Heq].
+      - exact Hslt.
+      - exfalso. exact (Ht_ne_smin (eq_sym Heq)). }
+    apply List_neq in Hs_zero.
+    (* s ≠ zeros *)
+    destruct (last (bv_neg t) false) eqn:Hlast_neg_t.
+    + (* last(-t) = true: t is strictly positive. Witness: zeros n. *)
+      (* last(-t)=true → last(t)=false and t≠zeros (from last_bv_neg_pos) *)
+      assert (Hlast_t : last t false = false).
+      { destruct (last t false) eqn:Hlt; [| reflexivity]. exfalso.
+        destruct (beq_list t (signed_min n)) eqn:Htsmin.
+        - apply List_eq in Htsmin. subst t.
+          rewrite Hneg_min in Hrhs, Hor_sz.
+          assert (Hnotmin : bv_not (signed_min n) = signed_max n).
+          { pose proof (signed_min_eq_not_smax Hn_pos) as H. rewrite H. apply bv_not_involutive. }
+          rewrite Hnotmin in Hrhs.
+          pose proof (signed_max_size n) as Hsmax_sz.
+          pose proof (signed_max_sle_any Hor_sz Hn_pos_nat) as Hmaxle.
+          rewrite (bv_slt_negb_sle Hsmax_sz Hor_sz) in Hrhs.
+          rewrite Hmaxle in Hrhs. simpl in Hrhs. discriminate.
+        - apply List_neq in Htsmin.
+          pose proof (last_bv_neg_neg_nonmin Ht Hn_pos Hlt Htsmin) as Hfls.
+          rewrite Hfls in Hlast_neg_t. discriminate. }
+      assert (Ht_ne_zeros : t <> zeros n).
+      { intro Heq. subst t. rewrite bv_neg_zeros_zeros in Hlast_neg_t.
+        unfold zeros in Hlast_neg_t. rewrite last_mk_list_false in Hlast_neg_t. discriminate. }
+      exists (zeros n). split; [apply zeros_size |].
+      rewrite (bv_urem_zeros_l Hs).
+      rewrite (bv_slt_iff_sbv2int (zeros_size n) Ht).
+      assert (Hsbv_zeros : (sbv2int n (zeros n) = 0)%Z).
+      { unfold sbv2int, zeros. rewrite (last_mk_list_false (N.to_nat n)).
+        unfold bv2int. rewrite list2int_mk_list_false. simpl. reflexivity. }
+      rewrite Hsbv_zeros.
+      assert (Hsbv_t_pos : (0 < sbv2int n t)%Z).
+      { unfold sbv2int. rewrite Hlast_t.
+        rewrite bv2int_eq_Z_of_nat_bv2nat_a.
+        assert (Hbv2nat_t_pos : (0 < bv2nat_a t)%nat).
+        { destruct (bv2nat_a t) eqn:H.
+          - exfalso. apply Ht_ne_zeros. exact (bv2nat_a_zero_eq_zeros Ht H).
+          - lia. }
+        lia. }
+      lia.
+    + (* last(-t) = false *)
+      destruct (last (bv_neg s) false) eqn:Hlast_neg_s.
+      * (* last(-s) = true, last(-t) = false: RHS is false, exfalso *)
+        exfalso.
+        (* From RHS being true: -st-1 < sbv2int(bv_or(-s)(-t)) *)
+        rewrite (bv_slt_iff_sbv2int Hnot_t_sz Hor_sz) in Hrhs.
+        rewrite (sbv2int_bv_not Ht Hn_pos) in Hrhs.
+        (* last(or) = true (last(-s)=true) *)
+        assert (Hlast_or : last (bv_or (bv_neg s) (bv_neg t)) false = true)
+          by (rewrite Hlast_or_eq; reflexivity).
+        (* sbv2int(or) = bv2int(or) - P *)
+        assert (Hsbv_or_val : (sbv2int n (bv_or (bv_neg s) (bv_neg t)) =
+            bv2int (bv_or (bv_neg s) (bv_neg t)) - pow2_int_N n)%Z)
+          by (unfold sbv2int; rewrite Hlast_or; reflexivity).
+        rewrite Hsbv_or_val in Hrhs.
+        (* bv2int(bv_neg t) ≥ 0 (unsigned) and = -sbv2int(t) (since last(-t)=false) *)
+        assert (Ht_ne_smin2 := Ht_ne_smin_iff eq_refl).
+        assert (Hsbv_neg_t : (sbv2int n (bv_neg t) = -sbv2int n t)%Z)
+          by (apply sbv2int_bv_neg_nonmin; [exact Ht | exact Hn_pos | exact Ht_ne_smin2]).
+        assert (Hbv2int_neg_t_val : (bv2int (bv_neg t) = -sbv2int n t)%Z).
+        { assert (H : (sbv2int n (bv_neg t) = bv2int (bv_neg t))%Z)
+            by (unfold sbv2int; rewrite Hlast_neg_t; reflexivity).
+          lia. }
+        assert (Hsbv_t_nonpos : (sbv2int n t <= 0)%Z).
+        { assert (Hge : (0 <= bv2int (bv_neg t))%Z) by (unfold bv2int; apply list2int_geq_zero).
+          lia. }
+        (* bv2int(or) ≥ bv2int(-t) = -st ≥ 0 *)
+        (* Hrhs: -st - 1 < bv2int(or) - P. Since bv2int(or) < P: bv2int(or)-P < 0 ≤ -st-1? *)
+        (* -st ≥ 0 → -st - 1 ≥ -1. And bv2int(or) - P < 0. *)
+        (* We need -st - 1 < bv2int(or) - P. *)
+        (* bv2int(or) ≥ bv2int(-t) = -st ≥ 0. So bv2int(or) - P ≥ -st - P. *)
+        (* And -st - 1 < bv2int(or) - P requires bv2int(or) > -st - 1 + P = P - st - 1. *)
+        (* bv2int(or) ≥ -st. And P - st - 1 > -st (since P > 1). *)
+        (* So bv2int(or) ≥ -st < P - st - 1. Not sufficient! *)
+        (* The contradiction is: bv2int(or) < P, so bv2int(or)-P < 0 ≤ -st - 1. *)
+        assert (Hbv2int_or_nonneg : (0 <= bv2int (bv_or (bv_neg s) (bv_neg t)))%Z)
+          by (unfold bv2int; apply list2int_geq_zero).
+        assert (Hbv2int_or_lt_P : (bv2int (bv_or (bv_neg s) (bv_neg t)) < pow2_int_N n)%Z).
+        { unfold bv2int. unfold pow2_int_N. rewrite <- (size_to_length Hor_sz).
+          apply list2int_lt_pow2_int. reflexivity. }
+        lia.
+      * (* last(-s) = false, last(-t) = false: witness = signed_min n *)
+        (* From last(-s)=false AND s≠zeros: last(s)=true AND s≠signed_min → bv2nat(s) > 2^(n-1) *)
+        assert (Hlast_s_true : last s false = true).
+        { destruct (last s false) eqn:Hlast_s; [reflexivity |].
+          exfalso.
+          pose proof (last_bv_neg_pos Hs Hn_pos Hlast_s Hs_zero) as Hfls.
+          rewrite Hfls in Hlast_neg_s. discriminate. }
+        assert (Hs_ne_smin : s <> signed_min n).
+        { intro Heq. subst s.
+          rewrite Hneg_min, Hmin_last in Hlast_neg_s. discriminate. }
+        assert (Hbv2nat_s_gt : (2^(N.to_nat n - 1) < bv2nat_a s)%nat).
+        { apply Nat2Z.inj_lt.
+          pose proof (last_true_list2int_lb Hs_ne Hlast_s_true) as Hlb.
+          rewrite Hlen_s in Hlb.
+          assert (Hne : (bv2nat_a s <> 2^(N.to_nat n - 1))%nat).
+          { intro Heq. apply Hs_ne_smin.
+            apply (bv2nat_a_inj Hs Hmin_sz). lia. }
+          rewrite pow2_int_eq_Z_of_nat_pow2 in Hlb.
+          change (list2int s) with (bv2int s) in Hlb.
+          rewrite bv2int_eq_Z_of_nat_bv2nat_a in Hlb.
+          assert (Hne_Z : (Z.of_nat (bv2nat_a s) <> Z.of_nat (2^(N.to_nat n - 1)))%Z)
+            by (intro H; apply Hne; exact (Nat2Z.inj _ _ H)).
+          lia. }
+        (* bv_urem(signed_min)(s) = signed_min (since bv2nat(signed_min) = 2^(n-1) < bv2nat(s)) *)
+        assert (Hurem_smin : bv_urem (signed_min n) s = signed_min n).
+        { apply bv2nat_a_inj with (n := n);
+            [apply bv_urem_size; [exact Hmin_sz | exact Hs] | exact Hmin_sz |].
+          rewrite (bv2nat_a_urem_nonzero Hmin_sz Hs Hs_zero).
+          rewrite Hmin_bv2nat.
+          apply Nat.mod_small. exact Hbv2nat_s_gt. }
+        (* t ≠ signed_min from last(-t)=false *)
+        assert (Ht_ne_smin := Ht_ne_smin_iff eq_refl).
+        exists (signed_min n). split; [exact Hmin_sz |].
+        rewrite Hurem_smin.
+        (* signed_min <_s t *)
+        pose proof (signed_min_sle t) as Hsle. rewrite Ht in Hsle.
+        apply bv_sle_eq in Hsle. destruct Hsle as [Hslt | Heq].
+        -- exact Hslt.
+        -- exfalso. exact (Ht_ne_smin (eq_sym Heq)).
+Qed.
+
 (* ~0 <s -s & t <=> (exists x, x urem s <=s t) *)
 Theorem bvurem_sle : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
