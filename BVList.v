@@ -16919,6 +16919,139 @@ Proof.
   - lia.
 Qed.
 
+(* list2int of bv_add t t = (2 * list2int t) mod pow2_int n *)
+Lemma list2int_bv_add_twice : forall (n : N) (t : bitvector),
+  size t = n ->
+  (list2int (bv_add t t) = (2 * list2int t) mod pow2_int (N.to_nat n))%Z.
+Proof.
+  intros n t Ht.
+  unfold bv_add. rewrite Ht, N.eqb_refl. unfold add_list.
+  rewrite list2int_add_list_ingr; [| reflexivity].
+  simpl bool2int. rewrite Z.add_0_r.
+  rewrite (size_to_length Ht).
+  replace (list2int t + list2int t)%Z with (2 * list2int t)%Z by ring.
+  reflexivity.
+Qed.
+
+(* list2int of bv_subt a b = (list2int a - list2int b + pow2_int n) mod pow2_int n *)
+Lemma list2int_bv_subt : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n ->
+  (list2int (bv_subt a b) = (list2int a - list2int b + pow2_int (N.to_nat n)) mod pow2_int (N.to_nat n))%Z.
+Proof.
+  intros n a b Ha Hb.
+  unfold bv_subt. rewrite Ha, Hb, N.eqb_refl. unfold bits.
+  assert (Hlen : length a = length b).
+  { pose proof (size_to_length Ha) as H1. pose proof (size_to_length Hb) as H2. lia. }
+  rewrite <- (size_to_length Ha).
+  apply list2int_subst_list_formula. exact Hlen.
+Qed.
+
+(* Inclusion-exclusion: list2int(bv_and a b) + list2int(bv_or a b) = list2int a + list2int b *)
+Lemma list2int_bv_and_or_sum : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n ->
+  (list2int (bv_and a b) + list2int (bv_or a b) = list2int a + list2int b)%Z.
+Proof.
+  intros n a b Ha Hb.
+  assert (Hlen : length a = length b).
+  { pose proof (size_to_length Ha) as H1. pose proof (size_to_length Hb) as H2. lia. }
+  unfold bv_and, bv_or. rewrite Ha, Hb, N.eqb_refl. unfold bits.
+  apply list2int_map2_and_or_sum. exact Hlen.
+Qed.
+
+(* bv2nat_a of bv_subt when t <=u s *)
+Lemma bv2nat_a_subt_ule : forall (n : N) (s t : bitvector),
+  size s = n -> size t = n ->
+  bv_ule t s = true ->
+  (bv2nat_a (bv_subt s t) = bv2nat_a s - bv2nat_a t)%nat.
+Proof.
+  intros n s t Hs Ht Hule.
+  apply Nat2Z.inj.
+  rewrite Nat2Z.inj_sub.
+  - rewrite <- !bv2int_eq_Z_of_nat_bv2nat_a. unfold bv2int.
+    rewrite (list2int_bv_subt Hs Ht).
+    assert (HTS_le : (list2int t <= list2int s)%Z).
+    { apply ule_list_list2int.
+      - pose proof (size_to_length Hs) as H1. pose proof (size_to_length Ht) as H2. lia.
+      - unfold bv_ule in Hule. rewrite Ht, Hs, N.eqb_refl in Hule. exact Hule. }
+    pose proof (@list2int_geq_zero t) as HT_ge.
+    assert (HS_lt : (list2int s < pow2_int (N.to_nat n))%Z)
+      by (apply list2int_lt_pow2_int with (n := N.to_nat n); apply size_to_length; exact Hs).
+    assert (HP_ne : pow2_int (N.to_nat n) <> 0%Z)
+      by (pose proof (zero_lt_pow2_int (N.to_nat n)); lia).
+    replace (list2int s - list2int t + pow2_int (N.to_nat n))%Z
+      with (list2int s - list2int t + 1 * pow2_int (N.to_nat n))%Z by ring.
+    rewrite Z.mod_add; [| exact HP_ne].
+    apply Z.mod_small. lia.
+  - apply Nat2Z.inj_le.
+    rewrite <- !bv2int_eq_Z_of_nat_bv2nat_a. unfold bv2int.
+    apply ule_list_list2int.
+    + pose proof (size_to_length Hs) as H1. pose proof (size_to_length Ht) as H2. lia.
+    + unfold bv_ule in Hule. rewrite Ht, Hs, N.eqb_refl in Hule. exact Hule.
+Qed.
+
+(* bv_ule a b = true ↔ bv2nat_a a ≤ bv2nat_a b *)
+Lemma bv2nat_a_ule_iff : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n ->
+  bv_ule a b = true <-> (bv2nat_a a <= bv2nat_a b)%nat.
+Proof.
+  intros n a b Ha Hb. split.
+  - intros Hule.
+    apply bv_ule_bv_uge in Hule.
+    apply bv_uge_implies_not_bv_ult in Hule.
+    rewrite bv_ult_nat in Hule; [| rewrite Hb, Ha; apply N.eqb_refl].
+    apply Nat.ltb_ge. exact Hule.
+  - intros Hle.
+    apply bv_uge_bv_ule.
+    apply not_bv_ult_implies_bv_uge; [congruence |].
+    rewrite bv_ult_nat; [| rewrite Hb, Ha; apply N.eqb_refl].
+    apply Nat.ltb_nlt. lia.
+Qed.
+
+(* bv_uge a b = true ↔ bv2nat_a b ≤ bv2nat_a a *)
+Lemma bv2nat_a_uge_iff : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n ->
+  bv_uge a b = true <-> (bv2nat_a b <= bv2nat_a a)%nat.
+Proof.
+  intros n a b Ha Hb. split.
+  - intros Huge. apply bv_uge_bv_ule in Huge.
+    apply (bv2nat_a_ule_iff Hb Ha). exact Huge.
+  - intros Hle. apply bv_ule_bv_uge.
+    apply (bv2nat_a_ule_iff Hb Ha). exact Hle.
+Qed.
+
+(* Inclusion-exclusion: bv2nat_a(bv_and a b) + bv2nat_a(bv_or a b) = bv2nat_a a + bv2nat_a b *)
+Lemma bv2nat_a_bv_and_or_add : forall (n : N) (a b : bitvector),
+  size a = n -> size b = n ->
+  (bv2nat_a (bv_and a b) + bv2nat_a (bv_or a b) = bv2nat_a a + bv2nat_a b)%nat.
+Proof.
+  intros n a b Ha Hb.
+  apply Nat2Z.inj.
+  rewrite !Nat2Z.inj_add, <- !bv2int_eq_Z_of_nat_bv2nat_a. unfold bv2int.
+  exact (list2int_bv_and_or_sum Ha Hb).
+Qed.
+
+(* list2int of bv_subt (bv_add t t) s = (2*T - S) mod P, useful for bvurem_reverse_eq *)
+Lemma list2int_bv_subt_2t_s : forall (n : N) (s t : bitvector),
+  size t = n -> size s = n ->
+  (list2int (bv_subt (bv_add t t) s) = (2 * list2int t - list2int s) mod pow2_int (N.to_nat n))%Z.
+Proof.
+  intros n s t Ht Hs.
+  assert (Hatt : size (bv_add t t) = n) by (apply bv_add_size; exact Ht; exact Ht).
+  rewrite (list2int_bv_subt Hatt Hs), (list2int_bv_add_twice Ht).
+  pose proof (zero_lt_pow2_int (N.to_nat n)) as HP_pos.
+  assert (HP_ne : pow2_int (N.to_nat n) <> 0%Z) by lia.
+  assert (HS_ge : (0 <= list2int s)%Z) by exact (@list2int_geq_zero s).
+  assert (HS_lt : (list2int s < pow2_int (N.to_nat n))%Z)
+    by (apply list2int_lt_pow2_int with (n := N.to_nat n); apply size_to_length; exact Hs).
+  replace (2 * list2int t mod pow2_int (N.to_nat n) - list2int s + pow2_int (N.to_nat n))%Z
+    with (2 * list2int t mod pow2_int (N.to_nat n) - list2int s + 1 * pow2_int (N.to_nat n))%Z
+    by ring.
+  rewrite Z.mod_add; [| exact HP_ne].
+  rewrite (Zminus_mod (2 * list2int t) (list2int s) (pow2_int (N.to_nat n))).
+  rewrite (Z.mod_small (list2int s) (pow2_int (N.to_nat n))); [| split; lia].
+  reflexivity.
+Qed.
+
 Lemma bv_slt_not_zeros_nonneg : forall (n : N) (x : bitvector),
   (0 < n)%N -> size x = n ->
   bv_slt (bv_not (zeros n)) x = negb (last x false).

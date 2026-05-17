@@ -3948,9 +3948,156 @@ Theorem bvurem_reverse_eq : forall (n : N) (s t : bitvector),
        t
      = true).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  assert (Hatt : size (bv_add t t) = n) by exact (bv_add_size Ht Ht).
+  assert (HA_sz : size (bv_subt (bv_add t t) s) = n) by exact (bv_subt_size Hatt Hs).
+  assert (HM_sz : size (bv_and (bv_subt (bv_add t t) s) s) = n)
+    by exact (bv_and_size HA_sz Hs).
+  assert (HOR_sz : size (bv_or (bv_subt (bv_add t t) s) s) = n)
+    by exact (bv_or_size HA_sz Hs).
+  assert (HP_pos : (0 < pow2_int (N.to_nat n))%Z) by exact (zero_lt_pow2_int (N.to_nat n)).
+  assert (HP_ne : pow2_int (N.to_nat n) <> 0%Z) by lia.
+  assert (HT_ge : (0 <= list2int t)%Z) by exact (@list2int_geq_zero t).
+  assert (HS_ge : (0 <= list2int s)%Z) by exact (@list2int_geq_zero s).
+  assert (HT_lt : (list2int t < pow2_int (N.to_nat n))%Z)
+    by (apply list2int_lt_pow2_int with (n := N.to_nat n); apply size_to_length; exact Ht).
+  assert (HS_lt : (list2int s < pow2_int (N.to_nat n))%Z)
+    by (apply list2int_lt_pow2_int with (n := N.to_nat n); apply size_to_length; exact Hs).
+  assert (HP_nat_pos : (0 < 2^N.to_nat n)%nat).
+  { assert (H2ne : (2 <> 0)%nat) by lia. pose proof (Nat.pow_nonzero 2 (N.to_nat n) H2ne). lia. }
+  assert (HT_nat_lt : (bv2nat_a t < 2^N.to_nat n)%nat) by exact (bv2nat_a_lt_pow2 Ht).
+  assert (HS_nat_lt : (bv2nat_a s < 2^N.to_nat n)%nat) by exact (bv2nat_a_lt_pow2 Hs).
+  assert (HTP_Z : (list2int t = Z.of_nat (bv2nat_a t))%Z)
+    by (rewrite bv2int_eq_Z_of_nat_bv2nat_a; reflexivity).
+  assert (HSP_Z : (list2int s = Z.of_nat (bv2nat_a s))%Z)
+    by (rewrite bv2int_eq_Z_of_nat_bv2nat_a; reflexivity).
+  assert (HPP_Z : (pow2_int (N.to_nat n) = Z.of_nat (2^N.to_nat n))%Z)
+    by exact (pow2_int_eq_Z_of_nat_pow2 (N.to_nat n)).
+  assert (HA_formula : (list2int (bv_subt (bv_add t t) s) =
+    (2 * list2int t - list2int s) mod pow2_int (N.to_nat n))%Z)
+    by exact (list2int_bv_subt_2t_s Ht Hs).
+  (* bv2nat_a of A in Z *)
+  assert (HA_Z : (Z.of_nat (bv2nat_a (bv_subt (bv_add t t) s)) =
+    (2 * list2int t - list2int s) mod pow2_int (N.to_nat n))%Z).
+  { rewrite <- bv2int_eq_Z_of_nat_bv2nat_a. unfold bv2int. exact HA_formula. }
+  split.
 
- 
+  (* ========================= FORWARD ========================= *)
+  - intros [x [Hx Heq]].
+    rewrite bv_eq_reflect in Heq.
+    apply (bv2nat_a_uge_iff HM_sz Ht).
+    destruct (Nat.eq_dec (bv2nat_a s) (bv2nat_a t)) as [HSTeq | HSTne].
+    + (* s = t: show M = t *)
+      assert (Hst : s = t) by exact (bv2nat_a_inj Hs Ht HSTeq).
+      subst s.
+      assert (HAtv : bv_subt (bv_add t t) t = t).
+      { apply (bv2nat_a_inj HA_sz Ht).
+        apply Nat2Z.inj. rewrite HA_Z, HTP_Z.
+        replace (2 * Z.of_nat (bv2nat_a t) - Z.of_nat (bv2nat_a t))%Z
+          with (Z.of_nat (bv2nat_a t))%Z by ring.
+        apply Z.mod_small. split; lia. }
+      rewrite HAtv, bv_and_idem. lia.
+    + (* s ≠ t: S > 2T, then M > T *)
+      assert (Hxne : x <> zeros n).
+      { intro Hxz. rewrite Hxz, (bv_urem_zeros_s Hs) in Heq. apply HSTne.
+        rewrite <- Heq. reflexivity. }
+      assert (HXpos : (0 < bv2nat_a x)%nat).
+      { destruct (bv2nat_a x) eqn:Hx0; [| lia].
+        exfalso. apply Hxne.
+          apply (bv2nat_a_inj Hx (zeros_size n)).
+          rewrite Hx0, bv2nat_a_zeros_eq. reflexivity. }
+      assert (HuremT : (bv2nat_a t = bv2nat_a s mod bv2nat_a x)%nat).
+      { rewrite <- Heq. exact (bv2nat_a_urem_nonzero Hs Hx Hxne). }
+      assert (HT_lt_X : (bv2nat_a t < bv2nat_a x)%nat)
+        by (rewrite HuremT; apply Nat.mod_upper_bound; lia).
+      (* S > 2T *)
+      assert (HS_gt_2T : (2 * bv2nat_a t < bv2nat_a s)%nat).
+      { destruct (lt_dec (bv2nat_a s) (bv2nat_a x)) as [HltX | HgeX].
+        - exfalso. apply HSTne. rewrite HuremT, (Nat.mod_small _ _ HltX). reflexivity.
+        - set (q := bv2nat_a s / bv2nat_a x).
+          pose proof (Nat.div_mod (bv2nat_a s) (bv2nat_a x) ltac:(lia)) as HdivS.
+          fold q in HdivS. rewrite <- HuremT in HdivS.
+          assert (Hq1 : (1 <= q)%nat).
+          { destruct q as [|q']; [| lia].
+            exfalso. simpl in HdivS. lia. }
+          nia. }
+      (* M + OR = A + S = 2^n + 2T *)
+      assert (HAS : (bv2nat_a (bv_and (bv_subt (bv_add t t) s) s) +
+                     bv2nat_a (bv_or (bv_subt (bv_add t t) s) s) =
+                     2^N.to_nat n + 2*bv2nat_a t)%nat).
+      { assert (HA_val : (Z.of_nat (bv2nat_a (bv_subt (bv_add t t) s)) =
+                          Z.of_nat (2^N.to_nat n) + 2*Z.of_nat (bv2nat_a t) - Z.of_nat (bv2nat_a s))%Z).
+        { rewrite HA_Z, HTP_Z, HSP_Z, HPP_Z.
+          replace (2 * Z.of_nat (bv2nat_a t) - Z.of_nat (bv2nat_a s))%Z
+            with (Z.of_nat (2^N.to_nat n) + 2*Z.of_nat (bv2nat_a t) - Z.of_nat (bv2nat_a s) +
+                  (-1) * Z.of_nat (2^N.to_nat n))%Z by ring.
+          rewrite Z.mod_add; [| lia]. apply Z.mod_small. split; lia. }
+        pose proof (bv2nat_a_bv_and_or_add HA_sz Hs) as Hsum.
+        apply Nat2Z.inj.
+        rewrite !Nat2Z.inj_add, !Nat2Z.inj_mul.
+        apply (f_equal Z.of_nat) in Hsum. rewrite !Nat2Z.inj_add in Hsum.
+        lia. }
+      assert (HOR_lt : (bv2nat_a (bv_or (bv_subt (bv_add t t) s) s) < 2^N.to_nat n)%nat)
+        by exact (bv2nat_a_lt_pow2 HOR_sz).
+      lia.
+
+  (* ========================= BACKWARD ========================= *)
+  - intros Huge.
+    apply (bv2nat_a_uge_iff HM_sz Ht) in Huge.
+    (* M ≤ A *)
+    assert (HM_ule_A : (bv2nat_a (bv_and (bv_subt (bv_add t t) s) s) <=
+                        bv2nat_a (bv_subt (bv_add t t) s))%nat).
+    { apply (bv2nat_a_ule_iff HM_sz HA_sz).
+      apply bv_ule_and. congruence. }
+    (* M ≤ s *)
+    assert (HM_ule_s : (bv2nat_a (bv_and (bv_subt (bv_add t t) s) s) <= bv2nat_a s)%nat).
+    { apply (bv2nat_a_ule_iff HM_sz Hs).
+      rewrite (bv_and_comm HA_sz Hs). apply bv_ule_and. congruence. }
+    (* T ≤ S *)
+    assert (HT_le_S : (bv2nat_a t <= bv2nat_a s)%nat) by lia.
+    destruct (Nat.eq_dec (bv2nat_a s) (bv2nat_a t)) as [HSTeq | HSTne].
+    + (* s = t: witness zeros n *)
+      exists (zeros n). split; [apply zeros_size |].
+      rewrite bv_eq_reflect.
+      rewrite (bv_urem_zeros_s Hs).
+      apply (bv2nat_a_inj Hs Ht). exact HSTeq.
+    + (* s ≠ t: S > 2T, witness bv_subt s t *)
+      assert (HT_lt_S : (bv2nat_a t < bv2nat_a s)%nat) by lia.
+      (* If S ≤ 2T: A ≤ T-1 < T ≤ M, contradiction *)
+      destruct (lt_dec (2 * bv2nat_a t) (bv2nat_a s)) as [HS_gt_2T | HS_le_2T].
+      * (* S > 2T: witness D = s - t *)
+        assert (Hule_ts : bv_ule t s = true)
+          by (apply (bv2nat_a_ule_iff Ht Hs); lia).
+        set (D := bv_subt s t).
+        assert (HD_sz : size D = n) by (unfold D; exact (bv_subt_size Hs Ht)).
+        assert (HD_nat : (bv2nat_a D = bv2nat_a s - bv2nat_a t)%nat)
+          by exact (bv2nat_a_subt_ule Hs Ht Hule_ts).
+        assert (HD_ne : D <> zeros n).
+        { intro Hz.
+          assert (HD0 : bv2nat_a D = 0) by (rewrite Hz; apply bv2nat_a_zeros_eq).
+          rewrite HD_nat in HD0. lia. }
+        assert (HS_mod : (bv2nat_a s mod (bv2nat_a s - bv2nat_a t) = bv2nat_a t)%nat).
+        { apply Nat2Z.inj. rewrite Nat2Z.inj_mod.
+          replace (Z.of_nat (bv2nat_a s))%Z
+            with (Z.of_nat (bv2nat_a t) + 1 * Z.of_nat (bv2nat_a s - bv2nat_a t))%Z
+            by (rewrite Nat2Z.inj_sub; [ring | lia]).
+          rewrite Z.mod_add; [| lia].
+          apply Z.mod_small.
+          rewrite Nat2Z.inj_sub; [| lia]. split; lia. }
+        exists D. split; [exact HD_sz |].
+        rewrite bv_eq_reflect.
+        apply (bv2nat_a_inj (bv_urem_size Hs HD_sz) Ht).
+        rewrite (bv2nat_a_urem_nonzero Hs HD_sz HD_ne), HD_nat, HS_mod. reflexivity.
+      * (* S ≤ 2T: A_nat < T, M ≤ A < T ≤ M, contradiction *)
+        exfalso.
+        assert (HS_le : (bv2nat_a s <= 2 * bv2nat_a t)%nat) by lia.
+        assert (HA_lt_T : (Z.of_nat (bv2nat_a (bv_subt (bv_add t t) s)) < Z.of_nat (bv2nat_a t))%Z).
+        { rewrite HA_Z, HTP_Z, HSP_Z.
+          rewrite Z.mod_small; [| split]; lia. }
+        apply Nat2Z.inj_lt in HA_lt_T. lia.
+Qed.
+
+
 (* (s >=s 0 => s >s t) /\ (s <s 0 => ((s - 1) >> 1) >s t) <=> (exists x, s urem x >s t) *)
 Theorem bvurem_reverse_sgt : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->

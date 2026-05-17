@@ -178,4 +178,4 @@ Do NOT spawn subagents for proof work. All Coq proof attempts must be done inlin
 
 ## Current Open Problem
 
-bvurem_sle (line 3758)
+bvurem_reverse_sgt (line 4102)
