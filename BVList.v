@@ -17078,6 +17078,65 @@ Proof.
     exact (bv_sle_pos_neg_absurd Hn Hx Hones_sz Hlast_x Hlast_ones Hsle).
 Qed.
 
+(* bv2nat_a (bv_urem s x) <= bv2nat_a s for any x *)
+Lemma bv2nat_a_urem_le_s : forall (n : N) (s x : bitvector),
+  size s = n -> size x = n ->
+  (bv2nat_a (bv_urem s x) <= bv2nat_a s)%nat.
+Proof.
+  intros n s x Hs Hx.
+  destruct (bv_eq x (zeros n)) eqn:Hxeq.
+  - apply bv_eq_reflect in Hxeq. subst x.
+    rewrite bv_urem_zeros_s by exact Hs. lia.
+  - assert (Hxne : x <> zeros n).
+    { intro Heq. rewrite Heq, bv_eq_refl in Hxeq. discriminate. }
+    rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+    apply Nat.Div0.mod_le.
+Qed.
+
+(* If last s = false then last (bv_urem s x) = false *)
+Lemma last_bv_urem_nonneg : forall (n : N) (s x : bitvector),
+  size s = n -> size x = n -> (0 < n)%N ->
+  last s false = false -> last (bv_urem s x) false = false.
+Proof.
+  intros n s x Hs Hx Hn Hlast_s.
+  assert (Hurem_sz : size (bv_urem s x) = n) by exact (bv_urem_size Hs Hx).
+  assert (Hult_s : bv_ult s (signed_min n) = true)
+    by exact (nonneg_ult_signed_min Hn Hs Hlast_s).
+  assert (Hs_lt : (bv2nat_a s < bv2nat_a (signed_min n))%nat).
+  { rewrite bv_ult_nat in Hult_s; [| rewrite Hs, signed_min_size; apply N.eqb_refl].
+    apply Nat.ltb_lt. exact Hult_s. }
+  assert (Hurem_le : (bv2nat_a (bv_urem s x) <= bv2nat_a s)%nat)
+    by exact (bv2nat_a_urem_le_s Hs Hx).
+  assert (Hult_urem : bv_ult (bv_urem s x) (signed_min n) = true).
+  { rewrite bv_ult_nat; [| rewrite Hurem_sz, signed_min_size; apply N.eqb_refl].
+    apply Nat.ltb_lt. lia. }
+  exact (ult_b_signed_min_implies_positive_sign Hurem_sz Hult_urem).
+Qed.
+
+(* When s is negative, bv2nat_a ((s-1)>>1) = (bv2nat_a s - 1) / 2 *)
+Lemma bv2nat_a_shr_subt_one : forall (n : N) (s : bitvector),
+  size s = n -> (0 < N.to_nat n)%nat -> last s false = true ->
+  (bv2nat_a (bv_shr (bv_subt s (one n)) (one n)) = (bv2nat_a s - 1) / 2)%nat.
+Proof.
+  intros n s Hs Hn Hlast_s.
+  assert (Hsubt_sz : size (bv_subt s (one n)) = n)
+    by exact (bv_subt_size Hs (one_size n)).
+  rewrite (bv2nat_a_shr_one Hsubt_sz Hn).
+  assert (Hs_ne : s <> zeros n).
+  { intro Heq. rewrite Heq in Hlast_s.
+    unfold zeros in Hlast_s. rewrite last_mk_list_false in Hlast_s. discriminate. }
+  assert (Hs_pos : (0 < bv2nat_a s)%nat).
+  { destruct (bv2nat_a s) eqn:H0; [| lia].
+    exfalso. apply Hs_ne.
+    apply bv2nat_a_inj with (n := n); [exact Hs | apply zeros_size |].
+    rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+  assert (Hone_le_s : bv_ule (one n) s = true).
+  { apply (bv2nat_a_ule_iff (one_size n) Hs).
+    rewrite bv2nat_a_one by exact Hn. lia. }
+  rewrite (bv2nat_a_subt_ule Hs (one_size n) Hone_le_s).
+  rewrite bv2nat_a_one by exact Hn. reflexivity.
+Qed.
+
 End RAWBITVECTOR_LIST.
 
 Module BITVECTOR_LIST <: BITVECTOR.

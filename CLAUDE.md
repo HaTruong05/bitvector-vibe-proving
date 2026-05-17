@@ -178,4 +178,4 @@ Do NOT spawn subagents for proof work. All Coq proof attempts must be done inlin
 
 ## Current Open Problem
 
-bvurem_reverse_sgt (line 4102)
+All bvurem IC stubs complete as of 2026-05-17. Run `grep -n "Admitted" InvCond.v` to find the next open stub.

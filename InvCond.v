@@ -4108,7 +4108,190 @@ Theorem bvurem_reverse_sgt : forall (n : N) (s t : bitvector),
       (bv_slt s (zeros n) = true -> bv_sgt (bv_shr (bv_subt s (one n)) (one n)) t = true)
     ).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  destruct (N.eq_dec n 0%N) as [Hn0 | Hn0].
+  { rewrite Hn0 in Hs, Ht.
+    pose proof (size_to_length Hs) as Hls. simpl in Hls. apply length_zero_iff_nil in Hls.
+    pose proof (size_to_length Ht) as Hlt. simpl in Hlt. apply length_zero_iff_nil in Hlt.
+    subst s t. split.
+    - intros [x [Hx Heq]].
+      pose proof (size_to_length Hx) as Hlx. rewrite Hn0 in Hlx. simpl in Hlx.
+      apply length_zero_iff_nil in Hlx. subst x.
+      vm_compute in Heq. discriminate.
+    - intros [H1 _].
+      assert (Hsg : bv_sge nil (zeros n) = true).
+      { rewrite Hn0. vm_compute. reflexivity. }
+      apply H1 in Hsg. vm_compute in Hsg. discriminate. }
+  assert (Hn_pos : (0 < n)%N) by (destruct n; [contradiction | lia]).
+  assert (Hn_nat : (0 < N.to_nat n)%nat) by (destruct n; [simpl in Hn_pos; lia | simpl; lia]).
+  assert (Hsubt_sz : size (bv_subt s (one n)) = n) by exact (bv_subt_size Hs (one_size n)).
+  assert (Hshr_sz : size (bv_shr (bv_subt s (one n)) (one n)) = n)
+    by exact (bv_shr_size Hsubt_sz (one_size n)).
+  assert (Hlast_shr_pos : last (bv_shr (bv_subt s (one n)) (one n)) false = false).
+  { apply (last_bv_shr_pos Hsubt_sz (one_size n)).
+    rewrite bv2nat_a_one by exact Hn_nat. lia. }
+  split.
+  (* FORWARD *)
+  - intros [x [Hx Heq]].
+    assert (Hurem_sz : size (bv_urem s x) = n) by exact (bv_urem_size Hs Hx).
+    rewrite bv_sgt_slt_equiv in Heq.
+    split.
+    + (* s >=s 0 implies s >s t *)
+      intros Hsge.
+      rewrite bv_sgt_slt_equiv.
+      assert (Hlast_s : last s false = false).
+      { rewrite bv_sge_sle_equiv in Hsge.
+        pose proof (bv_zeros_sle s) as Hzs. rewrite Hs in Hzs.
+        rewrite Hsge in Hzs. symmetry in Hzs. apply Bool.negb_true_iff in Hzs. exact Hzs. }
+      assert (Hlast_urem : last (bv_urem s x) false = false)
+        by exact (last_bv_urem_nonneg Hs Hx Hn_pos Hlast_s).
+      assert (Hle : (bv2nat_a (bv_urem s x) <= bv2nat_a s)%nat)
+        by exact (bv2nat_a_urem_le_s Hs Hx).
+      assert (Hule : bv_ule (bv_urem s x) s = true).
+      { apply (bv2nat_a_ule_iff Hurem_sz Hs). exact Hle. }
+      assert (Hlast_eq : last (bv_urem s x) false = last s false)
+        by (rewrite Hlast_urem, Hlast_s; reflexivity).
+      assert (Hsle : bv_sle (bv_urem s x) s = true).
+      { rewrite (bv_sle_ule_same_sign Hurem_sz Hs Hlast_eq). exact Hule. }
+      exact (bv_slt_sle_trans Heq Hsle).
+    + (* s <s 0 implies (s-1)>>1 >s t *)
+      intros Hslt.
+      rewrite bv_sgt_slt_equiv.
+      assert (Hlast_s : last s false = true).
+      { pose proof (bv_slt_zeros s) as Hzs. rewrite Hs in Hzs. rewrite Hzs in Hslt. exact Hslt. }
+      assert (Hshr_val : (bv2nat_a (bv_shr (bv_subt s (one n)) (one n)) = (bv2nat_a s - 1) / 2)%nat)
+        by exact (bv2nat_a_shr_subt_one Hs Hn_nat Hlast_s).
+      destruct (last (bv_urem s x) false) eqn:Hlast_urem.
+      * (* urem is negative: neg_sle_pos gives bv_sle urem shr *)
+        exact (bv_slt_sle_trans Heq (neg_sle_pos Hurem_sz Hshr_sz Hlast_urem Hlast_shr_pos)).
+      * (* urem is non-negative: need bv2nat_a urem <= (S-1)/2 *)
+        assert (Hs_pos : (0 < bv2nat_a s)%nat).
+        { assert (Hs_ne : s <> zeros n).
+          { intro Heq'. rewrite Heq' in Hlast_s. unfold zeros in Hlast_s.
+            rewrite last_mk_list_false in Hlast_s. discriminate. }
+          destruct (bv2nat_a s) eqn:H0; [| lia].
+          exfalso. apply Hs_ne.
+          apply bv2nat_a_inj with (n := n); [exact Hs | apply zeros_size |].
+          rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+        assert (Hurem_le_half : (bv2nat_a (bv_urem s x) <= (bv2nat_a s - 1) / 2)%nat).
+        { destruct (bv_eq x (zeros n)) eqn:Hxeq.
+          - apply bv_eq_reflect in Hxeq. subst x.
+            rewrite bv_urem_zeros_s in Hlast_urem by exact Hs.
+            rewrite Hlast_s in Hlast_urem. discriminate.
+          - assert (Hxne : x <> zeros n).
+            { intro Heq'. rewrite Heq', bv_eq_refl in Hxeq. discriminate. }
+            rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+            assert (HX_pos : (0 < bv2nat_a x)%nat).
+            { destruct (bv2nat_a x) eqn:H0; [| lia].
+              exfalso. apply Hxne.
+              apply bv2nat_a_inj with (n := n); [exact Hx | apply zeros_size |].
+              rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+            destruct (lt_dec (bv2nat_a s) (bv2nat_a x)) as [HXgS | HXleS].
+            + (* X > S: urem = S, but last(s) = true contradicts last(urem) = false *)
+              exfalso.
+              assert (Heq_sv : bv_urem s x = s).
+              { apply bv2nat_a_inj with (n := n).
+                - exact Hurem_sz.
+                - exact Hs.
+                - rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+                  apply Nat.mod_small. exact HXgS. }
+              rewrite Heq_sv in Hlast_urem. rewrite Hlast_s in Hlast_urem. discriminate.
+            + (* X <= S: S mod X <= (S-1)/2 *)
+              assert (HXleS' : (bv2nat_a x <= bv2nat_a s)%nat) by lia.
+              pose proof (Nat.div_mod (bv2nat_a s) (bv2nat_a x) ltac:(lia)) as Hdiv_S.
+              assert (Hq1 : (1 <= bv2nat_a s / bv2nat_a x)%nat).
+              { destruct (bv2nat_a s / bv2nat_a x) as [|q']; [| lia].
+                exfalso. simpl in Hdiv_S.
+                assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+                  by (apply Nat.mod_upper_bound; lia). lia. }
+              assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+                by (apply Nat.mod_upper_bound; lia).
+              assert (H2r_lt_S : (2 * (bv2nat_a s mod bv2nat_a x) < bv2nat_a s)%nat) by nia.
+              pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+              pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half.
+              lia. }
+        rewrite <- Hshr_val in Hurem_le_half.
+        assert (Hule : bv_ule (bv_urem s x) (bv_shr (bv_subt s (one n)) (one n)) = true).
+        { apply (bv2nat_a_ule_iff Hurem_sz Hshr_sz). exact Hurem_le_half. }
+        assert (Hlast_eq : last (bv_urem s x) false = last (bv_shr (bv_subt s (one n)) (one n)) false)
+          by (rewrite Hlast_urem, Hlast_shr_pos; reflexivity).
+        assert (Hsle : bv_sle (bv_urem s x) (bv_shr (bv_subt s (one n)) (one n)) = true).
+        { rewrite (bv_sle_ule_same_sign Hurem_sz Hshr_sz Hlast_eq). exact Hule. }
+        exact (bv_slt_sle_trans Heq Hsle).
+  (* BACKWARD *)
+  - intros [H1 H2].
+    destruct (last s false) eqn:Hlast_s.
+    + (* s is negative *)
+      assert (Hslt : bv_slt s (zeros n) = true).
+      { pose proof (bv_slt_zeros s) as Hzs. rewrite Hs in Hzs. rewrite Hzs. exact Hlast_s. }
+      pose proof (H2 Hslt) as Hsgt_shr.
+      rewrite bv_sgt_slt_equiv in Hsgt_shr.
+      (* Witness: bv_subt s ((s-1)>>1) *)
+      set (SHR := bv_shr (bv_subt s (one n)) (one n)).
+      assert (Hxwit_sz : size (bv_subt s SHR) = n) by exact (bv_subt_size Hs Hshr_sz).
+      exists (bv_subt s SHR). split; [exact Hxwit_sz |].
+      rewrite bv_sgt_slt_equiv.
+      assert (Hshr_val : (bv2nat_a SHR = (bv2nat_a s - 1) / 2)%nat)
+        by exact (bv2nat_a_shr_subt_one Hs Hn_nat Hlast_s).
+      assert (Hs_pos : (0 < bv2nat_a s)%nat).
+      { assert (Hs_ne : s <> zeros n).
+        { intro Heq. rewrite Heq in Hlast_s. unfold zeros in Hlast_s.
+          rewrite last_mk_list_false in Hlast_s. discriminate. }
+        destruct (bv2nat_a s) eqn:H0; [| lia].
+        exfalso. apply Hs_ne.
+        apply bv2nat_a_inj with (n := n); [exact Hs | apply zeros_size |].
+        rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+      assert (Hshr_le_s : bv_ule SHR s = true).
+      { apply (bv2nat_a_ule_iff Hshr_sz Hs).
+        rewrite (bv2nat_a_shr_subt_one Hs Hn_nat Hlast_s).
+        pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+        pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half.
+        lia. }
+      assert (Hx_val : (bv2nat_a (bv_subt s SHR) = bv2nat_a s - bv2nat_a SHR)%nat)
+        by exact (bv2nat_a_subt_ule Hs Hshr_sz Hshr_le_s).
+      assert (Hxwit_pos : (0 < bv2nat_a (bv_subt s SHR))%nat).
+      { rewrite Hx_val, Hshr_val.
+        pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+        pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half.
+        lia. }
+      assert (Hxwit_ne : bv_subt s SHR <> zeros n).
+      { intro Heq.
+        assert (H0 : bv2nat_a (bv_subt s SHR) = 0%nat).
+        { rewrite Heq. apply bv2nat_a_zeros_eq. }
+        lia. }
+      assert (Hurem_val : (bv2nat_a (bv_urem s (bv_subt s SHR)) = (bv2nat_a s - 1) / 2)%nat).
+      { rewrite (bv2nat_a_urem_nonzero Hs Hxwit_sz Hxwit_ne).
+        rewrite Hx_val, Hshr_val.
+        set (S := bv2nat_a s). set (D := (S - 1) / 2).
+        assert (HD_le_S : (D <= S)%nat).
+        { unfold D. pose proof (Nat.div_mod (S - 1) 2 ltac:(lia)) as Hdiv_half.
+          pose proof (Nat.mod_upper_bound (S - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+        assert (HD_lt_SD : (D < S - D)%nat).
+        { unfold D. pose proof (Nat.div_mod (S - 1) 2 ltac:(lia)) as Hdiv_half.
+          pose proof (Nat.mod_upper_bound (S - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+        apply Nat2Z.inj.
+        rewrite Nat2Z.inj_mod.
+        replace (Z.of_nat S)%Z with (Z.of_nat D + 1 * Z.of_nat (S - D))%Z
+          by (rewrite Nat2Z.inj_sub; [ring | lia]).
+        rewrite Z.mod_add; [| lia].
+        apply Z.mod_small.
+        split; [lia |].
+        exact (proj1 (Nat2Z.inj_lt D (S - D)) HD_lt_SD). }
+      assert (Hurem_eq : bv_urem s (bv_subt s SHR) = SHR).
+      { apply bv2nat_a_inj with (n := n).
+        - exact (bv_urem_size Hs Hxwit_sz).
+        - exact Hshr_sz.
+        - rewrite Hurem_val, Hshr_val. reflexivity. }
+      rewrite Hurem_eq. exact Hsgt_shr.
+    + (* s is non-negative *)
+      assert (Hsge : bv_sge s (zeros n) = true).
+      { rewrite bv_sge_sle_equiv.
+        pose proof (bv_zeros_sle s) as Hzs. rewrite Hs in Hzs.
+        rewrite Hlast_s in Hzs. simpl in Hzs. exact Hzs. }
+      pose proof (H1 Hsge) as Hsgt_s.
+      exists (zeros n). split; [apply zeros_size |].
+      rewrite bv_urem_zeros_s by exact Hs. exact Hsgt_s.
+Qed.
 
 (* (s >=s 0 => s >=s t) /\ ((s <s 0 /\ t >=s 0) => s - t >u t) <=> (exists x, s urem x >=s t) *)
 Theorem bvurem_reverse_sge : forall (n : N) (s t : bitvector),
@@ -4121,6 +4304,254 @@ Theorem bvurem_reverse_sge : forall (n : N) (s t : bitvector),
        bv_ugt (bv_subt s t) t = true)
     ).
 Proof.
-Admitted.
+  intros n s t Hs Ht.
+  destruct (N.eq_dec n 0%N) as [Hn0 | Hn0].
+  { rewrite Hn0 in Hs, Ht.
+    pose proof (size_to_length Hs) as Hls. simpl in Hls. apply length_zero_iff_nil in Hls.
+    pose proof (size_to_length Ht) as Hlt. simpl in Hlt. apply length_zero_iff_nil in Hlt.
+    subst s t. split.
+    - intros _. split.
+      + intros _. vm_compute. reflexivity.
+      + intros [Hc _]. rewrite Hn0 in Hc. vm_compute in Hc. discriminate.
+    - intros _. exists nil. split; [rewrite Hn0; reflexivity |].
+      vm_compute. reflexivity. }
+  assert (Hn_pos : (0 < n)%N) by (destruct n; [contradiction | lia]).
+  assert (Hn_nat : (0 < N.to_nat n)%nat) by (destruct n; [simpl in Hn_pos; lia | simpl; lia]).
+  assert (Hsubt_sz : size (bv_subt s (one n)) = n) by exact (bv_subt_size Hs (one_size n)).
+  assert (Hshr_sz : size (bv_shr (bv_subt s (one n)) (one n)) = n)
+    by exact (bv_shr_size Hsubt_sz (one_size n)).
+  assert (Hlast_shr_pos : last (bv_shr (bv_subt s (one n)) (one n)) false = false).
+  { apply (last_bv_shr_pos Hsubt_sz (one_size n)).
+    rewrite bv2nat_a_one by exact Hn_nat. lia. }
+  split.
+  (* FORWARD *)
+  - intros [x [Hx Heq]].
+    assert (Hurem_sz : size (bv_urem s x) = n) by exact (bv_urem_size Hs Hx).
+    rewrite bv_sge_sle_equiv in Heq.
+    split.
+    + (* s >=s 0 implies s >=s t *)
+      intros Hsge.
+      rewrite bv_sge_sle_equiv.
+      assert (Hlast_s : last s false = false).
+      { rewrite bv_sge_sle_equiv in Hsge.
+        pose proof (bv_zeros_sle s) as Hzs. rewrite Hs in Hzs.
+        rewrite Hsge in Hzs. symmetry in Hzs. apply Bool.negb_true_iff in Hzs. exact Hzs. }
+      assert (Hlast_urem : last (bv_urem s x) false = false)
+        by exact (last_bv_urem_nonneg Hs Hx Hn_pos Hlast_s).
+      assert (Hle : (bv2nat_a (bv_urem s x) <= bv2nat_a s)%nat)
+        by exact (bv2nat_a_urem_le_s Hs Hx).
+      assert (Hule_urem_s : bv_ule (bv_urem s x) s = true).
+      { apply (bv2nat_a_ule_iff Hurem_sz Hs). exact Hle. }
+      assert (Hlast_eq_us : last (bv_urem s x) false = last s false)
+        by (rewrite Hlast_urem, Hlast_s; reflexivity).
+      assert (Hsle_urem_s : bv_sle (bv_urem s x) s = true).
+      { rewrite (bv_sle_ule_same_sign Hurem_sz Hs Hlast_eq_us). exact Hule_urem_s. }
+      exact (bv_sle_trans Heq Hsle_urem_s).
+    + (* s <s 0 /\ t >=s 0 implies s-t >u t *)
+      intros [Hslt Htge].
+      assert (Hlast_s : last s false = true).
+      { pose proof (bv_slt_zeros s) as Hzs. rewrite Hs in Hzs. rewrite Hzs in Hslt. exact Hslt. }
+      assert (Hlast_t : last t false = false).
+      { rewrite bv_sge_sle_equiv in Htge.
+        pose proof (bv_zeros_sle t) as Hzt. rewrite Ht in Hzt.
+        rewrite Htge in Hzt. symmetry in Hzt. apply Bool.negb_true_iff in Hzt. exact Hzt. }
+      (* urem non-negative: 0 <=s t <=s urem => 0 <=s urem *)
+      assert (Hlast_urem : last (bv_urem s x) false = false).
+      { assert (Hzeros_sle_t : bv_sle (zeros n) t = true).
+        { pose proof (bv_zeros_sle t) as H. rewrite Ht in H.
+          rewrite Hlast_t in H. simpl in H. exact H. }
+        pose proof (bv_sle_trans Hzeros_sle_t Heq) as Hzu.
+        pose proof (bv_zeros_sle (bv_urem s x)) as Hz. rewrite Hurem_sz in Hz.
+        rewrite Hzu in Hz. symmetry in Hz. apply Bool.negb_true_iff in Hz. exact Hz. }
+      (* T <= bv2nat_a(urem) from bv_sle t urem and same sign *)
+      assert (HT_le_urem : (bv2nat_a t <= bv2nat_a (bv_urem s x))%nat).
+      { assert (Hlast_eq_tu : last t false = last (bv_urem s x) false)
+          by (rewrite Hlast_t, Hlast_urem; reflexivity).
+        assert (Hule_t_urem : bv_ule t (bv_urem s x) = true).
+        { rewrite <- (bv_sle_ule_same_sign Ht Hurem_sz Hlast_eq_tu). exact Heq. }
+        exact (proj1 (bv2nat_a_ule_iff Ht Hurem_sz) Hule_t_urem). }
+      (* bv2nat_a(urem) <= (S-1)/2: same argument as sgt *)
+      assert (Hs_pos : (0 < bv2nat_a s)%nat).
+      { assert (Hs_ne : s <> zeros n).
+        { intro H. rewrite H in Hlast_s. unfold zeros in Hlast_s.
+          rewrite last_mk_list_false in Hlast_s. discriminate. }
+        destruct (bv2nat_a s) eqn:H0; [| lia].
+        exfalso. apply Hs_ne.
+        apply bv2nat_a_inj with (n := n); [exact Hs | apply zeros_size |].
+        rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+      assert (Hurem_le_half : (bv2nat_a (bv_urem s x) <= (bv2nat_a s - 1) / 2)%nat).
+      { destruct (bv_eq x (zeros n)) eqn:Hxeq.
+        - apply bv_eq_reflect in Hxeq. subst x.
+          rewrite bv_urem_zeros_s in Hlast_urem by exact Hs.
+          rewrite Hlast_s in Hlast_urem. discriminate.
+        - assert (Hxne : x <> zeros n).
+          { intro Heq'. rewrite Heq', bv_eq_refl in Hxeq. discriminate. }
+          rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+          assert (HX_pos : (0 < bv2nat_a x)%nat).
+          { destruct (bv2nat_a x) eqn:H0; [| lia].
+            exfalso. apply Hxne.
+            apply bv2nat_a_inj with (n := n); [exact Hx | apply zeros_size |].
+            rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+          destruct (lt_dec (bv2nat_a s) (bv2nat_a x)) as [HXgS | HXleS].
+          + exfalso.
+            assert (Heq_sv : bv_urem s x = s).
+            { apply bv2nat_a_inj with (n := n).
+              - exact Hurem_sz.
+              - exact Hs.
+              - rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+                apply Nat.mod_small. exact HXgS. }
+            rewrite Heq_sv in Hlast_urem. rewrite Hlast_s in Hlast_urem. discriminate.
+          + assert (HXleS' : (bv2nat_a x <= bv2nat_a s)%nat) by lia.
+            pose proof (Nat.div_mod (bv2nat_a s) (bv2nat_a x) ltac:(lia)) as Hdiv_S.
+            assert (Hq1 : (1 <= bv2nat_a s / bv2nat_a x)%nat).
+            { destruct (bv2nat_a s / bv2nat_a x) as [|q']; [| lia].
+              exfalso. simpl in Hdiv_S.
+              assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+                by (apply Nat.mod_upper_bound; lia). lia. }
+            assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+              by (apply Nat.mod_upper_bound; lia).
+            assert (H2r_lt_S : (2 * (bv2nat_a s mod bv2nat_a x) < bv2nat_a s)%nat) by nia.
+            pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+            pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half.
+            lia. }
+      (* T <= (S-1)/2 *)
+      assert (HT_le_half : (bv2nat_a t <= (bv2nat_a s - 1) / 2)%nat) by lia.
+      (* bv_ule t s from the bound *)
+      assert (HT_le_S : (bv2nat_a t <= bv2nat_a s)%nat).
+      { pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+        pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half.
+        lia. }
+      assert (Hsubt_st_sz : size (bv_subt s t) = n) by exact (bv_subt_size Hs Ht).
+      assert (Hule_t_s : bv_ule t s = true)
+        by exact (proj2 (bv2nat_a_ule_iff Ht Hs) HT_le_S).
+      assert (Hsubt_val : (bv2nat_a (bv_subt s t) = bv2nat_a s - bv2nat_a t)%nat)
+        by exact (bv2nat_a_subt_ule Hs Ht Hule_t_s).
+      (* S - T > T: apply bv_ult_bv_ugt *)
+      apply bv_ult_bv_ugt.
+      rewrite bv_ult_nat; [| rewrite Ht, Hsubt_st_sz; apply N.eqb_refl].
+      apply Nat.ltb_lt. rewrite Hsubt_val.
+      pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+      pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half. lia.
+  (* BACKWARD *)
+  - intros [H1 H2].
+    destruct (last s false) eqn:Hlast_s.
+    + (* s is negative *)
+      assert (Hslt : bv_slt s (zeros n) = true).
+      { pose proof (bv_slt_zeros s) as Hzs. rewrite Hs in Hzs. rewrite Hzs. exact Hlast_s. }
+      destruct (last t false) eqn:Hlast_t.
+      * (* t is negative: witness = one n, urem = zeros n >=s t *)
+        assert (Hone_ne : one n <> zeros n).
+        { intro H. assert (H' : bv2nat_a (one n) = bv2nat_a (zeros n)) by (rewrite H; reflexivity).
+          rewrite bv2nat_a_one, bv2nat_a_zeros_eq in H' by exact Hn_nat. discriminate. }
+        assert (Hurem_one_zeros : bv_urem s (one n) = zeros n).
+        { apply bv2nat_a_inj with (n := n).
+          - exact (bv_urem_size Hs (one_size n)).
+          - apply zeros_size.
+          - rewrite (bv2nat_a_urem_nonzero Hs (one_size n) Hone_ne).
+            rewrite bv2nat_a_one by exact Hn_nat.
+            rewrite bv2nat_a_zeros_eq. apply Nat.mod_1_r. }
+        exists (one n). split; [apply one_size |].
+        rewrite bv_sge_sle_equiv. rewrite Hurem_one_zeros.
+        assert (Hlast_zeros : last (zeros n) false = false)
+          by (unfold zeros; rewrite last_mk_list_false; reflexivity).
+        exact (neg_sle_pos Ht (zeros_size n) Hlast_t Hlast_zeros).
+      * (* t is non-negative: use same witness as sgt *)
+        assert (Htge : bv_sge t (zeros n) = true).
+        { rewrite bv_sge_sle_equiv. pose proof (bv_zeros_sle t) as H. rewrite Ht in H.
+          rewrite Hlast_t in H. simpl in H. exact H. }
+        pose proof (H2 (conj Hslt Htge)) as Hugt.
+        assert (Hult_t_subt : bv_ult t (bv_subt s t) = true)
+          by exact (bv_ugt_bv_ult Hugt).
+        assert (Hsubt_st_sz : size (bv_subt s t) = n) by exact (bv_subt_size Hs Ht).
+        rewrite bv_ult_nat in Hult_t_subt; [| rewrite Ht, Hsubt_st_sz; apply N.eqb_refl].
+        apply Nat.ltb_lt in Hult_t_subt.
+        (* Derive T < S via signed_min bounds *)
+        assert (Hult_t_smin : bv_ult t (signed_min n) = true)
+          by exact (nonneg_ult_signed_min Hn_pos Ht Hlast_t).
+        assert (HT_lt_smin : (bv2nat_a t < bv2nat_a (signed_min n))%nat).
+        { rewrite bv_ult_nat in Hult_t_smin; [| rewrite Ht, signed_min_size; apply N.eqb_refl].
+          apply Nat.ltb_lt. exact Hult_t_smin. }
+        assert (Huge_s_smin : bv_uge s (signed_min n) = true)
+          by exact (bv_msb_implies_uge_signed_min Hs Hn_pos Hlast_s).
+        assert (HS_ge_smin : (bv2nat_a (signed_min n) <= bv2nat_a s)%nat)
+          by exact (proj1 (bv2nat_a_uge_iff Hs (signed_min_size n)) Huge_s_smin).
+        assert (HT_le_S : (bv2nat_a t <= bv2nat_a s)%nat) by lia.
+        assert (Hule_t_s : bv_ule t s = true)
+          by exact (proj2 (bv2nat_a_ule_iff Ht Hs) HT_le_S).
+        assert (Hsubt_val : (bv2nat_a (bv_subt s t) = bv2nat_a s - bv2nat_a t)%nat)
+          by exact (bv2nat_a_subt_ule Hs Ht Hule_t_s).
+        (* T ≤ (S-1)/2 from S - T > T *)
+        rewrite Hsubt_val in Hult_t_subt.
+        assert (Hs_pos : (0 < bv2nat_a s)%nat) by lia.
+        assert (HT_le_half : (bv2nat_a t <= (bv2nat_a s - 1) / 2)%nat).
+        { pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+          pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+        (* Witness: bv_subt s SHR *)
+        assert (Hshr_val : (bv2nat_a (bv_shr (bv_subt s (one n)) (one n)) = (bv2nat_a s - 1) / 2)%nat)
+          by exact (bv2nat_a_shr_subt_one Hs Hn_nat Hlast_s).
+        assert (Hshr_le_s : bv_ule (bv_shr (bv_subt s (one n)) (one n)) s = true).
+        { apply (bv2nat_a_ule_iff Hshr_sz Hs).
+          rewrite (bv2nat_a_shr_subt_one Hs Hn_nat Hlast_s).
+          pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+          pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+        assert (Hxwit_sz : size (bv_subt s (bv_shr (bv_subt s (one n)) (one n))) = n)
+          by exact (bv_subt_size Hs Hshr_sz).
+        exists (bv_subt s (bv_shr (bv_subt s (one n)) (one n))). split; [exact Hxwit_sz |].
+        rewrite bv_sge_sle_equiv.
+        assert (Hx_val : (bv2nat_a (bv_subt s (bv_shr (bv_subt s (one n)) (one n))) =
+                          bv2nat_a s - bv2nat_a (bv_shr (bv_subt s (one n)) (one n)))%nat)
+          by exact (bv2nat_a_subt_ule Hs Hshr_sz Hshr_le_s).
+        assert (Hxwit_pos : (0 < bv2nat_a (bv_subt s (bv_shr (bv_subt s (one n)) (one n))))%nat).
+        { rewrite Hx_val, Hshr_val.
+          pose proof (Nat.div_mod (bv2nat_a s - 1) 2 ltac:(lia)) as Hdiv_half.
+          pose proof (Nat.mod_upper_bound (bv2nat_a s - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+        assert (Hxwit_ne : bv_subt s (bv_shr (bv_subt s (one n)) (one n)) <> zeros n).
+        { intro Heq.
+          assert (H0 : bv2nat_a (bv_subt s (bv_shr (bv_subt s (one n)) (one n))) = 0%nat).
+          { rewrite Heq. apply bv2nat_a_zeros_eq. }
+          lia. }
+        assert (Hurem_val : (bv2nat_a (bv_urem s (bv_subt s (bv_shr (bv_subt s (one n)) (one n)))) =
+                             (bv2nat_a s - 1) / 2)%nat).
+        { rewrite (bv2nat_a_urem_nonzero Hs Hxwit_sz Hxwit_ne).
+          rewrite Hx_val, Hshr_val.
+          set (S := bv2nat_a s). set (D := (S - 1) / 2).
+          assert (HD_le_S : (D <= S)%nat).
+          { unfold D. pose proof (Nat.div_mod (S - 1) 2 ltac:(lia)) as Hdiv_half.
+            pose proof (Nat.mod_upper_bound (S - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+          assert (HD_lt_SD : (D < S - D)%nat).
+          { unfold D. pose proof (Nat.div_mod (S - 1) 2 ltac:(lia)) as Hdiv_half.
+            pose proof (Nat.mod_upper_bound (S - 1) 2 ltac:(lia)) as Hmod_half. lia. }
+          apply Nat2Z.inj.
+          rewrite Nat2Z.inj_mod.
+          replace (Z.of_nat S)%Z with (Z.of_nat D + 1 * Z.of_nat (S - D))%Z
+            by (rewrite Nat2Z.inj_sub; [ring | lia]).
+          rewrite Z.mod_add; [| lia].
+          apply Z.mod_small.
+          split; [lia |].
+          exact (proj1 (Nat2Z.inj_lt D (S - D)) HD_lt_SD). }
+        assert (Hurem_eq : bv_urem s (bv_subt s (bv_shr (bv_subt s (one n)) (one n))) =
+                           bv_shr (bv_subt s (one n)) (one n)).
+        { apply bv2nat_a_inj with (n := n).
+          - exact (bv_urem_size Hs Hxwit_sz).
+          - exact Hshr_sz.
+          - rewrite Hurem_val, Hshr_val. reflexivity. }
+        rewrite Hurem_eq.
+        (* bv_sle t SHR: both non-negative, T <= (S-1)/2 = bv2nat_a SHR *)
+        assert (HT_le_SHR : (bv2nat_a t <= bv2nat_a (bv_shr (bv_subt s (one n)) (one n)))%nat)
+          by (rewrite Hshr_val; exact HT_le_half).
+        assert (Hule_t_shr : bv_ule t (bv_shr (bv_subt s (one n)) (one n)) = true)
+          by exact (proj2 (bv2nat_a_ule_iff Ht Hshr_sz) HT_le_SHR).
+        assert (Hlast_eq_t_shr : last t false = last (bv_shr (bv_subt s (one n)) (one n)) false)
+          by (rewrite Hlast_t, Hlast_shr_pos; reflexivity).
+        rewrite (bv_sle_ule_same_sign Ht Hshr_sz Hlast_eq_t_shr). exact Hule_t_shr.
+    + (* s is non-negative *)
+      assert (Hsge : bv_sge s (zeros n) = true).
+      { rewrite bv_sge_sle_equiv.
+        pose proof (bv_zeros_sle s) as Hzs. rewrite Hs in Hzs.
+        rewrite Hlast_s in Hzs. simpl in Hzs. exact Hzs. }
+      pose proof (H1 Hsge) as Hsge_s_t.
+      exists (zeros n). split; [apply zeros_size |].
+      rewrite bv_urem_zeros_s by exact Hs. exact Hsge_s_t.
+Qed.
 
 (*------------------------------------------------------------*)
