@@ -17137,6 +17137,110 @@ Proof.
   rewrite bv2nat_a_one by exact Hn. reflexivity.
 Qed.
 
+(* Dividing a bitvector by 2 via udiv equals right shift by 1, when n >= 2 *)
+Lemma bv_udiv_neg_eq_shr : forall (n : N) (s : bitvector),
+  size s = n -> (0 < N.to_nat n)%nat -> (2 <= N.to_nat n)%nat ->
+  bv_udiv s (nat2bv 2 n) = bv_shr s (one n).
+Proof.
+  intros n s Hs Hn_pos Hn_ge_2.
+  assert (Hnat2bv2_sz : size (nat2bv 2 n) = n) by apply nat2bv_size.
+  assert (Hnat2bv2_val : (bv2nat_a (nat2bv 2 n) = 2)%nat)
+    by exact (bv2nat_a_nat2bv_two Hn_ge_2).
+  assert (Hnat2bv2_ne : nat2bv 2 n <> zeros n).
+  { intro Heq. apply (f_equal bv2nat_a) in Heq.
+    rewrite Hnat2bv2_val, bv2nat_a_zeros_eq in Heq. discriminate. }
+  assert (Hudiv_val : (bv2nat_a (bv_udiv s (nat2bv 2 n)) = bv2nat_a s / 2)%nat).
+  { rewrite (bv2nat_a_udiv_nonzero Hs Hnat2bv2_sz Hnat2bv2_ne).
+    rewrite Hnat2bv2_val. reflexivity. }
+  assert (Hshr_val : (bv2nat_a (bv_shr s (one n)) = bv2nat_a s / 2)%nat)
+    by exact (bv2nat_a_shr_one Hs Hn_pos).
+  apply bv2nat_a_inj with (n := n).
+  - exact (bv_udiv_size Hs Hnat2bv2_sz).
+  - exact (bv_shr_size Hs (one_size n)).
+  - rewrite Hudiv_val, Hshr_val. reflexivity.
+Qed.
+
+(* When a bitvector has MSB set (s negative in two's complement), its unsigned value is positive *)
+Lemma bv2nat_a_pos_of_neg : forall (n : N) (s : bitvector),
+  size s = n -> last s false = true -> (0 < bv2nat_a s)%nat.
+Proof.
+  intros n s Hs Hlast_s.
+  assert (Hs_ne : s <> zeros n).
+  { intro Heq. rewrite Heq in Hlast_s. unfold zeros in Hlast_s.
+    rewrite last_mk_list_false in Hlast_s. discriminate. }
+  destruct (bv2nat_a s) eqn:H0; [| lia].
+  exfalso. apply Hs_ne.
+  apply bv2nat_a_inj with (n := n); [exact Hs | apply zeros_size |].
+  rewrite H0; symmetry; apply bv2nat_a_zeros_eq.
+Qed.
+
+(* When s is negative (MSB=1), any non-negative urem value r satisfies r <= (bv2nat_a s - 1) / 2 *)
+Lemma bv2nat_a_urem_neg_nonneg_le_half : forall (n : N) (s x : bitvector),
+  size s = n -> size x = n ->
+  last s false = true -> last (bv_urem s x) false = false ->
+  (bv2nat_a (bv_urem s x) <= (bv2nat_a s - 1) / 2)%nat.
+Proof.
+  intros n s x Hs Hx Hlast_s Hlast_urem.
+  assert (Hurem_sz : size (bv_urem s x) = n) by exact (bv_urem_size Hs Hx).
+  destruct (bv_eq x (zeros n)) eqn:Hxeq.
+  - apply bv_eq_reflect in Hxeq. subst x.
+    rewrite bv_urem_zeros_s in Hlast_urem by exact Hs.
+    rewrite Hlast_s in Hlast_urem. discriminate.
+  - assert (Hxne : x <> zeros n).
+    { intro Heq'. rewrite Heq', bv_eq_refl in Hxeq. discriminate. }
+    rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+    assert (HX_pos : (0 < bv2nat_a x)%nat).
+    { destruct (bv2nat_a x) eqn:H0; [| lia].
+      exfalso. apply Hxne.
+      apply bv2nat_a_inj with (n := n); [exact Hx | apply zeros_size |].
+      rewrite H0; symmetry; apply bv2nat_a_zeros_eq. }
+    destruct (lt_dec (bv2nat_a s) (bv2nat_a x)) as [HXgS | HXleS].
+    + exfalso.
+      assert (Heq_sv : bv_urem s x = s).
+      { apply bv2nat_a_inj with (n := n).
+        - exact Hurem_sz.
+        - exact Hs.
+        - rewrite (bv2nat_a_urem_nonzero Hs Hx Hxne).
+          apply Nat.mod_small. exact HXgS. }
+      rewrite Heq_sv in Hlast_urem. rewrite Hlast_s in Hlast_urem. discriminate.
+    + assert (HXleS' : (bv2nat_a x <= bv2nat_a s)%nat) by lia.
+      pose proof (Nat.div_mod (bv2nat_a s) (bv2nat_a x) ltac:(lia)) as Hdiv_S.
+      assert (Hq1 : (1 <= bv2nat_a s / bv2nat_a x)%nat).
+      { destruct (Nat.div (bv2nat_a s) (bv2nat_a x)) as [|q']; [| lia].
+        exfalso. simpl in Hdiv_S.
+        assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+          by (apply Nat.mod_upper_bound; lia). lia. }
+      assert (Hr_lt : (bv2nat_a s mod bv2nat_a x < bv2nat_a x)%nat)
+        by (apply Nat.mod_upper_bound; lia).
+      assert (H2r_lt_S : (2 * (bv2nat_a s mod bv2nat_a x) < bv2nat_a s)%nat) by nia.
+      pose proof (Nat.div_mod (bv2nat_a s - 1)%nat 2%nat ltac:(lia)) as Hdiv_half.
+      pose proof (Nat.mod_upper_bound (bv2nat_a s - 1)%nat 2%nat ltac:(lia)) as Hmod_half.
+      lia.
+Qed.
+
+(* For k > 0: k mod (k - (k-1)/2) = (k-1)/2. Used for the urem backward witness. *)
+Lemma nat_half_mod : forall (k : nat),
+  (0 < k)%nat ->
+  (k mod (k - (k - 1) / 2) = (k - 1) / 2)%nat.
+Proof.
+  intros k Hk_pos.
+  set (D := ((k - 1) / 2)%nat).
+  assert (HD_le_k : (D <= k)%nat).
+  { unfold D. pose proof (Nat.div_mod (k - 1)%nat 2%nat ltac:(lia)) as Hdiv_half.
+    pose proof (Nat.mod_upper_bound (k - 1)%nat 2%nat ltac:(lia)) as Hmod_half. lia. }
+  assert (HD_lt_kD : (D < k - D)%nat).
+  { unfold D. pose proof (Nat.div_mod (k - 1)%nat 2%nat ltac:(lia)) as Hdiv_half.
+    pose proof (Nat.mod_upper_bound (k - 1)%nat 2%nat ltac:(lia)) as Hmod_half. lia. }
+  apply Nat2Z.inj.
+  rewrite Nat2Z.inj_mod.
+  replace (Z.of_nat k)%Z with (Z.of_nat D + 1 * Z.of_nat (k - D)%nat)%Z
+    by (rewrite Nat2Z.inj_sub; [ring | lia]).
+  rewrite Z.mod_add; [| lia].
+  apply Z.mod_small.
+  split; [lia |].
+  exact (proj1 (Nat2Z.inj_lt D (k - D)%nat) HD_lt_kD).
+Qed.
+
 End RAWBITVECTOR_LIST.
 
 Module BITVECTOR_LIST <: BITVECTOR.
