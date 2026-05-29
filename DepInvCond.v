@@ -69,6 +69,27 @@ Proof. intros.
          exists x. split; easy.
 Qed.
 
+
+(* ~(-t) & s <s t <=> (exists x, x & s <s t) *)
+Theorem bvand_slt : forall (n : N), forall (s t : bitvector n),
+  iff
+    ((bv_slt (bv_and (bv_not (bv_neg t)) s) t) = true) 
+    (exists (x : bitvector n), (bv_slt (bv_and x s) t) = true).
+Proof. intros.
+       destruct s as (s, Hs).
+       destruct t as (t, Ht).
+       unfold bv_and, bv_slt, bv in *. cbn in *.
+       specialize (bvand_slt n s t Hs Ht); intros.
+       destruct H as (H, Ha).
+       split; intros.
+       + unfold bv_not in H0. specialize (H H0).
+         destruct H as (x, (Hx, p)).
+          exists (@MkBitvector n x Hx). apply p.
+       + apply Ha. destruct H0 as ((x, Hx), H0).
+         now exists x.
+Qed.
+
+
 (*------------------------------------------------------------*)
 
 
