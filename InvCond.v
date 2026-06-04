@@ -3066,7 +3066,7 @@ Qed.
 (*-----------------------Division 2---------------------------*)
 
 (* n = 1 -> s & t = 0 ; otherwise True <=> (exists x, s /u x != t) *)
-Theorem bvudiv_reverse_neq : forall (n : N) (s t : bitvector),
+Theorem bvudiv_neq2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_eq (bv_udiv s x) t = false)
@@ -3146,7 +3146,7 @@ Qed.
 
 (* n = 1 -> s >s t ; n != 1 -> ( (s >=s 0 => s >s t) /\ (s <s 0 => (s >> 1) >s t) ) 
    <=> (exists x, s /u x >s t) *)
-Theorem bvudiv_reverse_sgt : forall (n : N) (s t : bitvector),
+Theorem bvudiv_sgt2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sgt (bv_udiv s x) t = true)
@@ -3263,7 +3263,7 @@ Proof.
 Qed.
 
 (* (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) <=> (exists x, s /u x >=s t) *)
-Theorem bvudiv_reverse_sge : forall (n : N) (s t : bitvector),
+Theorem bvudiv_sge2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sge (bv_udiv s x) t = true)
@@ -3856,7 +3856,7 @@ Qed.
 (*-----------------------Remainder 2--------------------------*)
  
 (* (t + t - s) & s >=u t <=> (exists x, s urem x = t) *)
-Theorem bvurem_reverse_eq : forall (n : N) (s t : bitvector),
+Theorem bvurem_eq2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_eq (bv_urem s x) t = true)
@@ -4007,7 +4007,7 @@ Qed.
 
 
 (* (s >=s 0 => s >s t) /\ (s <s 0 => ((s - 1) >> 1) >s t) <=> (exists x, s urem x >s t) *)
-Theorem bvurem_reverse_sgt : forall (n : N) (s t : bitvector),
+Theorem bvurem_sgt2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sgt (bv_urem s x) t = true)
@@ -4135,7 +4135,7 @@ Proof.
 Qed.
 
 (* (s >=s 0 => s >=s t) /\ ((s <s 0 /\ t >=s 0) => s - t >u t) <=> (exists x, s urem x >=s t) *)
-Theorem bvurem_reverse_sge : forall (n : N) (s t : bitvector),
+Theorem bvurem_sge2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
     (exists (x : bitvector), size x = n /\ bv_sge (bv_urem s x) t = true)
