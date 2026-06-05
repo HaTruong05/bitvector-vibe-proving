@@ -3262,7 +3262,8 @@ Proof.
   }
 Qed.
 
-(* (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) <=> (exists x, s /u x >=s t) *)
+(* n=1 -> s >=s t ; n!=1 -> (s >=s 0 => s >=s t) /\ (s <s 0 => s >> 1 >=s t) 
+  <=> (exists x, s /u x >=s t) *)
 Theorem bvudiv_sge2 : forall (n : N) (s t : bitvector),
   size s = n -> size t = n ->
   iff
