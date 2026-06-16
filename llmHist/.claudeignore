@@ -1,0 +1,28 @@
+# Coq build artifacts
+
+_.vo
+_.vok
+_.vos
+_.glob
+\*.crashcoqide
+Makefile
+Makefile.conf
+.coqdeps.d
+
+# Others
+
+README.md
+textProofs
+Reconstr.v
+DepInvCond.v
+BVListWorkbench.v
+coqPractice.v
+Notes.md
+INSTALL.md
+bitvector_README.md
+LICENSE
+\_CoqProject
+conventions
+coq_claude_loop.py
+convo.jsonl
+convo.md

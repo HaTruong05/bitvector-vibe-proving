@@ -1,0 +1,2 @@
+- [Project status](project_status.md) — bvmult signed IC group complete; all Admitted removed
+- [Proof patterns](proof_patterns.md) — key tactics and gotchas for this codebase

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make*)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(ls*)",
+      "Bash(awk *)",
+      "Bash(coqc *)",
+      "Bash(cat:*)",
+      "Bash(opam:*)",
+      "Bash(coqtop *)",
+      "Bash(find *)",
+      "Read(//usr/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(grep * | *)",
+      "Bash(make* | *)",
+      "Bash(find * | *)",
+      "Bash(grep -n \"div_le\" /root/.opam/default/lib/coq/theories/Arith/PeanoNat.v 2>/dev/null | head -20 || grep -rn \"div_le\" ~/.opam/default/lib/coq/theories/Arith/ 2>/dev/null | head -20)",
+      "Read(//root/.opam/default/lib/coq/theories/Arith/**)",
+      "Bash(python3 -)"
+    ],
+    "additionalDirectories": ["/tmp", "/home/hakull245/bitvector-vibe-proving"]
+  }
+}
