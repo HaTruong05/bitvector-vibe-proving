@@ -1057,7 +1057,7 @@ Proof. intros.
 Qed.
 
 (* (exists x, s /u x != t) <=> n=1 -> (s & t = 0) else 0 < n *)
-Theorem bvudiv_reverse_neq : forall (n : N), forall (s t : bitvector n),
+Theorem bvudiv_neq2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_eq (bv_udiv s x) t = false)
     (if N.eq_dec n 1 then
@@ -1067,7 +1067,7 @@ Theorem bvudiv_reverse_neq : forall (n : N), forall (s t : bitvector n),
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_udiv, bv_and, bv_eq, bv in *. cbn in *.
-  specialize (InvCond.bvudiv_reverse_neq n s t Hs Ht); intros H.
+  specialize (InvCond.bvudiv_neq2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
@@ -1075,7 +1075,7 @@ Proof. intros.
 Qed.
 
 (* (exists x, s /u x >s t) <=> n=1 -> s >s t else ... *)
-Theorem bvudiv_reverse_sgt : forall (n : N), forall (s t : bitvector n),
+Theorem bvudiv_sgt2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_sgt (bv_udiv s x) t = true)
     (if N.eq_dec n 1 then
@@ -1086,7 +1086,7 @@ Theorem bvudiv_reverse_sgt : forall (n : N), forall (s t : bitvector n),
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_udiv, bv_sgt, bv_sge, bv_slt, bv_shr, bv in *. cbn in *.
-  specialize (InvCond.bvudiv_reverse_sgt n s t Hs Ht); intros H.
+  specialize (InvCond.bvudiv_sgt2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
@@ -1094,7 +1094,7 @@ Proof. intros.
 Qed.
 
 (* (exists x, s /u x >=s t) <=> n=1 -> s >=s t else ... *)
-Theorem bvudiv_reverse_sge : forall (n : N), forall (s t : bitvector n),
+Theorem bvudiv_sge2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_sge (bv_udiv s x) t = true)
     (if N.eq_dec n 1 then
@@ -1105,7 +1105,7 @@ Theorem bvudiv_reverse_sge : forall (n : N), forall (s t : bitvector n),
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_udiv, bv_sge, bv_slt, bv_shr, bv in *. cbn in *.
-  specialize (InvCond.bvudiv_reverse_sge n s t Hs Ht); intros H.
+  specialize (InvCond.bvudiv_sge2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
@@ -1145,14 +1145,14 @@ Proof. intros.
 Qed.
 
 (* (exists x, s % x = t) <=> (2t - s) & s >=u t *)
-Theorem bvurem_reverse_eq : forall (n : N), forall (s t : bitvector n),
+Theorem bvurem_eq2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_eq (bv_urem s x) t = true)
     (bv_uge (bv_and (bv_subt (bv_add t t) s) s) t = true).
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_urem, bv_eq, bv_uge, bv_and, bv_subt, bv_add, bv in *. cbn in *.
-  specialize (InvCond.bvurem_reverse_eq n s t Hs Ht); intros H.
+  specialize (InvCond.bvurem_eq2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
@@ -1160,7 +1160,7 @@ Proof. intros.
 Qed.
 
 (* (exists x, s % x >s t) <=> (s >=s 0 -> s >s t) /\ (s <s 0 -> (s-1)/2 >s t) *)
-Theorem bvurem_reverse_sgt : forall (n : N), forall (s t : bitvector n),
+Theorem bvurem_sgt2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_sgt (bv_urem s x) t = true)
     ((bv_sge s (zeros n) = true -> bv_sgt s t = true) /\
@@ -1168,7 +1168,7 @@ Theorem bvurem_reverse_sgt : forall (n : N), forall (s t : bitvector n),
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_urem, bv_sgt, bv_sge, bv_slt, bv_shr, bv_subt, bv in *. cbn in *.
-  specialize (InvCond.bvurem_reverse_sgt n s t Hs Ht); intros H.
+  specialize (InvCond.bvurem_sgt2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
@@ -1176,7 +1176,7 @@ Proof. intros.
 Qed.
 
 (* (exists x, s % x >=s t) <=> (s >=s 0 -> s >=s t) /\ (s <s 0 /\ t >=s 0 -> s-t >u t) *)
-Theorem bvurem_reverse_sge : forall (n : N), forall (s t : bitvector n),
+Theorem bvurem_sge2 : forall (n : N), forall (s t : bitvector n),
   iff
     (exists (x : bitvector n), bv_sge (bv_urem s x) t = true)
     ((bv_sge s (zeros n) = true -> bv_sge s t = true) /\
@@ -1185,7 +1185,7 @@ Theorem bvurem_reverse_sge : forall (n : N), forall (s t : bitvector n),
 Proof. intros.
   destruct s as (s, Hs). destruct t as (t, Ht).
   unfold bv_urem, bv_sge, bv_slt, bv_ugt, bv_subt, zeros, bv in *. cbn in *.
-  specialize (InvCond.bvurem_reverse_sge n s t Hs Ht); intros H.
+  specialize (InvCond.bvurem_sge2 n s t Hs Ht); intros H.
   destruct H as (Hfwd, Hbwd). split; intros H0.
   + destruct H0 as ((x, Hx), H0). apply Hfwd. exists x. split; easy.
   + apply Hbwd in H0. destruct H0 as (x, (Hx, p)).
