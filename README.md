@@ -12,6 +12,16 @@ recostruction tactics of the [Coqhammer](https://github.com/lukaszcz/coqhammer) 
 However, one does not need to install Coqhammer to be able to compile the library,
 since all such tactics are in `Reconstr.v`.
 
+Some of the proofs were generated using assistance from the Google Gemini 
+large language model (LLM) and many others using assistance from 
+the Claude Code LLM. Unfortunately, we weren't able to recover chat logs for 
+our interactions with Gemini, since the platform's data retention period of three 
+months had already expired by the time we were preparing this directory.
+
+The `llmHist` directory contains all the files that were either necessary or a 
+by-produce of using Claude Code. The directory also contains a `README.md` file 
+that explains the structure of the directory.
+
 Compilation requires Coq version 8.20.0. To compile, run in `root`:
 1. `coq_makefile -f _CoqProject -o Makefile`
 2. `make`
