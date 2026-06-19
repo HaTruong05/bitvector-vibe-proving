@@ -9,8 +9,7 @@ library) with the raw bit-vector module.
 
 Many of the proofs in `BVList.v` and `InvCond.v` benefit from the
 recostruction tactics of the [Coqhammer](https://github.com/lukaszcz/coqhammer) tool.
-However, one does not need to install Coqhammer to be able to compile the library,
-since all such tactics are in `Reconstr.v`.
+`Reconstr.v` defines some tactics locally to make it easier to use CoqHammer.
 
 Some of the proofs were generated using assistance from the Google Gemini 
 large language model (LLM) and many others using assistance from 
