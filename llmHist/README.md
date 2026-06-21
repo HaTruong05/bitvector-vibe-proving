@@ -1,6 +1,6 @@
 # llmHist — LLM Artifacts for Bit-Vector Invertibility Condition Verification
 
-This directory archives the artifacts produced by working with **Claude Code** (Anthropic's AI coding assistant) to formally verify CVC5's bit-vector invertibility conditions in Coq 8.20.0. It is included alongside the proof source to document the LLM-assisted development process for reproducibility and research purposes.
+This directory archives the artifacts produced by working with **Claude Code** (Anthropic's AI coding assistant) to formally verify cvc5's bit-vector invertibility conditions in Coq 8.20.0. It is included alongside the proof source to document the LLM-assisted development process for reproducibility and research purposes.
 
 **Total proof time:** 40 hours, 7 minutes, 14 seconds  
 **Average per proof:** 2 hours, 13 minutes, 44 seconds
@@ -9,7 +9,7 @@ This directory archives the artifacts produced by working with **Claude Code** (
 
 ## Project Background
 
-The proofs in this repository establish correctness of bit-vector *invertibility conditions* — predicates of the form `(∃x. f(x) op t) ↔ g(s, t)` over fixed-width bit-vectors — as used by the CVC5 SMT solver (Niemetz et al.). The two core files are:
+The proofs in this repository establish correctness of bit-vector *invertibility conditions* — predicates of the form `(∃x. f(x) op t) ↔ g(s, t)` over fixed-width bit-vectors — as used by the cvc5 SMT solver (Niemetz et al.). The core files are:
 
 - `BVList.v` — the bit-vector library (~14k lines); helper lemmas live here.
 - `InvCond.v` — the invertibility condition proofs.
