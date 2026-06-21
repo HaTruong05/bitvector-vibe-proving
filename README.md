@@ -1,4 +1,4 @@
-# Bit-Vector Invertibility Condition Proofs in Rocq
+# LLM-Assisted Formal Verification of Bit-vector Invertibility Conditions in Rocq
 
 ## Repository Contents
 
@@ -88,6 +88,16 @@ that explains the structure of the directory.
 [bvurem_eq2](InvCond.v#L3860),
 [bvurem_sgt2](InvCond.v#L4011),
 [bvurem_sge2](InvCond.v#L4139)
+
+## New Library Additions
+
+Three new operators were defined in `BVList.v` to support the new invertibility equivalence proofs:
+
+| Definition                   | Description                                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`bv_udiv`](BVList.v#L4773)  | Unsigned division over raw bitvectors                                                                                         |
+| [`bv_urem`](BVList.v#L4784)  | Unsigned remainder over raw bitvectors                                                                                        |
+| [`sbv2int`](BVList.v#L11156) | Signed bitvector-to-integer interpretation (Z-valued); used throughout the signed-comparison invertibility equivalence proofs |
 
 ## Building
 
