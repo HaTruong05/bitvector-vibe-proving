@@ -91,13 +91,17 @@ that explains the structure of the directory.
 
 ## New Library Additions
 
-Three new operators were defined in `BVList.v` to support the new invertibility equivalence proofs:
+The following definitions were added to `BVList.v` to support the new invertibility equivalence proofs:
 
-| Definition                   | Description                                                                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [`bv_udiv`](BVList.v#L4773)  | Unsigned division over raw bitvectors                                                                                         |
-| [`bv_urem`](BVList.v#L4784)  | Unsigned remainder over raw bitvectors                                                                                        |
-| [`sbv2int`](BVList.v#L11156) | Signed bitvector-to-integer interpretation (Z-valued); used throughout the signed-comparison invertibility equivalence proofs |
+| Definition                   | Description                                             |
+| ---------------------------- | ------------------------------------------------------- |
+| [`bv_sle`](BVList.v#L1199)   | Signed less-than-or-equal                               |
+| [`bv_sgt`](BVList.v#L1251)   | Signed greater-than                                     |
+| [`bv_sge`](BVList.v#L6347)   | Signed greater-than-or-equal                            |
+| [`bv_udiv`](BVList.v#L4773)  | Unsigned division                                       |
+| [`bv_urem`](BVList.v#L4784)  | Unsigned remainder                                      |
+| [`bv2int`](BVList.v#L10167)  | Unsigned bitvector-to-integer interpretation (Z-valued) |
+| [`sbv2int`](BVList.v#L11156) | Signed bitvector-to-integer interpretation (Z-valued)   |
 
 ## Building
 
